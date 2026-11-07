@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+.fintech-gradient {
+  background: linear-gradient(135deg, #0052FF 0%, #4F46E5 50%, #7C3AED 100%);
+}
+
+.glow-blue {
+  box-shadow: 0 0 25px -5px rgba(0, 82, 255, 0.4);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.4);
+}
+
+.glass-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+

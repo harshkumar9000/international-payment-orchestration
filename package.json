@@ -1,0 +1,33 @@
+{
+  "name": "international-payment-orchestration",
+  "version": "1.0.0",
+  "description": "Multi-rail intelligent international payment orchestration platform with smart routing, AI fraud detection, currency conversion, and automated decline recovery.",
+  "scripts": {
+    "setup": "npm --prefix backend install && npm --prefix frontend install",
+    "seed": "npm --prefix backend run seed",
+    "test": "npm run test:python && npm run test:backend",
+    "test:python": "python3 -m unittest intelligence_service/test_intelligence.py",
+    "test:backend": "npm --prefix backend test",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:python": "python3 -m uvicorn intelligence_service.main:app --port 8000 --reload",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start"
+  },
+  "keywords": [
+    "fintech",
+    "payment-orchestration",
+    "smart-routing",
+    "fraud-detection",
+    "fastapi",
+    "express",
+    "react",
+    "vite",
+    "paypal",
+    "upi",
+    "stripe"
+  ],
+  "author": "Harsh Kumar",
+  "license": "MIT"
+}
+

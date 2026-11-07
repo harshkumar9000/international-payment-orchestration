@@ -1,0 +1,24 @@
+{
+  "name": "international-payment-orchestration-backend",
+  "version": "1.0.0",
+  "description": "Backend API and Orchestration Engine for International Payment Platform",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/db/seed.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {}
+}
+
