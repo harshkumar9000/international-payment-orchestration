@@ -8,14 +8,26 @@ export default {
   theme: {
     extend: {
       colors: {
-        fintech: {
-          blue: '#0052FF',
-          dark: '#0A0E17',
-          cardDark: '#121826',
+        atlas: {
+          navy: '#111827',
+          teal: '#14B8A6',
+          mint: '#D1FAE5',
+          amber: '#F59E0B',
+          bg: '#F8FAFC',
+          white: '#FFFFFF',
+          cardDark: '#1E293B',
           cardLight: '#FFFFFF',
-          borderDark: '#1F293D',
+          borderDark: '#334155',
+          borderLight: '#E2E8F0'
+        },
+        fintech: {
+          blue: '#14B8A6', // Accent teal
+          dark: '#111827',
+          cardDark: '#1E293B',
+          cardLight: '#FFFFFF',
+          borderDark: '#334155',
           borderLight: '#E2E8F0',
-          accent: '#10B981',
+          accent: '#14B8A6',
           gold: '#F59E0B',
           purple: '#6366F1'
         }

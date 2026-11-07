@@ -5,6 +5,7 @@
   "scripts": {
     "setup": "npm --prefix backend install && npm --prefix frontend install",
     "seed": "npm --prefix backend run seed",
+    "dev": "concurrently -n \"intelligence,backend,frontend\" -c \"magenta,cyan,green\" \"npm run dev:python\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "test": "npm run test:python && npm run test:backend",
     "test:python": "python3 -m unittest intelligence_service/test_intelligence.py",
     "test:backend": "npm --prefix backend test",
@@ -28,6 +29,8 @@
     "stripe"
   ],
   "author": "Harsh Kumar",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
 }
-

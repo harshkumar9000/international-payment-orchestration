@@ -425,6 +425,169 @@ async function seed() {
     }
   }
 
+  // 5. Student & Under-18 Profiles
+  const studentProfiles = [
+    {
+      id: 'stu_aarav_sharma_01',
+      user_id: 'usr_aarav_01',
+      email: 'aarav.student@delhiuniversity.ac.in',
+      student_name: 'Aarav Sharma',
+      date_of_birth: '2008-05-15',
+      is_minor: true,
+      institution_name: 'Delhi Public School / Global Scholars Program',
+      student_id_number: 'DPS-2024-9842',
+      guardian_id: 'guard_priya_sharma_01',
+      guardian_email: 'priya.sharma@parent.in',
+      guardian_name: 'Priya Sharma (Parent/Guardian)',
+      guardian_consent_status: 'ACTIVE',
+      daily_limit: 100.00,
+      weekly_limit: 400.00,
+      monthly_limit: 1200.00,
+      single_tx_limit: 250.00,
+      auto_approval_threshold: 50.00,
+      whitelisted_mccs: JSON.stringify(['education_higher_ed', 'online_courses', 'books_study_materials', 'software_tools', 'standardized_testing']),
+      created_at: new Date(now - 60 * 24 * 3600 * 1000).toISOString()
+    },
+    {
+      id: 'stu_elena_02',
+      user_id: 'usr_elena_02',
+      email: 'elena.rostova@oxford.ac.uk',
+      student_name: 'Elena Rostova',
+      date_of_birth: '2005-09-12',
+      is_minor: false,
+      institution_name: 'University of Oxford',
+      student_id_number: 'OX-2023-4122',
+      guardian_id: 'guard_dmitri_02',
+      guardian_email: 'dmitri.rostov@family.co.uk',
+      guardian_name: 'Dmitri Rostov',
+      guardian_consent_status: 'ACTIVE',
+      daily_limit: 500.00,
+      weekly_limit: 2000.00,
+      monthly_limit: 5000.00,
+      single_tx_limit: 1000.00,
+      auto_approval_threshold: 200.00,
+      whitelisted_mccs: JSON.stringify(['education_higher_ed', 'online_courses', 'software_tools']),
+      created_at: new Date(now - 90 * 24 * 3600 * 1000).toISOString()
+    }
+  ];
+
+  for (const stu of studentProfiles) {
+    await db.table('student_profiles').insert(stu);
+  }
+  console.log(`  -> Inserted ${studentProfiles.length} student profiles.`);
+
+  // 6. Guardian Approval Requests
+  const guardianApprovals = [
+    {
+      id: 'appr_pending_coursera_01',
+      transaction_id: 'tx_student_pending_01',
+      student_id: 'stu_aarav_sharma_01',
+      guardian_id: 'guard_priya_sharma_01',
+      amount: 79.00,
+      currency: 'USD',
+      merchant_name: 'Coursera Deep Learning Specialization',
+      merchant_category: 'online_courses',
+      purpose_description: 'Stanford AI & Machine Learning Specialization Certificate (Exceeds $50 auto-allowance)',
+      status: 'PENDING',
+      decision_reason: null,
+      requested_at: new Date(now - 25 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'appr_approved_gre_02',
+      transaction_id: 'tx_student_gre_02',
+      student_id: 'stu_aarav_sharma_01',
+      guardian_id: 'guard_priya_sharma_01',
+      amount: 220.00,
+      currency: 'USD',
+      merchant_name: 'Educational Testing Service (ETS) - GRE Exam',
+      merchant_category: 'standardized_testing',
+      purpose_description: 'GRE General Test Registration Fee',
+      status: 'APPROVED',
+      decision_reason: 'Approved by Priya Sharma via Parent Mobile Portal.',
+      requested_at: new Date(now - 3 * 24 * 3600 * 1000).toISOString(),
+      decided_at: new Date(now - 3 * 24 * 3600 * 1000 + 400000).toISOString()
+    }
+  ];
+
+  for (const appr of guardianApprovals) {
+    await db.table('guardian_approvals').insert(appr);
+  }
+  console.log(`  -> Inserted ${guardianApprovals.length} guardian approvals.`);
+
+  // 7. Stuck Transactions & Seeded Refunds for Agentic Engine
+  const stuckTxs = [
+    {
+      id: 'tx_stuck_orphaned_01',
+      merchant_id: demoMerchant.id,
+      amount: 89.00,
+      currency: 'USD',
+      customer_amount: 89.00,
+      customer_currency: 'USD',
+      exchange_rate: 1.0,
+      customer_email: 'anita.desai@mumbai.in',
+      customer_country: 'IN',
+      payment_method: 'credit_card',
+      primary_provider: 'stripe',
+      executed_provider: 'stripe',
+      status: 'failed',
+      risk_score: 18,
+      risk_level: 'LOW',
+      decline_code: 'network_timeout_after_capture',
+      decline_reason: 'Stuck Transaction: Card was debited at gateway but merchant webhook timed out. Eligible for automated agentic refund.',
+      fee_charged: 0.00,
+      latency_ms: 3200,
+      metadata_json: JSON.stringify({ order_id: 'ORD-STUCK-891', stuck_type: 'ORPHANED_CAPTURE' }),
+      created_at: new Date(now - 15 * 60 * 1000).toISOString()
+    },
+    {
+      id: 'tx_high_val_tuition_02',
+      merchant_id: demoMerchant.id,
+      amount: 850.00,
+      currency: 'USD',
+      customer_amount: 850.00,
+      customer_currency: 'USD',
+      exchange_rate: 1.0,
+      customer_email: 'rohan.mehta@delhi.ac.in',
+      customer_country: 'IN',
+      payment_method: 'credit_card',
+      primary_provider: 'adyen',
+      executed_provider: 'adyen',
+      status: 'failed',
+      risk_score: 42,
+      risk_level: 'MEDIUM',
+      decline_code: 'service_cancellation_dispute',
+      decline_reason: 'High-Value Course Tuition: Exceeds $500 threshold. Queued for human compliance officer review.',
+      fee_charged: 0.00,
+      latency_ms: 420,
+      metadata_json: JSON.stringify({ order_id: 'ORD-TUITION-99', high_value: true }),
+      created_at: new Date(now - 40 * 60 * 1000).toISOString()
+    }
+  ];
+
+  for (const st of stuckTxs) {
+    await db.table('transactions').insert(st);
+  }
+
+  // Pre-seed an existing settled refund to test idempotency
+  await db.table('refund_records').insert({
+    id: 'ref_demo_settled_01',
+    transaction_id: 'tx_demo_009',
+    amount: 275.00,
+    currency: 'USD',
+    provider: 'stripe',
+    provider_refund_id: 're_stripe_89123891',
+    reason_code: 'AUTONOMOUS_REFUND_AUTHORIZED',
+    reason_description: 'Automated agent refund for duplicate charge attempt.',
+    status: 'SETTLED',
+    idempotency_key: 'idem_tx_demo_009_275_USD',
+    agent_evaluated: true,
+    agent_confidence_score: 0.99,
+    customer_notified: true,
+    initiated_by: 'AI_AGENT_AUTONOMOUS',
+    created_at: new Date(now - 120 * 60 * 1000).toISOString()
+  });
+
+  console.log(`  -> Inserted stuck transactions and agentic refund seed records.`);
   console.log(`  -> Inserted ${sampleTransactions.length} sample transactions and audit records.`);
   console.log('✅ Database seed completed successfully!');
 }

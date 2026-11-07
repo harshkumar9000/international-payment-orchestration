@@ -94,6 +94,38 @@ export const api = {
     retry: (id) => request(`/recovery/retry/${id}`, { method: 'POST' })
   },
 
+  // Domestic Card & UPI International
+  domesticCard: {
+    checkEligibility: (payload) => request('/domestic-card/check-eligibility', { method: 'POST', body: payload }),
+    getSupportedRails: () => request('/domestic-card/supported-rails'),
+    calculateTcs: (payload) => request('/domestic-card/tcs-calculator', { method: 'POST', body: payload })
+  },
+
+  // Agentic Refund & Autonomous Recovery
+  agenticRefund: {
+    analyze: (txId, reason) => request(`/agentic-refund/analyze/${txId}`, { method: 'POST', body: { reason } }),
+    execute: (txId, reason, overrideByHuman = false) => request(`/agentic-refund/execute/${txId}`, { method: 'POST', body: { reason, overrideByHuman } }),
+    getHistory: () => request('/agentic-refund/history'),
+    getApprovalsQueue: () => request('/agentic-refund/approvals-queue'),
+    approveManual: (refundId) => request(`/agentic-refund/approve-manual/${refundId}`, { method: 'POST' })
+  },
+
+  // Student & Under-18 Management
+  student: {
+    getProfile: (studentId) => request(`/student/profile${studentId ? `?student_id=${studentId}` : ''}`),
+    verifyIntent: (payload) => request('/student/verify-intent', { method: 'POST', body: payload }),
+    updateLimits: (limits) => request('/student/limits', { method: 'PUT', body: limits }),
+    getCategories: () => request('/student/categories')
+  },
+
+  // Parent / Guardian Approval Portal
+  guardian: {
+    getPendingApprovals: (guardianId) => request(`/guardian/pending-approvals${guardianId ? `?guardian_id=${guardianId}` : ''}`),
+    approve: (id, reason) => request(`/guardian/approve/${id}`, { method: 'POST', body: { reason } }),
+    reject: (id, reason) => request(`/guardian/reject/${id}`, { method: 'POST', body: { reason } }),
+    getOverview: (guardianId) => request(`/guardian/overview${guardianId ? `?guardian_id=${guardianId}` : ''}`)
+  },
+
   // Transactions
   transactions: {
     list: (params = {}) => {

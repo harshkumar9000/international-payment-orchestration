@@ -8,6 +8,8 @@ const currencyService = require('../services/currency.service');
 const routingEngine = require('../services/routingEngine.service');
 const pythonBridge = require('../services/pythonBridge.service');
 const recoveryEngine = require('../services/recoveryEngine.service');
+const domesticCardService = require('../services/domesticCard.service');
+const studentPaymentService = require('../services/studentPayment.service');
 const { getProvider } = require('../services/paymentProviders');
 
 // POST /initiate (Prepares international checkout session)
@@ -21,10 +23,58 @@ router.post('/initiate', optionalAuth, async (req, res) => {
       payment_method = 'credit_card',
       ip_country = 'US',
       ip_address = '127.0.0.1',
-      is_vpn = false
+      is_vpn = false,
+      card_bin = null,
+      is_student_payment = false,
+      student_id = null,
+      merchant_category = 'general_ecommerce',
+      merchant_name = 'Atlas Global Commerce'
     } = req.body;
 
     const merchantId = req.merchant ? req.merchant.id : 'mer_demo_orchestration_01';
+
+    // 0. Domestic Instrument (RuPay / Domestic Card) Check
+    if (payment_method === 'rupay_card' || card_bin?.startsWith('60') || card_bin?.startsWith('65')) {
+      const domesticCheck = await domesticCardService.checkEligibility({
+        payment_method: payment_method,
+        bin: card_bin || '6521',
+        currency: currency,
+        merchant_country: customer_country,
+        amount_usd: parseFloat(amount),
+        is_educational: Boolean(is_student_payment)
+      });
+
+      if (!domesticCheck.eligible) {
+        return res.status(400).json({
+          error: domesticCheck.rejection_reason || 'Domestic instrument not eligible for cross-border transactions.',
+          domestic_check: domesticCheck
+        });
+      }
+    }
+
+    // 0b. Student & Minor Payment Intent Evaluation
+    let studentVerification = null;
+    let requiresParentApproval = false;
+    if (is_student_payment) {
+      const studentRes = await studentPaymentService.verifyStudentIntent(student_id || customer_email, {
+        amount: parseFloat(amount),
+        currency: currency.toUpperCase(),
+        merchant_category: merchant_category,
+        merchant_name: merchant_name
+      });
+      studentVerification = studentRes.verification || studentRes;
+
+      if (studentVerification.status === 'BLOCKED') {
+        return res.status(403).json({
+          error: studentVerification.reason || 'Transaction blocked by student protection guardrails.',
+          student_verification: studentVerification
+        });
+      }
+
+      if (studentVerification.status === 'PENDING_APPROVAL') {
+        requiresParentApproval = true;
+      }
+    }
 
     // 1. Check Corridor Compatibility & Sanctions
     const compCheck = compatibilityService.checkCompatibility(customer_country, currency, amount);
@@ -109,7 +159,24 @@ router.post('/initiate', optionalAuth, async (req, res) => {
       });
     }
 
-    // Create initiated transaction
+    // Create initiated transaction (or pending parent approval if student limit triggered)
+    const initialStatus = requiresParentApproval ? 'pending_parent_approval' : 'initiated';
+
+    let guardianApproval = null;
+    if (requiresParentApproval) {
+      guardianApproval = await studentPaymentService.requestGuardianApproval(
+        student_id || customer_email,
+        transactionId,
+        {
+          amount: parseFloat(amount),
+          currency: currency.toUpperCase(),
+          merchant_name: merchant_name,
+          merchant_category: merchant_category,
+          purpose_description: `Educational checkout on ${merchant_name}`
+        }
+      );
+    }
+
     const initialTx = {
       id: transactionId,
       merchant_id: merchantId,
@@ -123,16 +190,19 @@ router.post('/initiate', optionalAuth, async (req, res) => {
       payment_method: payment_method,
       primary_provider: routeDecision.primary_provider,
       executed_provider: routeDecision.primary_provider,
-      status: 'initiated',
+      status: initialStatus,
       risk_score: fraudAssessment.risk_score,
       risk_level: fraudAssessment.risk_level,
       decline_code: null,
-      decline_reason: null,
+      decline_reason: requiresParentApproval ? 'Payment held awaiting parent/guardian approval.' : null,
       fee_charged: 0.0,
       latency_ms: 0,
       metadata_json: JSON.stringify({
         cascade_options: routeDecision.cascade_fallback_order,
-        applied_rule: routeDecision.applied_rule
+        applied_rule: routeDecision.applied_rule,
+        is_student_payment: Boolean(is_student_payment),
+        student_id: student_id,
+        guardian_approval_id: guardianApproval ? guardianApproval.id : null
       }),
       created_at: new Date().toISOString()
     };
@@ -152,11 +222,14 @@ router.post('/initiate', optionalAuth, async (req, res) => {
     res.json({
       session_id: transactionId,
       transaction_id: transactionId,
+      status: initialStatus,
       corridor: compCheck,
       conversion: conversion,
       fraud_assessment: fraudAssessment,
       routing: routeDecision,
-      payment_methods: compCheck.compatible_methods
+      payment_methods: compCheck.compatible_methods,
+      student_verification: studentVerification,
+      guardian_approval: guardianApproval
     });
   } catch (err) {
     console.error('[Checkout Initiate Error]:', err);

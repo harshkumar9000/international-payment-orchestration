@@ -26,6 +26,11 @@ const recoveryRoutes = require('./routes/recovery.routes');
 const transactionsRoutes = require('./routes/transactions.routes');
 const analyticsRoutes = require('./routes/analytics.routes');
 const providersRoutes = require('./routes/providers.routes');
+const webhooksRoutes = require('./routes/webhooks.routes');
+const domesticCardRoutes = require('./routes/domesticCard.routes');
+const agenticRefundRoutes = require('./routes/agenticRefund.routes');
+const studentRoutes = require('./routes/student.routes');
+const guardianRoutes = require('./routes/guardian.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -61,6 +66,11 @@ app.use('/api/recovery', recoveryRoutes);
 app.use('/api/transactions', transactionsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/providers', providersRoutes);
+app.use('/api/webhooks', webhooksRoutes);
+app.use('/api/domestic-card', domesticCardRoutes);
+app.use('/api/agentic-refund', agenticRefundRoutes);
+app.use('/api/student', studentRoutes);
+app.use('/api/guardian', guardianRoutes);
 
 // Health Check Endpoint
 app.get('/api/health', async (req, res) => {

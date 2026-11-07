@@ -20,6 +20,9 @@ from typing import Dict, List, Any, Optional
 from fraud_engine import evaluate_fraud, SANCTIONED_COUNTRIES, HIGH_RISK_CORRIDORS
 from routing_engine import optimize_route, PROVIDER_PROFILES
 from recovery_engine import analyze_decline, DECLINE_TAXONOMY
+from domestic_card_engine import evaluate_domestic_instrument, RUPAY_BIN_DATABASE, UPI_INTERNATIONAL_CORRIDORS
+from agentic_refund_engine import evaluate_agentic_refund
+from student_payment_engine import verify_student_payment_intent, WHITELISTED_STUDENT_CATEGORIES, PROHIBITED_STUDENT_CATEGORIES
 
 app = FastAPI(
     title="International Payment Orchestration - Intelligence Service",
@@ -74,6 +77,44 @@ class RecoveryAnalysisRequest(BaseModel):
     currency: Optional[str] = Field(default="USD")
     payment_method: Optional[str] = Field(default="credit_card")
 
+class DomesticCardEligibilityRequest(BaseModel):
+    payment_method: str = Field(default="rupay_card", example="rupay_card")
+    card_number: Optional[str] = Field(default="6521000000000000")
+    bin: Optional[str] = Field(default="6521")
+    currency: Optional[str] = Field(default="USD")
+    merchant_country: Optional[str] = Field(default="US")
+    amount_usd: Optional[float] = Field(default=100.0)
+    amount_inr: Optional[float] = Field(default=0.0)
+    is_educational: Optional[bool] = Field(default=False)
+    annual_remittance_usd: Optional[float] = Field(default=12000.0)
+
+class AgenticRefundRequest(BaseModel):
+    transaction_id: str = Field(..., example="tx_demo_001")
+    provider: str = Field(default="stripe")
+    gateway_actual_status: str = Field(default="CAPTURED")
+    amount: float = Field(..., example=120.00)
+    currency: str = Field(default="USD")
+    decline_code: Optional[str] = Field(default=None)
+    is_duplicate_suspected: Optional[bool] = Field(default=False)
+    already_refunded: Optional[bool] = Field(default=False)
+    days_since_tx: Optional[int] = Field(default=1)
+    risk_score: Optional[int] = Field(default=15)
+    customer_email: Optional[str] = Field(default="user@example.com")
+
+class StudentPaymentIntentRequest(BaseModel):
+    age: int = Field(default=17, example=17)
+    guardian_consent_status: Optional[str] = Field(default="ACTIVE")
+    merchant_category: str = Field(default="online_courses", example="online_courses")
+    amount: float = Field(..., example=65.00)
+    currency: Optional[str] = Field(default="USD")
+    merchant_name: Optional[str] = Field(default="Coursera Inc.")
+    single_tx_limit: Optional[float] = Field(default=250.0)
+    daily_limit: Optional[float] = Field(default=100.0)
+    current_day_spend: Optional[float] = Field(default=0.0)
+    monthly_limit: Optional[float] = Field(default=1200.0)
+    current_month_spend: Optional[float] = Field(default=0.0)
+    auto_approval_threshold: Optional[float] = Field(default=50.0)
+
 # -----------------
 # Endpoints
 # -----------------
@@ -109,6 +150,44 @@ def analyze_failed_payment(req: RecoveryAnalysisRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Recovery engine failure: {str(e)}")
+
+@app.post("/api/v1/domestic-card/eligibility")
+def check_domestic_card_eligibility(req: DomesticCardEligibilityRequest):
+    try:
+        result = evaluate_domestic_instrument(req.model_dump())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Domestic card engine failure: {str(e)}")
+
+@app.post("/api/v1/agentic-refund/evaluate")
+def evaluate_refund_agent(req: AgenticRefundRequest):
+    try:
+        result = evaluate_agentic_refund(req.model_dump())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agentic refund failure: {str(e)}")
+
+@app.post("/api/v1/student/verify-intent")
+def verify_student_payment(req: StudentPaymentIntentRequest):
+    try:
+        result = verify_student_payment_intent(req.model_dump())
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Student payment engine failure: {str(e)}")
+
+@app.get("/api/v1/domestic-card/meta")
+def get_domestic_card_meta():
+    return {
+        "rupay_bins": RUPAY_BIN_DATABASE,
+        "upi_international_corridors": UPI_INTERNATIONAL_CORRIDORS
+    }
+
+@app.get("/api/v1/student/categories")
+def get_student_categories():
+    return {
+        "whitelisted": WHITELISTED_STUDENT_CATEGORIES,
+        "prohibited": PROHIBITED_STUDENT_CATEGORIES
+    }
 
 @app.get("/api/v1/providers/profiles")
 def get_providers():

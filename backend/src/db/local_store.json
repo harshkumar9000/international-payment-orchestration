@@ -3,14 +3,14 @@
     {
       "id": "mer_demo_orchestration_01",
       "email": "merchant@example.com",
-      "password_hash": "$2a$10$TjHu6OwZfoWsHJQfP7YJwOQz5Zo4.dMp1ckE91/uXdfaOchw6Il1e",
+      "password_hash": "$2a$10$iwz2aGGXeyUncpWJNcdT.eXlgTwH5P6PojFp/rF4og77KIVx1LkPq",
       "company_name": "Atlas Cross-Border Commerce Ltd",
       "default_currency": "USD",
       "markup_percentage": 1.25,
       "api_key": "sk_live_orchestration_atlas_983742",
       "role": "merchant",
-      "created_at": "2026-10-08T17:50:14.358Z",
-      "updated_at": "2026-11-07T17:50:14.359Z"
+      "created_at": "2026-10-08T19:13:50.954Z",
+      "updated_at": "2026-11-07T19:13:50.954Z"
     }
   ],
   "providers": [
@@ -26,7 +26,7 @@
       "supported_currencies": "[\"USD\",\"EUR\",\"GBP\",\"CAD\",\"AUD\",\"JPY\",\"SGD\",\"NZD\",\"CHF\"]",
       "supported_methods": "[\"credit_card\",\"debit_card\",\"apple_pay\",\"google_pay\"]",
       "supported_countries": "[\"US\",\"CA\",\"GB\",\"AU\",\"DE\",\"FR\",\"JP\",\"SG\",\"NL\",\"IE\",\"ES\",\"IT\"]",
-      "created_at": "2026-11-07T17:50:14.359Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "adyen",
@@ -40,7 +40,7 @@
       "supported_currencies": "[\"EUR\",\"GBP\",\"USD\",\"CHF\",\"SEK\",\"NOK\",\"DKK\",\"PLN\"]",
       "supported_methods": "[\"credit_card\",\"debit_card\",\"sepa_debit\",\"ideal\",\"sofort\",\"giropay\"]",
       "supported_countries": "[\"DE\",\"FR\",\"NL\",\"GB\",\"ES\",\"IT\",\"SE\",\"CH\",\"BE\",\"AT\",\"PL\"]",
-      "created_at": "2026-11-07T17:50:14.359Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "paypal",
@@ -54,7 +54,7 @@
       "supported_currencies": "[\"USD\",\"EUR\",\"GBP\",\"CAD\",\"AUD\",\"JPY\"]",
       "supported_methods": "[\"paypal_wallet\",\"paypal_credit\",\"credit_card\",\"debit_card\"]",
       "supported_countries": "[\"US\",\"GB\",\"DE\",\"FR\",\"CA\",\"AU\",\"JP\"]",
-      "created_at": "2026-11-07T17:50:14.359Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "razorpay_upi",
@@ -68,7 +68,7 @@
       "supported_currencies": "[\"INR\"]",
       "supported_methods": "[\"upi\",\"upi_qr\",\"upi_intent\",\"netbanking\",\"rupay_card\"]",
       "supported_countries": "[\"IN\"]",
-      "created_at": "2026-11-07T17:50:14.359Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "dlocal",
@@ -82,7 +82,7 @@
       "supported_currencies": "[\"BRL\",\"MXN\",\"COP\",\"CLP\",\"PEN\",\"ZAR\",\"NGN\",\"KES\",\"INR\",\"USD\"]",
       "supported_methods": "[\"pix\",\"oxxo\",\"pse\",\"boleto\",\"credit_card\",\"debit_card\"]",
       "supported_countries": "[\"BR\",\"MX\",\"CO\",\"CL\",\"PE\",\"ZA\",\"NG\",\"KE\",\"IN\"]",
-      "created_at": "2026-11-07T17:50:14.359Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     }
   ],
   "routing_rules": [
@@ -94,7 +94,7 @@
       "is_active": true,
       "condition_json": "{\"currency\":\"INR\",\"payment_method\":\"upi\"}",
       "target_provider": "razorpay_upi",
-      "created_at": "2026-11-07T17:50:14.360Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "rule_eur_sepa_adyen_02",
@@ -104,7 +104,7 @@
       "is_active": true,
       "condition_json": "{\"currency\":\"EUR\"}",
       "target_provider": "adyen",
-      "created_at": "2026-11-07T17:50:14.360Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "rule_latam_pix_03",
@@ -114,7 +114,7 @@
       "is_active": true,
       "condition_json": "{\"country\":\"BR\"}",
       "target_provider": "dlocal",
-      "created_at": "2026-11-07T17:50:14.360Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     },
     {
       "id": "rule_us_card_stripe_04",
@@ -124,7 +124,7 @@
       "is_active": true,
       "condition_json": "{\"currency\":\"USD\",\"country\":\"US\"}",
       "target_provider": "stripe",
-      "created_at": "2026-11-07T17:50:14.360Z"
+      "created_at": "2026-11-07T19:13:50.955Z"
     }
   ],
   "transactions": [
@@ -149,7 +149,7 @@
       "fee_charged": 4.62,
       "latency_ms": 310,
       "metadata_json": "{\"order_id\":\"ORD-9821\",\"ip\":\"64.233.160.1\",\"3ds\":\"frictionless\"}",
-      "created_at": "2026-11-07T17:38:14.360Z"
+      "created_at": "2026-11-07T19:01:50.956Z"
     },
     {
       "id": "tx_demo_002",
@@ -172,7 +172,7 @@
       "fee_charged": 1.73,
       "latency_ms": 275,
       "metadata_json": "{\"order_id\":\"ORD-9822\",\"ip\":\"85.214.132.1\"}",
-      "created_at": "2026-11-07T17:05:14.360Z"
+      "created_at": "2026-11-07T18:28:50.956Z"
     },
     {
       "id": "tx_demo_003",
@@ -195,7 +195,7 @@
       "fee_charged": 22.5,
       "latency_ms": 185,
       "metadata_json": "{\"order_id\":\"ORD-9823\",\"vpa\":\"vikram@okaxis\"}",
-      "created_at": "2026-11-07T16:30:14.360Z"
+      "created_at": "2026-11-07T17:53:50.956Z"
     },
     {
       "id": "tx_demo_004",
@@ -218,7 +218,7 @@
       "fee_charged": 4.3,
       "latency_ms": 590,
       "metadata_json": "{\"order_id\":\"ORD-9824\",\"retry_strategy\":\"CASCADE_FALLBACK\"}",
-      "created_at": "2026-11-07T15:30:14.360Z"
+      "created_at": "2026-11-07T16:53:50.956Z"
     },
     {
       "id": "tx_demo_005",
@@ -241,7 +241,7 @@
       "fee_charged": 0,
       "latency_ms": 45,
       "metadata_json": "{\"order_id\":\"ORD-9825\",\"fraud_flags\":[\"DISPOSABLE_EMAIL_DOMAIN\",\"AMOUNT_OUTLIER_CRITICAL\"]}",
-      "created_at": "2026-11-07T14:20:14.360Z"
+      "created_at": "2026-11-07T15:43:50.956Z"
     },
     {
       "id": "tx_demo_006",
@@ -264,7 +264,7 @@
       "fee_charged": 7.88,
       "latency_ms": 395,
       "metadata_json": "{\"order_id\":\"ORD-9826\",\"pix_qr\":\"generated\"}",
-      "created_at": "2026-11-07T12:30:14.360Z"
+      "created_at": "2026-11-07T13:53:50.956Z"
     },
     {
       "id": "tx_demo_007",
@@ -287,7 +287,7 @@
       "fee_charged": 2.21,
       "latency_ms": 290,
       "metadata_json": "{\"order_id\":\"ORD-9827\"}",
-      "created_at": "2026-11-07T10:20:14.360Z"
+      "created_at": "2026-11-07T11:43:50.956Z"
     },
     {
       "id": "tx_demo_008",
@@ -310,7 +310,7 @@
       "fee_charged": 3.8,
       "latency_ms": 510,
       "metadata_json": "{\"order_id\":\"ORD-9828\",\"paypal_capture_id\":\"PAYID-SANDBOX-89123\"}",
-      "created_at": "2026-11-07T07:50:14.360Z"
+      "created_at": "2026-11-07T09:13:50.956Z"
     },
     {
       "id": "tx_demo_009",
@@ -333,7 +333,7 @@
       "fee_charged": 0,
       "latency_ms": 340,
       "metadata_json": "{\"order_id\":\"ORD-9829\",\"recovery_status\":\"QUEUED\"}",
-      "created_at": "2026-11-07T04:50:14.360Z"
+      "created_at": "2026-11-07T06:13:50.956Z"
     },
     {
       "id": "tx_demo_010",
@@ -356,10 +356,57 @@
       "fee_charged": 0.9,
       "latency_ms": 480,
       "metadata_json": "{\"order_id\":\"ORD-9830\",\"fallback_type\":\"APM_SWITCH\"}",
-      "created_at": "2026-11-07T02:30:14.360Z"
+      "created_at": "2026-11-07T03:53:50.956Z"
     },
     {
-      "id": "tx_237c9bf2-c",
+      "id": "tx_stuck_orphaned_01",
+      "merchant_id": "mer_demo_orchestration_01",
+      "amount": 89,
+      "currency": "USD",
+      "customer_amount": 89,
+      "customer_currency": "USD",
+      "exchange_rate": 1,
+      "customer_email": "anita.desai@mumbai.in",
+      "customer_country": "IN",
+      "payment_method": "credit_card",
+      "primary_provider": "stripe",
+      "executed_provider": "stripe",
+      "status": "refunded",
+      "risk_score": 18,
+      "risk_level": "LOW",
+      "decline_code": "network_timeout_after_capture",
+      "decline_reason": "Refund settled ($89 USD) via stripe. Ref: re_stripe_6ip7j2rj",
+      "fee_charged": 0,
+      "latency_ms": 3200,
+      "metadata_json": "{\"order_id\":\"ORD-STUCK-891\",\"stuck_type\":\"ORPHANED_CAPTURE\"}",
+      "created_at": "2026-11-07T18:58:50.956Z",
+      "updated_at": "2026-11-07T19:13:51.035Z"
+    },
+    {
+      "id": "tx_high_val_tuition_02",
+      "merchant_id": "mer_demo_orchestration_01",
+      "amount": 850,
+      "currency": "USD",
+      "customer_amount": 850,
+      "customer_currency": "USD",
+      "exchange_rate": 1,
+      "customer_email": "rohan.mehta@delhi.ac.in",
+      "customer_country": "IN",
+      "payment_method": "credit_card",
+      "primary_provider": "adyen",
+      "executed_provider": "adyen",
+      "status": "failed",
+      "risk_score": 42,
+      "risk_level": "MEDIUM",
+      "decline_code": "service_cancellation_dispute",
+      "decline_reason": "High-Value Course Tuition: Exceeds $500 threshold. Queued for human compliance officer review.",
+      "fee_charged": 0,
+      "latency_ms": 420,
+      "metadata_json": "{\"order_id\":\"ORD-TUITION-99\",\"high_value\":true}",
+      "created_at": "2026-11-07T18:33:50.956Z"
+    },
+    {
+      "id": "tx_e5a55cd5-5",
       "merchant_id": "mer_demo_orchestration_01",
       "amount": 89.99,
       "currency": "USD",
@@ -377,13 +424,13 @@
       "decline_code": null,
       "decline_reason": null,
       "fee_charged": 2.91,
-      "latency_ms": 306,
-      "metadata_json": "{\"cascade_options\":[\"adyen\",\"paypal\"]}",
-      "created_at": "2026-11-07T17:50:14.430Z",
-      "updated_at": "2026-11-07T17:50:14.433Z"
+      "latency_ms": 292,
+      "metadata_json": "{\"cascade_options\":[\"adyen\",\"paypal\"],\"is_student_payment\":false,\"student_id\":null,\"guardian_approval_id\":null}",
+      "created_at": "2026-11-07T19:13:51.013Z",
+      "updated_at": "2026-11-07T19:13:51.015Z"
     },
     {
-      "id": "tx_8dcb449e-2",
+      "id": "tx_60ef7e8e-1",
       "merchant_id": "mer_demo_orchestration_01",
       "amount": 150,
       "currency": "USD",
@@ -401,63 +448,30 @@
       "decline_code": "network_timeout",
       "decline_reason": "Initial attempt on stripe failed (Stripe gateway connection timed out during card network handshake.). Recovered automatically via cascade to adyen.",
       "fee_charged": 2.97,
-      "latency_ms": 277,
-      "metadata_json": "{\"cascade_options\":[\"adyen\",\"paypal\"]}",
-      "created_at": "2026-11-07T17:50:14.435Z",
-      "updated_at": "2026-11-07T17:50:14.438Z"
-    },
-    {
-      "id": "tx_f21e9767-4",
-      "merchant_id": "mer_demo_orchestration_01",
-      "amount": 156,
-      "currency": "USD",
-      "customer_amount": 157.95,
-      "customer_currency": "USD",
-      "exchange_rate": 1.0125,
-      "customer_email": "alex.customer@globalpay.com",
-      "customer_country": "US",
-      "payment_method": "credit_card",
-      "primary_provider": "stripe",
-      "executed_provider": "stripe",
-      "status": "failed",
-      "risk_score": 18,
-      "risk_level": "LOW",
-      "decline_code": "stolen_card",
-      "decline_reason": "Card marked as stolen or lost by issuer.",
-      "fee_charged": 0,
-      "latency_ms": 0,
-      "metadata_json": "{\"cascade_options\":[\"adyen\",\"dlocal\",\"paypal\"],\"applied_rule\":\"North America Fast Card Authorization\"}",
-      "created_at": "2026-11-07T17:58:34.168Z",
-      "updated_at": "2026-11-07T17:58:35.243Z"
+      "latency_ms": 304,
+      "metadata_json": "{\"cascade_options\":[\"adyen\",\"paypal\"],\"is_student_payment\":false,\"student_id\":null,\"guardian_approval_id\":null}",
+      "created_at": "2026-11-07T19:13:51.018Z",
+      "updated_at": "2026-11-07T19:13:51.021Z"
     }
   ],
   "routing_logs": [
     {
-      "id": "rout_069bbdc1",
-      "transaction_id": "tx_237c9bf2-c",
-      "evaluated_at": "2026-11-07T17:50:14.430Z",
+      "id": "rout_c9747dc8",
+      "transaction_id": "tx_e5a55cd5-5",
+      "evaluated_at": "2026-11-07T19:13:51.013Z",
       "candidates_json": "[]",
       "chosen_provider": "stripe",
       "cascade_order_json": "[\"adyen\",\"paypal\"]",
       "rationale": "Selected stripe using currency affinity and lowest corridor fee."
     },
     {
-      "id": "rout_efcf6d70",
-      "transaction_id": "tx_8dcb449e-2",
-      "evaluated_at": "2026-11-07T17:50:14.436Z",
+      "id": "rout_804a82ca",
+      "transaction_id": "tx_60ef7e8e-1",
+      "evaluated_at": "2026-11-07T19:13:51.018Z",
       "candidates_json": "[]",
       "chosen_provider": "stripe",
       "cascade_order_json": "[\"adyen\",\"paypal\"]",
       "rationale": "Selected stripe using currency affinity and lowest corridor fee."
-    },
-    {
-      "id": "rout_6f20a7bf",
-      "transaction_id": "tx_f21e9767-4",
-      "evaluated_at": "2026-11-07T17:58:34.169Z",
-      "candidates_json": "[{\"provider_id\":\"adyen\",\"provider_name\":\"Adyen European & Global\",\"score\":79.84,\"estimated_fee\":3.084,\"fee_percent\":1.9,\"avg_latency_ms\":285,\"success_rate\":97.8,\"uptime_percent\":99.99},{\"provider_id\":\"dlocal\",\"provider_name\":\"dLocal Emerging Corridors\",\"score\":72.34,\"estimated_fee\":3.944,\"fee_percent\":2.4,\"avg_latency_ms\":410,\"success_rate\":95.1,\"uptime_percent\":99.92},{\"provider_id\":\"paypal\",\"provider_name\":\"PayPal Sandbox / Enterprise\",\"score\":61.46,\"estimated_fee\":5.9344,\"fee_percent\":3.49,\"avg_latency_ms\":520,\"success_rate\":94.5,\"uptime_percent\":99.95}]",
-      "chosen_provider": "stripe",
-      "cascade_order_json": "[\"adyen\",\"dlocal\",\"paypal\"]",
-      "rationale": "Matched rule 'North America Fast Card Authorization' prioritizing Stripe Global. Selected Stripe Global with composite efficiency score 179.48 (Est fee: $4.82, Latency: 320ms, Success: 96.2%)."
     }
   ],
   "recovery_logs": [
@@ -469,7 +483,7 @@
       "decline_code": "network_timeout",
       "is_successful": true,
       "strategy_used": "CASCADE_FALLBACK_IMMEDIATE",
-      "recovered_at": "2026-11-07T15:30:14.360Z"
+      "recovered_at": "2026-11-07T16:53:50.956Z"
     },
     {
       "id": "rec_tx_demo_010",
@@ -479,17 +493,17 @@
       "decline_code": "do_not_honor",
       "is_successful": true,
       "strategy_used": "CASCADE_FALLBACK_IMMEDIATE",
-      "recovered_at": "2026-11-07T02:30:14.360Z"
+      "recovered_at": "2026-11-07T03:53:50.956Z"
     },
     {
-      "id": "rec_dd71f6dc",
-      "transaction_id": "tx_8dcb449e-2",
+      "id": "rec_2e92a526",
+      "transaction_id": "tx_60ef7e8e-1",
       "original_provider": "stripe",
       "retry_provider": "adyen",
       "decline_code": "network_timeout",
       "is_successful": true,
       "strategy_used": "CASCADE_FALLBACK_INSTANT",
-      "recovered_at": "2026-11-07T17:50:14.439Z"
+      "recovered_at": "2026-11-07T19:13:51.022Z"
     }
   ],
   "fraud_assessments": [
@@ -501,7 +515,195 @@
       "decision": "DECLINE",
       "triggered_rules_json": "[\"DISPOSABLE_EMAIL_DOMAIN\",\"AMOUNT_OUTLIER_CRITICAL\"]",
       "score_breakdown_json": "{\"email_risk\":30,\"amount_risk\":35,\"velocity\":27}",
-      "assessed_at": "2026-11-07T14:20:14.360Z"
+      "assessed_at": "2026-11-07T15:43:50.956Z"
+    }
+  ],
+  "student_profiles": [
+    {
+      "id": "stu_aarav_sharma_01",
+      "user_id": "usr_aarav_01",
+      "email": "aarav.student@delhiuniversity.ac.in",
+      "student_name": "Aarav Sharma",
+      "date_of_birth": "2008-05-15",
+      "is_minor": true,
+      "institution_name": "Delhi Public School / Global Scholars Program",
+      "student_id_number": "DPS-2024-9842",
+      "guardian_id": "guard_priya_sharma_01",
+      "guardian_email": "priya.sharma@parent.in",
+      "guardian_name": "Priya Sharma (Parent/Guardian)",
+      "guardian_consent_status": "ACTIVE",
+      "daily_limit": 100,
+      "weekly_limit": 400,
+      "monthly_limit": 1200,
+      "single_tx_limit": 250,
+      "auto_approval_threshold": 50,
+      "whitelisted_mccs": "[\"education_higher_ed\",\"online_courses\",\"books_study_materials\",\"software_tools\",\"standardized_testing\"]",
+      "created_at": "2026-09-08T19:13:50.956Z"
+    },
+    {
+      "id": "stu_elena_02",
+      "user_id": "usr_elena_02",
+      "email": "elena.rostova@oxford.ac.uk",
+      "student_name": "Elena Rostova",
+      "date_of_birth": "2005-09-12",
+      "is_minor": false,
+      "institution_name": "University of Oxford",
+      "student_id_number": "OX-2023-4122",
+      "guardian_id": "guard_dmitri_02",
+      "guardian_email": "dmitri.rostov@family.co.uk",
+      "guardian_name": "Dmitri Rostov",
+      "guardian_consent_status": "ACTIVE",
+      "daily_limit": 500,
+      "weekly_limit": 2000,
+      "monthly_limit": 5000,
+      "single_tx_limit": 1000,
+      "auto_approval_threshold": 200,
+      "whitelisted_mccs": "[\"education_higher_ed\",\"online_courses\",\"software_tools\"]",
+      "created_at": "2026-08-09T19:13:50.956Z"
+    },
+    {
+      "id": "stu_aarav_sharma_01",
+      "user_id": "usr_aarav_01",
+      "email": "aarav.student@delhiuniversity.ac.in",
+      "student_name": "Aarav Sharma",
+      "date_of_birth": "2008-05-15",
+      "is_minor": true,
+      "institution_name": "Delhi Public School / Global Scholar",
+      "student_id_number": "DPS-2024-9842",
+      "guardian_id": "guard_priya_sharma_01",
+      "guardian_email": "priya.sharma@parent.in",
+      "guardian_name": "Priya Sharma (Parent/Guardian)",
+      "guardian_consent_status": "ACTIVE",
+      "daily_limit": 100,
+      "weekly_limit": 400,
+      "monthly_limit": 1200,
+      "single_tx_limit": 250,
+      "auto_approval_threshold": 50,
+      "whitelisted_mccs": "[\"education_higher_ed\",\"online_courses\",\"books_study_materials\",\"software_tools\",\"standardized_testing\"]"
+    },
+    {
+      "id": "stu_aarav_sharma_01",
+      "user_id": "usr_aarav_01",
+      "email": "aarav.student@delhiuniversity.ac.in",
+      "student_name": "Aarav Sharma",
+      "date_of_birth": "2008-05-15",
+      "is_minor": true,
+      "institution_name": "Delhi Public School / Global Scholar",
+      "student_id_number": "DPS-2024-9842",
+      "guardian_id": "guard_priya_sharma_01",
+      "guardian_email": "priya.sharma@parent.in",
+      "guardian_name": "Priya Sharma (Parent/Guardian)",
+      "guardian_consent_status": "ACTIVE",
+      "daily_limit": 100,
+      "weekly_limit": 400,
+      "monthly_limit": 1200,
+      "single_tx_limit": 250,
+      "auto_approval_threshold": 50,
+      "whitelisted_mccs": "[\"education_higher_ed\",\"online_courses\",\"books_study_materials\",\"software_tools\",\"standardized_testing\"]"
+    }
+  ],
+  "guardian_approvals": [
+    {
+      "id": "appr_pending_coursera_01",
+      "transaction_id": "tx_student_pending_01",
+      "student_id": "stu_aarav_sharma_01",
+      "guardian_id": "guard_priya_sharma_01",
+      "amount": 79,
+      "currency": "USD",
+      "merchant_name": "Coursera Deep Learning Specialization",
+      "merchant_category": "online_courses",
+      "purpose_description": "Stanford AI & Machine Learning Specialization Certificate (Exceeds $50 auto-allowance)",
+      "status": "APPROVED",
+      "decision_reason": "Approved for Stanford course",
+      "requested_at": "2026-11-07T18:48:50.956Z",
+      "decided_at": "2026-11-07T19:13:51.041Z",
+      "updated_at": "2026-11-07T19:13:51.041Z"
+    },
+    {
+      "id": "appr_approved_gre_02",
+      "transaction_id": "tx_student_gre_02",
+      "student_id": "stu_aarav_sharma_01",
+      "guardian_id": "guard_priya_sharma_01",
+      "amount": 220,
+      "currency": "USD",
+      "merchant_name": "Educational Testing Service (ETS) - GRE Exam",
+      "merchant_category": "standardized_testing",
+      "purpose_description": "GRE General Test Registration Fee",
+      "status": "APPROVED",
+      "decision_reason": "Approved by Priya Sharma via Parent Mobile Portal.",
+      "requested_at": "2026-11-04T19:13:50.956Z",
+      "decided_at": "2026-11-04T19:20:30.956Z"
+    }
+  ],
+  "refund_records": [
+    {
+      "id": "ref_demo_settled_01",
+      "transaction_id": "tx_demo_009",
+      "amount": 275,
+      "currency": "USD",
+      "provider": "stripe",
+      "provider_refund_id": "re_stripe_89123891",
+      "reason_code": "AUTONOMOUS_REFUND_AUTHORIZED",
+      "reason_description": "Automated agent refund for duplicate charge attempt.",
+      "status": "SETTLED",
+      "idempotency_key": "idem_tx_demo_009_275_USD",
+      "agent_evaluated": true,
+      "agent_confidence_score": 0.99,
+      "customer_notified": true,
+      "initiated_by": "AI_AGENT_AUTONOMOUS",
+      "created_at": "2026-11-07T17:13:50.956Z"
+    },
+    {
+      "id": "ref_4c2bfed1-b",
+      "transaction_id": "tx_stuck_orphaned_01",
+      "amount": 89,
+      "currency": "USD",
+      "provider": "stripe",
+      "provider_refund_id": "re_stripe_6ip7j2rj",
+      "reason_code": "AUTONOMOUS_REFUND_AUTHORIZED",
+      "reason_description": "Customer never received access",
+      "status": "SETTLED",
+      "idempotency_key": "idem_1794078831035_tx_stuck",
+      "agent_evaluated": true,
+      "agent_confidence_score": 0.98,
+      "customer_notified": true,
+      "initiated_by": "AI_AGENT_AUTONOMOUS",
+      "created_at": "2026-11-07T19:13:51.035Z"
+    }
+  ],
+  "agentic_audit_logs": [
+    {
+      "id": "audit_7230b766",
+      "transaction_id": "tx_stuck_orphaned_01",
+      "action_type": "STATUS_VERIFICATION_AND_EVALUATION",
+      "provider": "stripe",
+      "provider_status_verified": "CAPTURED",
+      "agent_reasoning": "Autonomous agent verified captured funds on STRIPE. Refund authorized.",
+      "decision": "AUTO_REFUND_APPROVED",
+      "requires_human_approval": false,
+      "created_at": "2026-11-07T19:13:51.032Z"
+    },
+    {
+      "id": "audit_01a1ceac",
+      "transaction_id": "tx_stuck_orphaned_01",
+      "action_type": "STATUS_VERIFICATION_AND_EVALUATION",
+      "provider": "stripe",
+      "provider_status_verified": "CAPTURED",
+      "agent_reasoning": "Autonomous agent verified captured funds on STRIPE. Refund authorized.",
+      "decision": "AUTO_REFUND_APPROVED",
+      "requires_human_approval": false,
+      "created_at": "2026-11-07T19:13:51.035Z"
+    },
+    {
+      "id": "audit_fca89d61",
+      "transaction_id": "tx_stuck_orphaned_01",
+      "action_type": "REFUND_SETTLEMENT_EXECUTED",
+      "provider": "stripe",
+      "provider_status_verified": "REFUNDED",
+      "agent_reasoning": "Successfully refunded USD 89 via gateway API with idempotency key idem_1794078831035_tx_stuck.",
+      "decision": "SETTLED",
+      "requires_human_approval": false,
+      "created_at": "2026-11-07T19:13:51.035Z"
     }
   ]
 }

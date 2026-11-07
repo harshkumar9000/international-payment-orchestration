@@ -3,7 +3,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import {
-  Globe,
+  Globe2,
   Sun,
   Moon,
   LayoutDashboard,
@@ -19,7 +19,9 @@ import {
   User,
   Activity,
   Menu,
-  X
+  X,
+  GraduationCap,
+  Sparkles
 } from 'lucide-react';
 
 export default function Navbar({ activePage, setActivePage }) {
@@ -43,44 +45,41 @@ export default function Navbar({ activePage, setActivePage }) {
   }, []);
 
   const navItems = [
-    { id: 'landing', label: 'Overview', icon: Globe },
-    { id: 'dashboard', label: 'Analytics', icon: LayoutDashboard },
+    { id: 'landing', label: 'Overview', icon: Globe2 },
+    { id: 'dashboard', label: 'AI Dashboard', icon: LayoutDashboard },
     { id: 'checkout', label: 'Live Checkout', icon: CreditCard, highlight: true },
-    { id: 'routing', label: 'Smart Routing', icon: GitBranch },
-    { id: 'fraud', label: 'Fraud Shield', icon: ShieldAlert },
-    { id: 'recovery', label: 'Auto Recovery', icon: RotateCcw },
-    { id: 'transactions', label: 'Transactions', icon: ListOrdered },
-    { id: 'providers', label: 'Providers', icon: Layers },
-    { id: 'currency', label: 'FX Engine', icon: ArrowRightLeft },
+    { id: 'compatibility', label: 'RuPay & UPI', icon: Globe2 },
+    { id: 'student', label: 'Student Hub', icon: GraduationCap },
+    { id: 'agentic-refund', label: 'Agentic Refund', icon: RotateCcw },
   ];
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-[#0A0E17]/85 border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <header className="sticky top-0 z-50 backdrop-blur-md bg-white/90 dark:bg-[#111827]/90 border-b border-slate-200 dark:border-slate-800 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          
+
           {/* Logo & Platform Name */}
           <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActivePage('landing')}>
-            <div className="w-10 h-10 rounded-xl fintech-gradient flex items-center justify-center text-white font-bold shadow-md shadow-blue-500/20">
-              <Globe className="w-5 h-5 animate-pulse" />
+            <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white font-black shadow-md shadow-teal-600/20">
+              <span className="text-xl tracking-tighter">A</span>
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1.5">
                 <span className="font-extrabold text-xl tracking-tight text-slate-900 dark:text-white">
-                  ATLAS<span className="text-blue-600 dark:text-blue-500">.PAY</span>
+                  ATLAS<span className="text-teal-500">.PAY</span>
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                  Orchestrator
+                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                  v2.5
                 </span>
               </div>
               <p className="text-[10px] text-slate-500 dark:text-slate-400 hidden sm:block">
-                International Smart Routing & FX Rails
+                Smarter Payments. Borderless Possibilities.
               </p>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden xl:flex items-center space-x-1">
+          <nav className="hidden lg:flex items-center space-x-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activePage === item.id;
@@ -88,13 +87,12 @@ export default function Navbar({ activePage, setActivePage }) {
                 <button
                   key={item.id}
                   onClick={() => setActivePage(item.id)}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
-                      : item.highlight
-                      ? 'text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 font-semibold'
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${isActive
+                    ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/30'
+                    : item.highlight
+                      ? 'text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/50'
                       : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{item.label}</span>
@@ -105,14 +103,13 @@ export default function Navbar({ activePage, setActivePage }) {
 
           {/* Right Action Bar */}
           <div className="flex items-center space-x-3">
-            
+
             {/* Health Indicator Badge */}
             <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-              <span className={`w-2 h-2 rounded-full ${
-                healthStatus === 'online' ? 'bg-emerald-500 animate-pulse' : healthStatus === 'degraded' ? 'bg-amber-500' : 'bg-rose-500'
-              }`} />
+              <span className={`w-2 h-2 rounded-full ${healthStatus === 'online' ? 'bg-emerald-500 animate-pulse' : healthStatus === 'degraded' ? 'bg-amber-500' : 'bg-rose-500'
+                }`} />
               <span className="text-slate-600 dark:text-slate-300">
-                {healthStatus === 'online' ? 'Engines 99.99%' : 'Fallback Active'}
+                {healthStatus === 'online' ? 'Engines 99.99%' : 'Simulators Active'}
               </span>
             </div>
 
@@ -120,7 +117,7 @@ export default function Navbar({ activePage, setActivePage }) {
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-600" />}
             </button>
@@ -130,15 +127,15 @@ export default function Navbar({ activePage, setActivePage }) {
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setActivePage('dashboard')}
-                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 text-white shadow-sm shadow-teal-600/20 hover:bg-teal-500 transition cursor-pointer"
                 >
-                  <User className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="max-w-[100px] truncate">{merchant?.company_name || merchant?.email}</span>
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>Open App</span>
                 </button>
                 <button
                   onClick={logout}
                   title="Logout"
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -150,24 +147,24 @@ export default function Navbar({ activePage, setActivePage }) {
                     await demoLogin();
                     setActivePage('dashboard');
                   }}
-                  className="px-3 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition"
+                  className="px-3 py-1.5 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 rounded-lg transition cursor-pointer"
                 >
                   Quick Demo
                 </button>
                 <button
                   onClick={() => setActivePage('login')}
-                  className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition"
+                  className="flex items-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-500 text-white shadow-sm shadow-teal-600/20 transition cursor-pointer"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Login</span>
+                  <span>Sign In</span>
                 </button>
               </div>
             )}
 
-            {/* Mobile Hamburger Button */}
+            {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="xl:hidden p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -178,10 +175,9 @@ export default function Navbar({ activePage, setActivePage }) {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="xl:hidden bg-white dark:bg-[#0A0E17] border-b border-slate-200 dark:border-slate-800 px-4 pt-2 pb-4 space-y-1">
+        <div className="lg:hidden border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] px-4 pt-2 pb-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activePage === item.id;
             return (
               <button
                 key={item.id}
@@ -189,11 +185,10 @@ export default function Navbar({ activePage, setActivePage }) {
                   setActivePage(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium ${
-                  isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
+                className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium text-left ${activePage === item.id
+                  ? 'bg-teal-600 text-white'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 <span>{item.label}</span>
@@ -205,4 +200,3 @@ export default function Navbar({ activePage, setActivePage }) {
     </header>
   );
 }
-

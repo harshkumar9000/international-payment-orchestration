@@ -21,7 +21,11 @@ let fallbackStore = {
   transactions: [],
   routing_logs: [],
   recovery_logs: [],
-  fraud_assessments: []
+  fraud_assessments: [],
+  student_profiles: [],
+  guardian_approvals: [],
+  refund_records: [],
+  agentic_audit_logs: []
 };
 
 // Load existing local store if present
@@ -233,7 +237,11 @@ const db = {
       transactions: [],
       routing_logs: [],
       recovery_logs: [],
-      fraud_assessments: []
+      fraud_assessments: [],
+      student_profiles: [],
+      guardian_approvals: [],
+      refund_records: [],
+      agentic_audit_logs: []
     };
     saveFallbackStore();
   }

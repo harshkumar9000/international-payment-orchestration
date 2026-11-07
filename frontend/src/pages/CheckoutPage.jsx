@@ -16,7 +16,9 @@ import {
   Info,
   RefreshCw,
   Clock,
-  Layers
+  Layers,
+  Copy,
+  Check
 } from 'lucide-react';
 
 const COUNTRIES = [
@@ -51,6 +53,8 @@ export default function CheckoutPage({ setActivePage }) {
   const [cardCvc, setCardCvc] = useState('888');
   const [cardName, setCardName] = useState('Alex Taylor');
   const [vpa, setVpa] = useState('alex@okaxis');
+  const [upiMode, setUpiMode] = useState('qr'); // 'qr' or 'vpa'
+  const [copiedPix, setCopiedPix] = useState(false);
 
   // Simulation test triggers
   const [simulatedFailure, setSimulatedFailure] = useState('none');
@@ -418,36 +422,115 @@ export default function CheckoutPage({ setActivePage }) {
               {/* UPI Inputs */}
               {selectedMethod === 'upi' && (
                 <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-3">
-                  <div className="flex items-center space-x-2 text-purple-700 dark:text-purple-300 text-xs font-bold">
-                    <Smartphone className="w-4 h-4" />
-                    <span>Instant UPI Payment (PhonePe, GPay, Paytm)</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2 text-purple-700 dark:text-purple-300 text-xs font-bold">
+                      <Smartphone className="w-4 h-4" />
+                      <span>Instant UPI Payment Rails (India)</span>
+                    </div>
+                    <div className="flex space-x-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <button
+                        type="button"
+                        onClick={() => setUpiMode('qr')}
+                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${
+                          upiMode === 'qr' ? 'bg-purple-600 text-white' : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Scan QR
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUpiMode('vpa')}
+                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${
+                          upiMode === 'vpa' ? 'bg-purple-600 text-white' : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        UPI ID / VPA
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setVpa('vikram@okhdfcbank')}
-                      className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 font-mono"
-                    >
-                      vikram@okhdfcbank
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVpa('user@paytm')}
-                      className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 font-mono"
-                    >
-                      user@paytm
-                    </button>
-                  </div>
+                  {upiMode === 'qr' ? (
+                    <div className="text-center py-2 space-y-3">
+                      <div className="w-40 h-40 mx-auto p-2 bg-white rounded-xl shadow border border-slate-200 flex flex-col items-center justify-center relative">
+                        <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900 fill-current">
+                          {/* Corner Squares */}
+                          <rect x="5" y="5" width="28" height="28" fill="#1e1b4b" rx="2" />
+                          <rect x="9" y="9" width="20" height="20" fill="white" />
+                          <rect x="13" y="13" width="12" height="12" fill="#1e1b4b" />
+                          
+                          <rect x="67" y="5" width="28" height="28" fill="#1e1b4b" rx="2" />
+                          <rect x="71" y="9" width="20" height="20" fill="white" />
+                          <rect x="75" y="13" width="12" height="12" fill="#1e1b4b" />
+                          
+                          <rect x="5" y="67" width="28" height="28" fill="#1e1b4b" rx="2" />
+                          <rect x="9" y="71" width="20" height="20" fill="white" />
+                          <rect x="13" y="75" width="12" height="12" fill="#1e1b4b" />
 
-                  <input
-                    type="text"
-                    required
-                    value={vpa}
-                    onChange={(e) => setVpa(e.target.value)}
-                    placeholder="yourname@okaxis"
-                    className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
+                          {/* Data Matrix Dots */}
+                          <rect x="38" y="10" width="6" height="6" fill="#7c3aed" />
+                          <rect x="48" y="10" width="6" height="6" fill="#1e1b4b" />
+                          <rect x="38" y="22" width="6" height="6" fill="#1e1b4b" />
+                          <rect x="48" y="22" width="6" height="6" fill="#7c3aed" />
+
+                          <rect x="10" y="38" width="6" height="6" fill="#1e1b4b" />
+                          <rect x="22" y="38" width="6" height="6" fill="#7c3aed" />
+                          <rect x="38" y="38" width="10" height="10" fill="#1e1b4b" />
+                          <rect x="54" y="38" width="6" height="6" fill="#7c3aed" />
+                          <rect x="66" y="38" width="8" height="6" fill="#1e1b4b" />
+                          <rect x="80" y="38" width="8" height="6" fill="#7c3aed" />
+
+                          <rect x="38" y="54" width="6" height="6" fill="#7c3aed" />
+                          <rect x="50" y="54" width="6" height="6" fill="#1e1b4b" />
+                          <rect x="62" y="54" width="8" height="8" fill="#7c3aed" />
+                          <rect x="76" y="54" width="8" height="6" fill="#1e1b4b" />
+
+                          <rect x="38" y="70" width="8" height="8" fill="#1e1b4b" />
+                          <rect x="52" y="70" width="6" height="6" fill="#7c3aed" />
+                          <rect x="64" y="70" width="8" height="6" fill="#1e1b4b" />
+                          <rect x="78" y="70" width="6" height="8" fill="#7c3aed" />
+
+                          <rect x="44" y="84" width="8" height="6" fill="#1e1b4b" />
+                          <rect x="58" y="84" width="6" height="6" fill="#7c3aed" />
+                          <rect x="70" y="84" width="8" height="6" fill="#1e1b4b" />
+                        </svg>
+                        <div className="text-[8px] font-bold text-purple-700 bg-purple-50 px-1 rounded mt-1">
+                          UPI 2.0 Dynamic
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-300">
+                        Scan with <b>Google Pay</b>, <b>PhonePe</b>, <b>Paytm</b>, or any banking app.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setVpa('vikram@okhdfcbank')}
+                          className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 font-mono"
+                        >
+                          vikram@okhdfcbank
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVpa('user@paytm')}
+                          className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 font-mono"
+                        >
+                          user@paytm
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        required
+                        value={vpa}
+                        onChange={(e) => setVpa(e.target.value)}
+                        placeholder="yourname@okaxis"
+                        className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      />
+                    </div>
+                  )}
+
                   <div className="text-[11px] text-slate-500">
                     Direct routing to Razorpay UPI gateway with 0.5% capped processing fee.
                   </div>
@@ -456,27 +539,52 @@ export default function CheckoutPage({ setActivePage }) {
 
               {/* PayPal Sandbox */}
               {selectedMethod === 'paypal' && (
-                <div className="p-4 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800 space-y-2">
+                <div className="p-4 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800 space-y-3">
                   <div className="flex items-center space-x-2 text-sky-700 dark:text-sky-300 text-xs font-bold">
                     <Globe className="w-4 h-4" />
                     <span>PayPal Sandbox REST API Integration</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    If PayPal credentials are set in .env, creates real Sandbox OAuth order. Otherwise uses high-fidelity simulation.
-                  </p>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900 text-xs space-y-1">
+                    <div className="text-slate-700 dark:text-slate-200 font-medium">
+                      Sandbox Buyer Account:
+                    </div>
+                    <div className="font-mono text-sky-600 dark:text-sky-400">
+                      sb-buyer@personal.example.com
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      If PayPal OAuth credentials exist in .env, creates real Sandbox orders. Otherwise high-fidelity sandbox simulator captures payment instantly.
+                    </p>
+                  </div>
                 </div>
               )}
 
               {/* Pix Brazil */}
               {selectedMethod === 'pix' && (
-                <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 space-y-2">
+                <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 space-y-3">
                   <div className="flex items-center space-x-2 text-amber-700 dark:text-amber-300 text-xs font-bold">
                     <QrCode className="w-4 h-4" />
                     <span>Pix Instant Central Bank Rails (Brazil)</span>
                   </div>
-                  <p className="text-xs text-slate-600 dark:text-slate-300">
-                    Generates dynamic Pix EMV QR code and Copia-e-Cola payload via dLocal rails.
-                  </p>
+                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900 space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">Pix Copia e Cola:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText('00020126580014BR.GOV.BCB.PIX0136dlocal-atlas-gateway');
+                          setCopiedPix(true);
+                          setTimeout(() => setCopiedPix(false), 2000);
+                        }}
+                        className="flex items-center space-x-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold hover:underline"
+                      >
+                        {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copiedPix ? 'Copied!' : 'Copy Pix Key'}</span>
+                      </button>
+                    </div>
+                    <div className="font-mono text-[10px] text-slate-500 break-all bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
+                      00020126580014BR.GOV.BCB.PIX0136dlocal-atlas-gateway5204000053039865802BR
+                    </div>
+                  </div>
                 </div>
               )}
 

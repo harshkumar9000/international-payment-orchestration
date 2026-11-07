@@ -1,0 +1,53 @@
+/**
+ * Domestic Card & UPI Cross-Border Service
+ * Orchestrates Indian domestic cards (RuPay BINs, dual-network verification)
+ * and UPI International corridors with regulatory LRS and TCS compliance.
+ */
+const pythonBridge = require('./pythonBridge.service');
+
+async function checkEligibility(details) {
+  const payload = {
+    payment_method: details.payment_method || 'rupay_card',
+    card_number: details.card_number || '',
+    bin: details.bin || (details.card_number ? details.card_number.replace(/\s+/g, '').substring(0, 4) : '6521'),
+    currency: details.currency || 'USD',
+    merchant_country: details.merchant_country || 'US',
+    amount_usd: parseFloat(details.amount_usd || 100),
+    amount_inr: parseFloat(details.amount_inr || 0),
+    is_educational: Boolean(details.is_educational),
+    annual_remittance_usd: parseFloat(details.annual_remittance_usd || 12000)
+  };
+
+  return await pythonBridge.checkDomesticCardEligibility(payload);
+}
+
+function calculateTcs(amountInr, isEducational = false) {
+  const threshold = 700000.0;
+  if (amountInr <= threshold) {
+    return {
+      tcs_applicable: false,
+      threshold_inr: threshold,
+      taxable_amount_inr: 0,
+      tcs_rate_percent: 0,
+      tcs_amount_inr: 0
+    };
+  }
+
+  const rate = isEducational ? 5.0 : 20.0;
+  const taxable = amountInr - threshold;
+  const tcs = Math.round(taxable * (rate / 100.0) * 100) / 100;
+
+  return {
+    tcs_applicable: true,
+    threshold_inr: threshold,
+    taxable_amount_inr: taxable,
+    tcs_rate_percent: rate,
+    tcs_amount_inr: tcs
+  };
+}
+
+module.exports = {
+  checkEligibility,
+  calculateTcs
+};
+

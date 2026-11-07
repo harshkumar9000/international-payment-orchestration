@@ -181,5 +181,91 @@ describe('International Payment Orchestration API Suite', () => {
     assert.ok(data.comparison);
     assert.strictEqual(data.comparison.length, 5);
   });
+
+  test('POST /api/domestic-card/check-eligibility should verify RuPay Global vs Domestic', async () => {
+    // RuPay Global Platinum (6521)
+    const resGlobal = await fetch(`${BASE_URL}/api/domestic-card/check-eligibility`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        payment_method: 'rupay_card',
+        bin: '6521',
+        currency: 'USD',
+        merchant_country: 'US',
+        amount_usd: 150
+      })
+    });
+    assert.strictEqual(resGlobal.status, 200);
+    const dataGlobal = await resGlobal.json();
+    assert.strictEqual(dataGlobal.eligible, true);
+    assert.ok(dataGlobal.co_branded_networks.includes('Discover'));
+
+    // RuPay PMJDY Domestic Only (6071)
+    const resDom = await fetch(`${BASE_URL}/api/domestic-card/check-eligibility`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        payment_method: 'rupay_card',
+        bin: '6071',
+        currency: 'USD',
+        merchant_country: 'US',
+        amount_usd: 50
+      })
+    });
+    assert.strictEqual(resDom.status, 200);
+    const dataDom = await resDom.json();
+    assert.strictEqual(dataDom.eligible, false);
+    assert.ok(dataDom.alternative_recommendations.length > 0);
+  });
+
+  test('POST /api/agentic-refund/analyze and execute should handle autonomous refund', async () => {
+    // Analyze stuck orphaned transaction
+    const anRes = await fetch(`${BASE_URL}/api/agentic-refund/analyze/tx_stuck_orphaned_01`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Customer never received access' })
+    });
+    assert.strictEqual(anRes.status, 200);
+    const anData = await anRes.json();
+    assert.strictEqual(anData.evaluation.decision, 'AUTO_REFUND_APPROVED');
+    assert.strictEqual(anData.evaluation.refund_eligible, true);
+
+    // Execute refund
+    const exRes = await fetch(`${BASE_URL}/api/agentic-refund/execute/tx_stuck_orphaned_01`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Customer never received access' })
+    });
+    assert.strictEqual(exRes.status, 200);
+    const exData = await exRes.json();
+    assert.strictEqual(exData.status, 'settled');
+    assert.ok(exData.refund_id);
+  });
+
+  test('GET /api/student/profile and /api/guardian/pending-approvals should manage under-18 flow', async () => {
+    // Student Profile
+    const stuRes = await fetch(`${BASE_URL}/api/student/profile`);
+    assert.strictEqual(stuRes.status, 200);
+    const stuData = await stuRes.json();
+    assert.strictEqual(stuData.profile.student_name, 'Aarav Sharma');
+    assert.strictEqual(stuData.profile.is_minor, true);
+
+    // Guardian Pending Approvals
+    const guardRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals`);
+    assert.strictEqual(guardRes.status, 200);
+    const guardData = await guardRes.json();
+    assert.ok(guardData.pending.length > 0);
+
+    // Approve the pending request
+    const pendingId = guardData.pending[0].id;
+    const apprRes = await fetch(`${BASE_URL}/api/guardian/approve/${pendingId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Approved for Stanford course' })
+    });
+    assert.strictEqual(apprRes.status, 200);
+    const apprData = await apprRes.json();
+    assert.strictEqual(apprData.approval.status, 'APPROVED');
+  });
 });
 

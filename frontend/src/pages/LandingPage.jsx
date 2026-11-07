@@ -1,339 +1,261 @@
 import React, { useState } from 'react';
 import {
-  Globe,
+  Globe2,
   ArrowRight,
   ShieldCheck,
   Zap,
   TrendingUp,
-  Cpu,
-  Layers,
-  CheckCircle2,
-  Lock,
   RotateCcw,
   Sparkles,
-  DollarSign,
-  ChevronRight
+  CreditCard,
+  QrCode,
+  GraduationCap,
+  Users2,
+  Bot,
+  Layers,
+  ChevronRight,
+  CheckCircle2,
+  Lock,
+  DollarSign
 } from 'lucide-react';
 
 export default function LandingPage({ setActivePage }) {
   const [monthlyVolume, setMonthlyVolume] = useState(250000);
 
   // ROI Calculator
-  const estimatedSavings = Math.round(monthlyVolume * 0.0145);
-  const recoveredRevenue = Math.round(monthlyVolume * 0.038);
+  const estimatedSavings = Math.round(monthlyVolume * 0.0185);
+  const recoveredRevenue = Math.round(monthlyVolume * 0.042);
 
   return (
     <div className="space-y-24 py-8">
-      
       {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        {/* Ambient Glows */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-blue-500/15 dark:bg-blue-600/20 blur-[130px] rounded-full pointer-events-none" />
-        <div className="absolute top-1/3 right-10 w-[300px] h-[250px] bg-purple-500/10 blur-[100px] rounded-full pointer-events-none" />
+      <section className="relative overflow-hidden text-center pt-8 pb-12">
+        {/* Glow ambient background */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-teal-500/10 dark:bg-teal-500/15 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center pt-8 pb-12">
-          
-          {/* Top Pill */}
-          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-semibold mb-6 shadow-sm">
-            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span>Next-Gen Multi-Rail Payment Orchestration</span>
+        <div className="max-w-5xl mx-auto px-4 relative z-10 space-y-6">
+          {/* Top Brand Pill */}
+          <div className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-teal-50 dark:bg-teal-950/70 border border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-300 text-xs font-bold uppercase tracking-wider shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-teal-500" />
+            <span>Next-Gen FinTech Orchestration • v2.5</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-5xl mx-auto leading-tight">
-            Route Globally. <br />
-            <span className="bg-clip-text text-transparent fintech-gradient">
-              Recover Soft Declines. Zero Loss.
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-slate-900 dark:text-white leading-[1.1]">
+            Smarter Payments. <br />
+            <span className="bg-gradient-to-r from-teal-500 via-teal-400 to-emerald-400 bg-clip-text text-transparent">
+              Borderless Possibilities.
             </span>
           </h1>
 
-          <p className="mt-6 text-base sm:text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Unify Stripe, Adyen, PayPal Sandbox, Razorpay UPI, and dLocal under an intelligent rule-based routing engine powered by Python AI fraud scoring and automated gateway cascading.
+          <p className="text-base sm:text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto leading-relaxed">
+            ATLAS.PAY orchestrates multi-gateway routing (Stripe, Adyen, PayPal, Razorpay, dLocal), unlocks cross-border RuPay & bilateral UPI rails, enforces Under-18 educational guardrails, and recovers stuck funds with autonomous agentic refunds.
           </p>
 
-          {/* CTA Buttons */}
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+          {/* Action Callouts */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
-              onClick={() => setActivePage('checkout')}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl fintech-gradient text-white font-semibold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2"
+              onClick={() => setActivePage('dashboard')}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm shadow-lg shadow-teal-600/25 hover:shadow-teal-600/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <span>Launch Live Checkout Demo</span>
+              <span>Explore AI Dashboard</span>
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setActivePage('dashboard')}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-white dark:bg-slate-800/90 text-slate-900 dark:text-white font-semibold text-sm border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex items-center justify-center space-x-2"
+              onClick={() => setActivePage('checkout')}
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-white hover:bg-slate-800 font-semibold text-sm border border-slate-700/60 shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <span>Explore Merchant Dashboard</span>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <CreditCard className="w-4 h-4 text-teal-400" />
+              <span>Live Multi-Rail Checkout</span>
             </button>
           </div>
 
-          {/* Key Stat Badges */}
-          <div className="mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
-            <div className="p-4 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">99.99%</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Payment Uptime</div>
-              <div className="text-[11px] text-emerald-500 font-medium mt-1">Automatic failover</div>
+          {/* Trust Highlights */}
+          <div className="pt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-teal-500" />
+              <span>RuPay Global BIN Check</span>
             </div>
-            <div className="p-4 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+1.45%</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Interchange Savings</div>
-              <div className="text-[11px] text-emerald-500 font-medium mt-1">Via least-cost routing</div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-teal-500" />
+              <span>Bilateral NIPL UPI Corridors</span>
             </div>
-            <div className="p-4 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">88.2%</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Decline Recovery</div>
-              <div className="text-[11px] text-purple-500 font-medium mt-1">Automated cascading</div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-teal-500" />
+              <span>Under-18 Guardian Consent</span>
             </div>
-            <div className="p-4 rounded-xl bg-white/70 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 backdrop-blur-sm">
-              <div className="text-2xl font-bold text-amber-500 dark:text-amber-400">&lt; 35ms</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">AI Risk Scoring</div>
-              <div className="text-[11px] text-amber-500 font-medium mt-1">FastAPI microservice</div>
+            <div className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-teal-500" />
+              <span>Idempotent Agentic Refunds</span>
             </div>
           </div>
-
         </div>
       </section>
 
-      {/* Interactive Savings Calculator */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="p-8 sm:p-10 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-            <div>
-              <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">Interactive ROI Calculator</span>
-              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">See Your Orchestration Uplift</h3>
-              <p className="text-sm text-slate-400 mt-1">Estimate savings from least-cost routing and revenue saved via cascading decline recovery.</p>
+      {/* Feature 1, 2, 3 Deep Dives */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <div className="text-center space-y-2">
+          <span className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+            Engine Architecture
+          </span>
+          <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white">
+            Three Pillars of Cross-Border Financial Intelligence
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
+            Engineered specifically to solve real-world international payment failure points and regulatory friction.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1: Domestic Card & UPI Integration */}
+          <div className="bg-white dark:bg-[#111827] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-teal-500/50 transition-all space-y-4 flex flex-col justify-between group">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+                <Globe2 className="w-6 h-6" />
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                Feature 1
+              </span>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Domestic Card & UPI Cross-Border Rails
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Solves Indian domestic checkout failure abroad. Validates RuPay Global (6521/6522 Discover co-badged) vs Domestic-only PMJDY, checks bilateral UPI corridors (Singapore PayNow, UAE NeoPay, France Lyra), and itemizes RBI LRS 20% & 5% TCS tax breakdowns.
+              </p>
             </div>
-            <div className="text-right">
-              <div className="text-xs text-slate-400">Monthly Processing Volume</div>
-              <div className="text-2xl font-mono font-bold text-white">${monthlyVolume.toLocaleString()} USD</div>
-            </div>
+            <button
+              onClick={() => setActivePage('compatibility')}
+              className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-900 hover:bg-teal-50 dark:hover:bg-teal-950/40 text-slate-700 dark:text-slate-300 hover:text-teal-600 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center gap-1 transition-all cursor-pointer"
+            >
+              Test Corridor Inspector <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <div className="mb-8">
+          {/* Card 2: Under-18 & Student Payments */}
+          <div className="bg-white dark:bg-[#111827] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-500/50 transition-all space-y-4 flex flex-col justify-between group">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                <GraduationCap className="w-6 h-6" />
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                Feature 2
+              </span>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Under-18 & Student Payment Support
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Dedicated youth financial framework. Minor DOB verification, guardian approval workflow for tuition & global courses (Coursera, edX), velocity spending limits, and automated category whitelisting blocking gambling/crypto.
+              </p>
+            </div>
+            <button
+              onClick={() => setActivePage('student')}
+              className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-900 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-slate-700 dark:text-slate-300 hover:text-indigo-600 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center gap-1 transition-all cursor-pointer"
+            >
+              Explore Student Hub <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Card 3: Agentic Refund & Payment Recovery */}
+          <div className="bg-white dark:bg-[#111827] rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:border-amber-500/50 transition-all space-y-4 flex flex-col justify-between group">
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                <Bot className="w-6 h-6" />
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                Feature 3
+              </span>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                Agentic Refund & Payment Recovery
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Never issue false refunds on client error screens. Autonomous AI verifies provider capture state, generates SHA256 idempotency keys (`idem_...`), prevents duplicate payouts, and routes &gt;$500 charges to a human compliance officer.
+              </p>
+            </div>
+            <button
+              onClick={() => setActivePage('agentic-refund')}
+              className="w-full py-2 px-3 bg-slate-50 dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-amber-950/40 text-slate-700 dark:text-slate-300 hover:text-amber-600 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-center gap-1 transition-all cursor-pointer"
+            >
+              Open Refund Center <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ROI & Cost Savings Interactive Simulator */}
+      <section className="max-w-5xl mx-auto px-4">
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-teal-950 p-8 rounded-3xl border border-teal-500/20 text-white shadow-2xl space-y-6">
+          <div className="text-center space-y-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-teal-400">
+              Interactive ROI Calculator
+            </span>
+            <h3 className="text-2xl font-extrabold text-white">
+              Calculate Smart Routing & Auto-Recovery Gains
+            </h3>
+            <p className="text-xs text-slate-300">
+              See what intelligent multi-rail cascading and idempotent recovery adds to your monthly margin.
+            </p>
+          </div>
+
+          <div className="max-w-md mx-auto space-y-2">
+            <div className="flex justify-between text-xs font-semibold text-slate-300">
+              <span>Monthly International Gross Volume:</span>
+              <span className="font-mono text-teal-300 text-sm font-bold">
+                ${monthlyVolume.toLocaleString()} USD
+              </span>
+            </div>
             <input
               type="range"
               min="50000"
               max="2000000"
-              step="25000"
+              step="50000"
               value={monthlyVolume}
               onChange={(e) => setMonthlyVolume(Number(e.target.value))}
-              className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              className="w-full accent-teal-400 cursor-pointer"
             />
-            <div className="flex justify-between text-xs text-slate-500 mt-2 font-mono">
-              <span>$50,000/mo</span>
-              <span>$1,000,000/mo</span>
-              <span>$2,000,000/mo</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1">
+              <span className="text-xs text-slate-300 block">FX & Gateway Fee Savings</span>
+              <span className="text-3xl font-extrabold text-teal-400 font-mono">
+                +${estimatedSavings.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-slate-400 block">Saved vs flat 3.5% non-orchestrated baseline</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 text-center space-y-1">
+              <span className="text-xs text-slate-300 block">Recovered Soft Declines</span>
+              <span className="text-3xl font-extrabold text-emerald-400 font-mono">
+                +${recoveredRevenue.toLocaleString()}
+              </span>
+              <span className="text-[10px] text-slate-400 block">Autonomous retry + cascaded acquiring rails</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-slate-800">
-            <div className="p-5 rounded-xl bg-slate-800/50 border border-slate-700/60">
-              <div className="flex items-center space-x-2 text-emerald-400 text-xs font-semibold">
-                <DollarSign className="w-4 h-4" />
-                <span>Estimated Annual Processing Savings</span>
-              </div>
-              <div className="text-3xl font-bold font-mono text-emerald-400 mt-2">
-                ${(estimatedSavings * 12).toLocaleString()}
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                From intelligent routing to lowest-fee local rails (e.g. UPI, SEPA, Adyen).
-              </div>
-            </div>
-
-            <div className="p-5 rounded-xl bg-slate-800/50 border border-slate-700/60">
-              <div className="flex items-center space-x-2 text-purple-400 text-xs font-semibold">
-                <RotateCcw className="w-4 h-4" />
-                <span>Annual Recovered Revenue</span>
-              </div>
-              <div className="text-3xl font-bold font-mono text-purple-400 mt-2">
-                ${(recoveredRevenue * 12).toLocaleString()}
-              </div>
-              <div className="text-xs text-slate-400 mt-1">
-                Via automated cascading to backup providers on network timeouts and soft declines.
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4 Pillars Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
-            Architecture Highlights
-          </h2>
-          <p className="mt-2 text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Engineered for Modern Cross-Border FinTech
-          </p>
-          <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm sm:text-base">
-            Every layer is decoupled, fault-tolerant, and designed to maximize authorization rates while cutting processing fees.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          
-          {/* Feature 1 */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 hover:border-blue-500/50 transition-all group">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <Zap className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-              Rule-Based Intelligent Routing
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-              Multi-factor optimization evaluates gateway health, interchange fees, real-time latency, and currency affinity. Prioritize lowest fee, fastest authorization, or enforce merchant custom corridor rules.
-            </p>
-            <button
-              onClick={() => setActivePage('routing')}
-              className="text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center space-x-1 group-hover:translate-x-1 transition-transform"
-            >
-              <span>Configure Routing Rules</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Feature 2 */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 transition-all group">
-            <div className="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-              Python AI Fraud Defense
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-              Real-time microservice evaluating IP geolocation mismatches, rapid transaction velocity bursts, disposable email detection, OFAC sanctions lists, and ticket size anomalies with 0-100 risk scoring.
-            </p>
-            <button
-              onClick={() => setActivePage('fraud')}
-              className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1 group-hover:translate-x-1 transition-transform"
-            >
-              <span>Test Fraud Scenarios</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Feature 3 */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 hover:border-purple-500/50 transition-all group">
-            <div className="w-12 h-12 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <RotateCcw className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-              Automated Cascading Recovery
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-              Intelligent decline classification automatically identifies soft recoverable errors (network timeouts, temporary processor outages). Instant zero-friction failover reroutes the payment to secondary providers.
-            </p>
-            <button
-              onClick={() => setActivePage('recovery')}
-              className="text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center space-x-1 group-hover:translate-x-1 transition-transform"
-            >
-              <span>Inspect Recovery Logs</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          {/* Feature 4 */}
-          <div className="p-8 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 hover:border-amber-500/50 transition-all group">
-            <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-              <Globe className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
-              Dynamic Currency & Compatibility Engine
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-              Live mid-market conversion across 20+ currencies with transparent merchant spread. Enforces EU PSD2 Strong Customer Auth, India RBI tokenization, and Brazil Pix instant rails.
-            </p>
-            <button
-              onClick={() => setActivePage('currency')}
-              className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center space-x-1 group-hover:translate-x-1 transition-transform"
-            >
-              <span>Explore FX Engine</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-        </div>
-      </section>
-
-      {/* Provider Ecosystem Matrix */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="p-8 sm:p-12 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Unified Payment Rails</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-              Connect leading global cards and local payment methods through a single orchestration contract.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
-              <div className="font-bold text-slate-900 dark:text-white text-base">Stripe Global</div>
-              <div className="text-xs text-blue-500 font-medium mt-1">Cards, Apple Pay, GPay</div>
-              <div className="text-[11px] text-slate-400 mt-2 font-mono">2.9% + $0.30</div>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
-              <div className="font-bold text-slate-900 dark:text-white text-base">Adyen Enterprise</div>
-              <div className="text-xs text-emerald-500 font-medium mt-1">SEPA, iDEAL, EUR Cards</div>
-              <div className="text-[11px] text-slate-400 mt-2 font-mono">1.9% + €0.12</div>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
-              <div className="font-bold text-slate-900 dark:text-white text-base">PayPal Sandbox</div>
-              <div className="text-xs text-sky-500 font-medium mt-1">PayPal Wallet, Pay in 4</div>
-              <div className="text-[11px] text-slate-400 mt-2 font-mono">3.49% + $0.49</div>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
-              <div className="font-bold text-slate-900 dark:text-white text-base">Razorpay UPI</div>
-              <div className="text-xs text-purple-500 font-medium mt-1">UPI QR, PhonePe, Paytm</div>
-              <div className="text-[11px] text-slate-400 mt-2 font-mono">0.50% (Domestic)</div>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-center">
-              <div className="font-bold text-slate-900 dark:text-white text-base">dLocal Emerging</div>
-              <div className="text-xs text-amber-500 font-medium mt-1">Pix Brazil, Oxxo Mexico</div>
-              <div className="text-[11px] text-slate-400 mt-2 font-mono">2.4% + $0.20</div>
-            </div>
-          </div>
-
-          <div className="text-center mt-8">
-            <button
-              onClick={() => setActivePage('providers')}
-              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              View Full Benchmark & Corridor Matrix →
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Ready to Experience Section */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center pb-12">
-        <div className="p-10 rounded-3xl fintech-gradient text-white shadow-2xl relative overflow-hidden">
-          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-            Ready to test live orchestration?
-          </h2>
-          <p className="mt-3 text-blue-100 max-w-xl mx-auto text-sm sm:text-base">
-            Run real-time checkouts across 15+ countries, trigger simulated soft declines, and watch the platform cascade and recover seamlessly.
-          </p>
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button
-              onClick={() => setActivePage('checkout')}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-white text-blue-600 font-bold text-sm shadow-lg hover:bg-blue-50 transition"
-            >
-              Open Live Checkout Experience
-            </button>
+          <div className="text-center pt-2">
             <button
               onClick={() => setActivePage('dashboard')}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-blue-700/60 hover:bg-blue-700 text-white font-semibold text-sm border border-blue-400/30 transition"
+              className="px-6 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs shadow-md transition-all cursor-pointer"
             >
-              View Merchant Analytics
+              Launch Platform With Test Volume →
             </button>
           </div>
         </div>
       </section>
 
+      {/* Supported Payment Gateway Integrations */}
+      <section className="max-w-7xl mx-auto px-4 text-center space-y-6">
+        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          Supported Gateways & Sandbox Environments
+        </span>
+        <div className="flex flex-wrap items-center justify-center gap-8 opacity-75">
+          <span className="font-bold text-lg text-slate-700 dark:text-slate-300">Stripe</span>
+          <span className="font-bold text-lg text-slate-700 dark:text-slate-300">Adyen</span>
+          <span className="font-bold text-lg text-slate-700 dark:text-slate-300">PayPal Sandbox</span>
+          <span className="font-bold text-lg text-slate-700 dark:text-slate-300">Razorpay / UPI</span>
+          <span className="font-bold text-lg text-slate-700 dark:text-slate-300">dLocal</span>
+          <span className="font-bold text-lg text-slate-700 dark:text-slate-300">NPCI / NIPL</span>
+        </div>
+      </section>
     </div>
   );
 }
-
