@@ -29,34 +29,34 @@ export default function Sidebar({ activePage, setActivePage, isCollapsed, setIsC
       ]
     },
     {
-      title: 'PAYMENTS & RAILS',
+      title: 'PAYMENTS',
       items: [
         { id: 'checkout', label: 'Payment Checkout', icon: CreditCard, highlight: true },
-        { id: 'compatibility', label: 'Domestic & Global Rails', icon: Globe2, badge: 'RuPay/UPI' },
-        { id: 'routing', label: 'Smart Routing Engine', icon: GitBranch },
-        { id: 'currency', label: 'FX & Tax Engine', icon: ArrowRightLeft }
+        { id: 'compatibility', label: 'Domestic Cards & UPI', icon: Globe2, badge: 'RuPay/UPI' },
+        { id: 'routing', label: 'Choose Best Provider', icon: GitBranch },
+        { id: 'currency', label: 'Currency & Taxes', icon: ArrowRightLeft }
       ]
     },
     {
-      title: 'STUDENT & GUARDIAN',
+      title: 'STUDENT & PARENT',
       items: [
         { id: 'student', label: 'Student Payments', icon: GraduationCap, badge: 'Under-18' },
-        { id: 'guardian', label: 'Guardian Approvals', icon: Users2 }
+        { id: 'guardian', label: 'Parent Approval', icon: Users2 }
       ]
     },
     {
-      title: 'INTELLIGENCE & TRUST',
+      title: 'SECURITY & REFUNDS',
       items: [
-        { id: 'agentic-refund', label: 'Agentic Refund Center', icon: RotateCcw, highlight: true },
-        { id: 'fraud', label: 'AI Fraud Detection', icon: ShieldAlert }
+        { id: 'agentic-refund', label: 'Automatic Refund Assistant', icon: RotateCcw, highlight: true },
+        { id: 'fraud', label: 'Suspicious Payment Shield', icon: ShieldAlert }
       ]
     },
     {
-      title: 'OPERATIONS',
+      title: 'REPORTS & SETTINGS',
       items: [
-        { id: 'analytics', label: 'Merchant Analytics', icon: BarChart3 },
+        { id: 'analytics', label: 'Business Reports', icon: BarChart3 },
         { id: 'providers', label: 'Payment Providers', icon: Layers },
-        { id: 'transactions', label: 'Transaction Ledger', icon: ListOrdered },
+        { id: 'transactions', label: 'Payment History', icon: ListOrdered },
         { id: 'settings', label: 'Platform Settings', icon: Settings }
       ]
     }
@@ -83,7 +83,7 @@ export default function Sidebar({ activePage, setActivePage, isCollapsed, setIsC
                     ATLAS<span className="text-teal-500">.PAY</span>
                   </span>
                   <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider bg-teal-50 text-teal-700 dark:bg-teal-950/80 dark:text-teal-300 rounded border border-teal-200 dark:border-teal-800">
-                    v2.5
+                    Demo
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[140px]">
@@ -145,7 +145,7 @@ export default function Sidebar({ activePage, setActivePage, isCollapsed, setIsC
       {!isCollapsed ? (
         <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
           <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-2">
-            <span>Demo Mode Perspective:</span>
+            <span>Switch User Perspective:</span>
           </div>
           <div className="grid grid-cols-3 gap-1">
             <button
@@ -176,4 +176,3 @@ export default function Sidebar({ activePage, setActivePage, isCollapsed, setIsC
     </aside>
   );
 }
-

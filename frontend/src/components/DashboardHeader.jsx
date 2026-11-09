@@ -27,22 +27,22 @@ export default function DashboardHeader({
   const { theme, toggleTheme } = useTheme();
   const { merchant, logout } = useAuth();
 
-  // Page titles map
+  // Page titles map in simple English
   const pageTitles = {
     'dashboard': { group: 'OVERVIEW', title: 'Dashboard Overview' },
-    'checkout': { group: 'PAYMENTS & RAILS', title: 'Payment Checkout' },
-    'compatibility': { group: 'PAYMENTS & RAILS', title: 'Domestic & Global Rails (RuPay / UPI)' },
-    'routing': { group: 'PAYMENTS & RAILS', title: 'Smart Routing Engine' },
-    'currency': { group: 'PAYMENTS & RAILS', title: 'FX & Tax Engine' },
-    'student': { group: 'STUDENT & GUARDIAN', title: 'Student Payments (Under-18)' },
-    'guardian': { group: 'STUDENT & GUARDIAN', title: 'Guardian Approvals' },
-    'agentic-refund': { group: 'INTELLIGENCE & TRUST', title: 'Agentic Refund Center' },
-    'fraud': { group: 'INTELLIGENCE & TRUST', title: 'AI Fraud Detection' },
-    'analytics': { group: 'OPERATIONS', title: 'Merchant Analytics' },
-    'providers': { group: 'OPERATIONS', title: 'Payment Providers' },
-    'transactions': { group: 'OPERATIONS', title: 'Transaction Ledger' },
-    'settings': { group: 'OPERATIONS', title: 'Platform Settings' },
-    'recovery': { group: 'INTELLIGENCE & TRUST', title: 'Auto Recovery' }
+    'checkout': { group: 'PAYMENTS', title: 'Payment Checkout' },
+    'compatibility': { group: 'PAYMENTS', title: 'Domestic Cards & UPI Check' },
+    'routing': { group: 'PAYMENTS', title: 'Choose Best Payment Provider' },
+    'currency': { group: 'PAYMENTS', title: 'Currency Conversion & Taxes' },
+    'student': { group: 'STUDENT & PARENT', title: 'Student Payments (Under-18)' },
+    'guardian': { group: 'STUDENT & PARENT', title: 'Parent Approval Portal' },
+    'agentic-refund': { group: 'SECURITY & REFUNDS', title: 'Automatic Refund Assistant' },
+    'fraud': { group: 'SECURITY & REFUNDS', title: 'Suspicious Payment Shield' },
+    'analytics': { group: 'REPORTS & SETTINGS', title: 'Business Reports' },
+    'providers': { group: 'REPORTS & SETTINGS', title: 'Payment Providers' },
+    'transactions': { group: 'REPORTS & SETTINGS', title: 'Payment History' },
+    'settings': { group: 'REPORTS & SETTINGS', title: 'Platform Settings' },
+    'recovery': { group: 'SECURITY & REFUNDS', title: 'Recover Failed Payments' }
   };
 
   const current = pageTitles[activePage] || { group: 'ATLAS.PAY', title: 'Dashboard' };
@@ -55,7 +55,7 @@ export default function DashboardHeader({
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          title="Toggle Sidebar"
+          title="Toggle Navigation Menu"
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -87,6 +87,7 @@ export default function DashboardHeader({
                 ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
+            title="View dashboard as a Merchant / Business Owner"
           >
             <Building2 className="w-3 h-3" /> Merchant
           </button>
@@ -100,6 +101,7 @@ export default function DashboardHeader({
                 ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
+            title="View as a Student enrolled in courses"
           >
             <GraduationCap className="w-3 h-3" /> Student
           </button>
@@ -113,8 +115,9 @@ export default function DashboardHeader({
                 ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
+            title="View as a Parent or Legal Guardian approving payments"
           >
-            <Users2 className="w-3 h-3" /> Guardian
+            <Users2 className="w-3 h-3" /> Parent
           </button>
         </div>
 
@@ -124,13 +127,13 @@ export default function DashboardHeader({
           className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs rounded-lg shadow-sm shadow-teal-600/20 transition-all cursor-pointer"
         >
           <CreditCard className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Checkout</span>
+          <span className="hidden sm:inline">Try Payment Checkout</span>
         </button>
 
         {/* AI Health Pulse */}
         <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Engines 99.99%</span>
+          <span>Services Online</span>
         </div>
 
         {/* Dark/Light Mode Switcher */}
@@ -146,7 +149,7 @@ export default function DashboardHeader({
         <button
           onClick={() => setActivePage('landing')}
           className="p-2 rounded-lg text-slate-500 hover:text-teal-600 dark:text-slate-400 dark:hover:text-teal-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-          title="View Landing Page"
+          title="Back to Landing Page"
         >
           <Globe2 className="w-4 h-4" />
         </button>
@@ -155,4 +158,3 @@ export default function DashboardHeader({
     </header>
   );
 }
-

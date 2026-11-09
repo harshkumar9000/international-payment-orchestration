@@ -48,16 +48,34 @@ export default function ParentApprovalPage({ setActivePage }) {
     setLoading(true);
     try {
       const [pendRes, profRes] = await Promise.all([
-        api.guardian.getPending(guardianId).catch(() => ({ pending: [] })),
-        api.student.getProfile(studentId).catch(() => null)
+        (typeof api.guardian?.getPending === 'function'
+          ? api.guardian.getPending(guardianId)
+          : typeof api.guardian?.getPendingApprovals === 'function'
+          ? api.guardian.getPendingApprovals(guardianId)
+          : Promise.resolve({ pending: [] })
+        ).catch(() => ({ pending: [] })),
+        (typeof api.student?.getProfile === 'function'
+          ? api.student.getProfile(studentId)
+          : Promise.resolve(null)
+        ).catch(() => null)
       ]);
 
-      setPendingApprovals(pendRes.pending || []);
-      if (profRes && profRes.student) {
-        setProfile(profRes.student);
-        setDailyLimit(profRes.student.spending_limits?.daily_limit || 100);
-        setWeeklyLimit(profRes.student.spending_limits?.weekly_limit || 250);
-        setMonthlyLimit(profRes.student.spending_limits?.monthly_limit || 500);
+      const rawPending = pendRes?.pending || [];
+      const uniquePending = [];
+      const seenIds = new Set();
+      for (const item of rawPending) {
+        if (item && item.id && !seenIds.has(item.id) && item.status?.toUpperCase() === 'PENDING') {
+          seenIds.add(item.id);
+          uniquePending.push(item);
+        }
+      }
+      setPendingApprovals(uniquePending);
+      const stuProfile = profRes?.student || profRes?.profile || profRes;
+      if (stuProfile) {
+        setProfile(stuProfile);
+        setDailyLimit(stuProfile.spending_limits?.daily_limit || stuProfile.daily_limit || 100);
+        setWeeklyLimit(stuProfile.spending_limits?.weekly_limit || stuProfile.weekly_limit || 250);
+        setMonthlyLimit(stuProfile.spending_limits?.monthly_limit || stuProfile.monthly_limit || 500);
       }
     } catch (err) {
       console.error('Error loading guardian data:', err);
@@ -75,7 +93,10 @@ export default function ParentApprovalPage({ setActivePage }) {
     setFeedback(null);
     try {
       const res = await api.guardian.approve(approvalId, 'Approved by Priya Sharma for educational advancement.');
-      setFeedback({ type: 'success', message: `Transaction approved! Dispatched to ${res.transaction?.executed_provider || 'Stripe'} for settlement.` });
+      setFeedback({ type: 'success', message: res.message || 'Payment approved! Authorized by parent in portal.' });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('guardian_approval_updated'));
+      }
       loadData();
     } catch (err) {
       console.error('Approve error:', err);
@@ -86,14 +107,17 @@ export default function ParentApprovalPage({ setActivePage }) {
   }
 
   async function handleReject(approvalId) {
-    const reason = prompt('Please provide reason for rejection:', 'Transaction exceeds permitted student study allowance.');
+    const reason = prompt('Please provide a reason for rejecting this request:', 'This course exceeds the current monthly educational budget.');
     if (!reason) return;
 
     setActionLoading(approvalId);
     setFeedback(null);
     try {
       await api.guardian.reject(approvalId, reason);
-      setFeedback({ type: 'success', message: 'Transaction successfully rejected. Student notified.' });
+      setFeedback({ type: 'success', message: 'Payment request rejected. Student has been notified.' });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('guardian_approval_updated'));
+      }
       loadData();
     } catch (err) {
       console.error('Reject error:', err);
@@ -107,12 +131,15 @@ export default function ParentApprovalPage({ setActivePage }) {
     e.preventDefault();
     setSavingLimits(true);
     try {
-      await api.guardian.updateLimits(studentId, {
+      const res = await api.guardian.updateLimits(studentId, {
         daily_limit: parseFloat(dailyLimit),
         weekly_limit: parseFloat(weeklyLimit),
         monthly_limit: parseFloat(monthlyLimit)
       });
       setLimitsSaved(true);
+      if (res?.profile) {
+        setProfile(res.profile);
+      }
       setTimeout(() => setLimitsSaved(false), 3000);
     } catch (err) {
       console.error('Error saving limits:', err);
@@ -135,15 +162,15 @@ export default function ParentApprovalPage({ setActivePage }) {
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center gap-1.5">
               <Users2 className="w-3.5 h-3.5" />
-              Parent & Guardian Control Center
+              Parent & Legal Guardian Portal
             </span>
-            <span className="text-xs text-slate-300">Guardian ID: Priya Sharma (priya.sharma@guardian.com)</span>
+            <span className="text-xs text-slate-300">Logged in as: Priya Sharma (priya.sharma@guardian.com)</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Supervising Student: Aarav Sharma (17 yrs)
+            Supervising Student: Aarav Sharma (Age 17)
           </h1>
           <p className="text-xs text-slate-300 max-w-2xl">
-            Authorize high-ticket international courses, customize spend velocity caps, and audit all cross-border educational transactions in real time.
+            Review and approve your student's online learning course payments, adjust daily and monthly spending allowances, and manage allowed purchase categories.
           </p>
         </div>
 
@@ -159,7 +186,7 @@ export default function ParentApprovalPage({ setActivePage }) {
             onClick={loadData}
             disabled={loading}
             className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all cursor-pointer"
-            title="Refresh"
+            title="Refresh Requests"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -190,18 +217,18 @@ export default function ParentApprovalPage({ setActivePage }) {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <Clock className="w-4 h-4 text-amber-500" />
-              Transactions Requiring Parent Consent ({pendingApprovals.length})
+              Payments Waiting for Your Approval ({pendingApprovals.length})
             </h2>
-            <span className="text-[10px] text-slate-400">Under-18 Regulatory Requirement</span>
+            <span className="text-[10px] text-slate-400">Parent Consent Required</span>
           </div>
 
           <div className="space-y-3">
             {pendingApprovals.length === 0 ? (
               <div className="p-8 rounded-xl bg-slate-50 dark:bg-slate-900 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">All Caught Up!</h3>
+                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">No Pending Requests</h3>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  There are no pending student transactions awaiting your authorization at this time.
+                  All current payment requests from your student have been resolved.
                 </p>
               </div>
             ) : (
@@ -214,7 +241,7 @@ export default function ParentApprovalPage({ setActivePage }) {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900 dark:text-white text-sm">
-                          {appr.merchant_name || 'International Course'}
+                          {appr.merchant_name || 'International Online Course'}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
                           {appr.merchant_category || 'Education'}
@@ -235,12 +262,12 @@ export default function ParentApprovalPage({ setActivePage }) {
                     </div>
                   </div>
 
-                  {/* Compliance note */}
+                  {/* Why approval is needed */}
                   <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
-                    <strong className="text-teal-600 dark:text-teal-400">Compliance Reason:</strong>{' '}
+                    <strong className="text-teal-600 dark:text-teal-400">Why approval is needed:</strong>{' '}
                     {appr.amount > 50
-                      ? 'Exceeds autonomous single-transaction $50 limit for minors.'
-                      : 'International educational merchant category requires parental 2FA authorization.'}
+                      ? 'The amount exceeds your student\'s $50 auto-approval limit.'
+                      : 'International educational purchase requires parent confirmation.'}
                   </div>
 
                   {/* Actions */}
@@ -251,7 +278,7 @@ export default function ParentApprovalPage({ setActivePage }) {
                       className="px-3.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
-                      Reject
+                      Reject Request
                     </button>
                     <button
                       onClick={() => handleApprove(appr.id)}
@@ -263,7 +290,7 @@ export default function ParentApprovalPage({ setActivePage }) {
                       ) : (
                         <Check className="w-3.5 h-3.5" />
                       )}
-                      Authorize & Settle Payment
+                      Approve & Pay Course
                     </button>
                   </div>
                 </div>
@@ -280,7 +307,7 @@ export default function ParentApprovalPage({ setActivePage }) {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Settings className="w-4 h-4 text-teal-500" />
-                Configure Spending Limits
+                Configure Spending Limits for Aarav
               </h2>
               {limitsSaved && (
                 <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
@@ -292,7 +319,7 @@ export default function ParentApprovalPage({ setActivePage }) {
             <form onSubmit={handleSaveLimits} className="space-y-3.5">
               <div>
                 <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  <span>Daily Cap:</span>
+                  <span>Daily Maximum:</span>
                   <span className="font-mono text-slate-900 dark:text-white">${dailyLimit} USD</span>
                 </div>
                 <input
@@ -308,7 +335,7 @@ export default function ParentApprovalPage({ setActivePage }) {
 
               <div>
                 <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  <span>Weekly Cap:</span>
+                  <span>Weekly Maximum:</span>
                   <span className="font-mono text-slate-900 dark:text-white">${weeklyLimit} USD</span>
                 </div>
                 <input
@@ -324,7 +351,7 @@ export default function ParentApprovalPage({ setActivePage }) {
 
               <div>
                 <div className="flex justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  <span>Monthly Cap:</span>
+                  <span>Monthly Maximum:</span>
                   <span className="font-mono text-slate-900 dark:text-white">${monthlyLimit} USD</span>
                 </div>
                 <input
@@ -344,7 +371,7 @@ export default function ParentApprovalPage({ setActivePage }) {
                 className="w-full py-2 px-3 bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-teal-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 {savingLimits ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                Update Limits
+                Save Spending Limits
               </button>
             </form>
           </div>
@@ -353,10 +380,10 @@ export default function ParentApprovalPage({ setActivePage }) {
           <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-indigo-500" />
-              Approved Merchant Categories
+              Allowed Purchase Categories
             </h2>
             <p className="text-[11px] text-slate-400">
-              Only checked merchant codes are permitted for international student checkout.
+              Only checked merchant categories are allowed. Non-educational categories like gambling or crypto are strictly blocked.
             </p>
 
             <div className="space-y-2 pt-1">
@@ -389,4 +416,3 @@ export default function ParentApprovalPage({ setActivePage }) {
     </div>
   );
 }
-

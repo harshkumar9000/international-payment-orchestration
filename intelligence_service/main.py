@@ -102,7 +102,9 @@ class AgenticRefundRequest(BaseModel):
     customer_email: Optional[str] = Field(default="user@example.com")
 
 class StudentPaymentIntentRequest(BaseModel):
-    age: int = Field(default=17, example=17)
+    age: Optional[int] = Field(default=None, example=17)
+    date_of_birth: Optional[str] = Field(default=None, example="2009-05-15")
+    age_status: Optional[str] = Field(default=None, example="VERIFIED")
     guardian_consent_status: Optional[str] = Field(default="ACTIVE")
     merchant_category: str = Field(default="online_courses", example="online_courses")
     amount: float = Field(..., example=65.00)

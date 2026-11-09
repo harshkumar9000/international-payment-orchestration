@@ -65,7 +65,28 @@ flowchart TD
 
 ---
 
-## 🚀 Key Features Breakdown
+## 📖 Plain-English Glossary: How It Works
+
+For college students, parents, small business owners, and judges without a technical background, here is what these common terms mean in ATLAS.PAY:
+
+| Technical Term | Everyday Explanation |
+| :--- | :--- |
+| **Payment Orchestration** | A system that coordinates multiple payment providers (like Stripe, PayPal, and Adyen) and automatically picks the best one for each transaction. |
+| **Payment Provider** | A company or financial service that processes payments between customers and businesses. |
+| **Smart Routing** | An automated decision engine that chooses the most cost-effective and reliable payment provider for each payment based on currency, country, and card type. |
+| **Currency Conversion (FX)** | Converting money from one currency to another (for example, US Dollars to Indian Rupees). |
+| **Conversion Spread / Markup** | A small percentage (e.g. 1.25%) added to market exchange rates to protect businesses from currency fluctuations. |
+| **3D Secure (3DS)** | An extra security step required by banks (such as an SMS code or banking app approval) to verify the cardholder. |
+| **Card BIN (Bank Identification Number)** | The first 6 digits of a card that identify which bank and card network issued it (for example, identifying international RuPay Global vs. domestic-only cards). |
+| **TCS (Tax Collected at Source)** | An Indian government tax collected on foreign money transfers under the RBI Liberalised Remittance Scheme (5% for education, 20% for general purchases above ₹7 Lakh). |
+| **Merchant Category Code (MCC)** | A 4-digit code identifying what a business sells, used by ATLAS.PAY to ensure students only spend on approved educational merchants. |
+| **Idempotency Protection** | A safety safeguard ensuring that if a network glitch causes a refund or payment to be sent twice, it is only processed once. |
+| **Webhooks** | Real-time automated notifications sent to your server as soon as an event happens (like a successful payment or refund). |
+| **Fraud Score (0 to 100)** | A security score assessing the risk of a payment. Lower is safer (under 30 is normal; over 80 is blocked as suspicious). |
+
+---
+
+## 🚀 Key Features Breakdown (In Plain English)
 
 ### 1. Domestic Card & UPI Integration for International Payments
 Indian shoppers and businesses frequently face declined payments when using domestic instruments for overseas purchases. ATLAS.PAY provides:
@@ -106,20 +127,20 @@ Visual aesthetics inspired by modern AI FinTech dashboards:
 | **Background** | `#F8FAFC` | Light Mode Slate Background |
 | **White** | `#FFFFFF` | Card Surfaces, High-Contrast Typography |
 
-### The 13 Dashboard Pages:
-1. **Overview Dashboard** (`/dashboard`): Recharts 7-day gross volume area chart, success rate gauge (96.4%), auto-refund KPIs, active provider health matrix, and recent transactions.
-2. **Payment Checkout** (`/checkout`): Multi-corridor payment checkout with RuPay Global badge, UPI QR code generator, and student educational tag.
-3. **Payment Compatibility** (`/compatibility`): Interactive RuPay BIN inspector (6521 vs 6070 PMJDY), bilateral UPI corridor map, and RBI LRS TCS tax calculator.
-4. **Smart Routing Engine** (`/routing`): Rule builder with priority weighting, currency criteria, latency limits, and route simulator.
-5. **Student Payments** (`/student`): Under-18 student dashboard, allowance utilization bar, Coursera/Harvard course enrollment, and pending request tracker.
-6. **Parent/Guardian Approval** (`/guardian`): Guardian consent portal, one-click Approve/Reject, spending sliders, and category whitelisting toggles.
-7. **Agentic Refund Center** (`/agentic-refund`): Stuck charge detection, provider status audit, autonomous refund execution, and compliance queue for >$500.
-8. **AI Fraud Detection Center** (`/fraud`): Machine learning risk scoring, attack preset simulator (Tor IP, card testing velocity, high-risk BIN), and rule editor.
-9. **Currency Exchange Engine** (`/currency`): Live exchange rates for 20+ currencies, FX margin markup editor, and converter.
-10. **Merchant Analytics** (`/analytics`): Deep business intelligence, currency corridor pie chart, provider latency bar chart, and net fee savings calculation.
-11. **Payment Providers** (`/providers`): Multi-gateway benchmark matrix (Stripe, Adyen, PayPal, Razorpay, dLocal) with active SLAs and fee structures.
-12. **Transaction History** (`/transactions`): Filterable transaction ledger with student markers, refund status pills, JSON detail drawer, and CSV export.
-13. **Platform Settings** (`/settings`): API secret key manager, merchant profile, student mode policy thresholds, and simulated webhook dispatcher.
+### The 13 Dashboard Pages (Simplified & Accessible):
+1. **Dashboard Overview** (`/dashboard`): Real-time snapshot of business volume, 96.4% payment success rate, automatic refund counter, provider health, and fee savings.
+2. **Payment Checkout** (`/checkout`): Guided 6-step international checkout supporting RuPay Global, UPI QR codes, student education discounts, and failover recovery.
+3. **Indian Cards & UPI Checker** (`/compatibility`): Instant tool to test whether an Indian RuPay card or UPI account works internationally, with transparent TCS tax breakdown.
+4. **Choose Best Payment Provider (Smart Routing)** (`/routing`): Intelligent rule builder and interactive payment simulator that automatically chooses the lowest-fee provider.
+5. **Student Payments (Under-18)** (`/student`): Safe portal for students to pay for international courses, view monthly spending limits, and request parent approval.
+6. **Parent Approval Portal** (`/guardian`): Real-time guardian portal to review and approve child purchases with 1 click, set spending limits, and approve merchants.
+7. **Automatic Refund Assistant** (`/agentic-refund`): AI assistant that detects interrupted payments, checks the provider's ledger directly, and safely refunds customers.
+8. **Suspicious Payment Shield (Fraud Check)** (`/fraud`): AI security system that analyzes payment risk (0-100) and blocks stolen cards and scams before they process.
+9. **Currency Conversion & Exchange Rates** (`/currency`): Live market conversion rates across 20+ currencies, customer price preview, and conversion fee settings.
+10. **Business Reports & Performance** (`/analytics`): Clear charts showing payment volume by currency, provider speeds, and total money saved on processing fees.
+11. **Payment Providers** (`/providers`): Side-by-side comparison of fees, speeds, and country strengths, with 1-click toggles to enable or pause providers.
+12. **Payment History** (`/transactions`): Filterable record of all completed, recovered, and blocked payments with step-by-step audit timelines.
+13. **Platform Settings & Controls** (`/settings`): Business profile settings, smart routing priorities, secure API keys, and test notification dispatchers.
 
 ---
 
@@ -242,25 +263,23 @@ npm --prefix frontend run build
 
 ### Domestic Card & UPI Rails (Feature 1)
 - `POST /api/domestic-card/check-eligibility` — Check RuPay Global vs PMJDY eligibility, NIPL bilateral UPI support, and TCS breakdown.
-- `GET /api/domestic-card/corridors` — List active NIPL bilateral corridors (Singapore, UAE, France, Mauritius).
-- `POST /api/domestic-card/calculate-tcs` — Calculate RBI LRS TCS withholding based on remittance purpose (Education 5% vs General 20%).
+- `GET /api/domestic-card/supported-rails` — List active NIPL bilateral corridors (Singapore, UAE, France, Mauritius) and co-branded networks.
+- `POST /api/domestic-card/tcs-calculator` — Calculate RBI LRS TCS withholding based on remittance purpose (Education 5% vs General 20%).
 
 ### Under-18 & Student Payments (Feature 2)
 - `GET /api/student/profile?student_id={id}` — Fetch student profile, minor indicator, spending limits, and guardian info.
-- `POST /api/student/payment-intent` — Submit educational payment intent with minor DOB and MCC validation.
-- `GET /api/student/approvals?student_id={id}` — View pending and past consent requests.
+- `POST /api/student/verify-intent` — Submit educational payment intent with minor DOB and MCC validation.
 - `GET /api/guardian/pending-approvals?guardian_id={id}` — Fetch pending approvals for guardian.
 - `POST /api/guardian/approve/:id` — Guardian authorizes transaction; dispatches to payment rail.
 - `POST /api/guardian/reject/:id` — Guardian rejects transaction with compliance reason.
-- `PUT /api/guardian/spending-limits` — Update student daily, weekly, and monthly limits.
+- `PUT /api/student/limits` — Update student daily, weekly, and monthly limits.
 
 ### Agentic Refund & Recovery (Feature 3)
-- `GET /api/agentic-refund/pending-refunds` — Retrieve stuck/orphaned charges.
+- `GET /api/agentic-refund/history` — Retrieve past automated refund records and audit status.
 - `POST /api/agentic-refund/analyze/:transaction_id` — Autonomous agent queries gateway ledger and generates decision with idempotency key.
 - `POST /api/agentic-refund/execute/:transaction_id` — Issue verified refund to provider API with duplicate protection.
-- `GET /api/agentic-refund/compliance-queue` — View transactions &gt;$500 USD awaiting human compliance review.
-- `POST /api/agentic-refund/compliance-action/:id` — Approve or reject high-value refund.
-- `GET /api/agentic-refund/audit-trail` — Complete agentic audit log.
+- `GET /api/agentic-refund/approvals-queue` — View transactions >$500 USD awaiting human compliance review.
+- `POST /api/agentic-refund/approve-manual/:id` — Approve or reject high-value refund in compliance queue.
 
 ### Checkout & Orchestration
 - `POST /api/checkout/initiate` — Initiate payment, run fraud check, verify student intent, select optimal provider.

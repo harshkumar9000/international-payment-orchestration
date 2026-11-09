@@ -15,7 +15,7 @@ from routing_engine import optimize_route, PROVIDER_PROFILES
 from recovery_engine import analyze_decline
 from domestic_card_engine import evaluate_domestic_instrument
 from agentic_refund_engine import evaluate_agentic_refund
-from student_payment_engine import verify_student_payment_intent
+from student_payment_engine import verify_student_payment_intent, parse_and_calculate_age
 
 class TestFraudEngine(unittest.TestCase):
     def test_clean_transaction_approves(self):
@@ -233,6 +233,19 @@ class TestAgenticRefundEngine(unittest.TestCase):
         self.assertEqual(res["decision"], "REFUND_REJECTED")
         self.assertEqual(res["reason_code"], "DUPLICATE_REFUND_PREVENTED")
 
+    def test_pending_transaction_rejects_premature_refund(self):
+        payload = {
+            "transaction_id": "tx_test_pending_05",
+            "provider": "stripe",
+            "gateway_actual_status": "PENDING",
+            "amount": 75.00,
+            "currency": "USD"
+        }
+        res = evaluate_agentic_refund(payload)
+        self.assertEqual(res["decision"], "REFUND_REJECTED")
+        self.assertEqual(res["reason_code"], "TRANSACTION_STILL_PENDING")
+        self.assertFalse(res["refund_eligible"])
+
 class TestStudentPaymentEngine(unittest.TestCase):
     def test_minor_with_active_consent_under_threshold_approves(self):
         payload = {
@@ -280,6 +293,157 @@ class TestStudentPaymentEngine(unittest.TestCase):
         res = verify_student_payment_intent(payload)
         self.assertEqual(res["status"], "BLOCKED")
         self.assertEqual(res["decision"], "GUARDIAN_CONSENT_REQUIRED")
+
+    def test_adult_student_18_or_older_does_not_require_guardian_approval(self):
+        # Student aged 18 paying above $50 threshold should not be treated as a minor
+        payload = {
+            "age": 18,
+            "merchant_category": "online_courses",
+            "amount": 89.00,
+            "currency": "USD",
+            "auto_approval_threshold": 50.0
+        }
+        res = verify_student_payment_intent(payload)
+        self.assertEqual(res["status"], "APPROVED")
+        self.assertEqual(res["decision"], "INSTANT_ALLOWANCE_APPROVED")
+        self.assertFalse(res["requires_parent_approval"])
+
+    def test_student_dob_calculates_minor_and_adult_accurately(self):
+        from datetime import date
+        today = date.today()
+
+        # Exactly 17 years old today
+        minor_dob = f"{today.year - 17}-{today.month:02d}-{today.day:02d}"
+        minor_res = verify_student_payment_intent({
+            "date_of_birth": minor_dob,
+            "guardian_consent_status": "ACTIVE",
+            "merchant_category": "online_courses",
+            "amount": 89.00,
+            "auto_approval_threshold": 50.0
+        })
+        self.assertEqual(minor_res["status"], "PENDING_APPROVAL")
+        self.assertTrue(minor_res["requires_parent_approval"])
+
+        # Exactly 18 years old today
+        adult_dob = f"{today.year - 18}-{today.month:02d}-{today.day:02d}"
+        adult_res = verify_student_payment_intent({
+            "date_of_birth": adult_dob,
+            "merchant_category": "online_courses",
+            "amount": 89.00,
+            "auto_approval_threshold": 50.0
+        })
+        self.assertEqual(adult_res["status"], "APPROVED")
+        self.assertFalse(adult_res["requires_parent_approval"])
+
+    def test_missing_dob_returns_unverified_and_blocked(self):
+        # 1. Missing / None DOB
+        res_none = verify_student_payment_intent({
+            "date_of_birth": None,
+            "merchant_category": "online_courses",
+            "amount": 50.0
+        })
+        self.assertEqual(res_none["status"], "BLOCKED")
+        self.assertEqual(res_none["decision"], "AGE_VERIFICATION_REQUIRED")
+        self.assertEqual(res_none["age_status"], "UNVERIFIED")
+        self.assertTrue(res_none["requires_age_verification"])
+
+        # 2. Empty string DOB
+        res_empty = verify_student_payment_intent({
+            "date_of_birth": "   ",
+            "merchant_category": "online_courses",
+            "amount": 50.0
+        })
+        self.assertEqual(res_empty["status"], "BLOCKED")
+        self.assertEqual(res_empty["decision"], "AGE_VERIFICATION_REQUIRED")
+
+        # 3. Direct parse check
+        info = parse_and_calculate_age(None)
+        self.assertEqual(info["status"], "UNVERIFIED")
+        self.assertIsNone(info["age"])
+
+    def test_invalid_dob_returns_unverified_and_blocked(self):
+        # 1. Malformed format string
+        res_format = verify_student_payment_intent({
+            "date_of_birth": "05/15/2008",
+            "merchant_category": "online_courses",
+            "amount": 50.0
+        })
+        self.assertEqual(res_format["status"], "BLOCKED")
+        self.assertEqual(res_format["decision"], "AGE_VERIFICATION_REQUIRED")
+        self.assertEqual(res_format["age_status"], "UNVERIFIED")
+
+        # 2. Non-existent calendar date (e.g. Feb 31)
+        res_calendar = verify_student_payment_intent({
+            "date_of_birth": "2008-02-31",
+            "merchant_category": "online_courses",
+            "amount": 50.0
+        })
+        self.assertEqual(res_calendar["status"], "BLOCKED")
+        self.assertEqual(res_calendar["decision"], "AGE_VERIFICATION_REQUIRED")
+
+        # Direct parse checks
+        info_calendar = parse_and_calculate_age("2008-02-31")
+        self.assertEqual(info_calendar["status"], "UNVERIFIED")
+        self.assertIn("invalid calendar values", info_calendar["reason"])
+
+    def test_future_dob_returns_unverified_and_blocked(self):
+        # Date of birth in the future
+        res_future = verify_student_payment_intent({
+            "date_of_birth": "2035-12-01",
+            "merchant_category": "online_courses",
+            "amount": 50.0
+        })
+        self.assertEqual(res_future["status"], "BLOCKED")
+        self.assertEqual(res_future["decision"], "AGE_VERIFICATION_REQUIRED")
+        self.assertEqual(res_future["age_status"], "UNVERIFIED")
+        self.assertIn("cannot be in the future", res_future["reason"])
+
+        info_future = parse_and_calculate_age("2035-12-01")
+        self.assertEqual(info_future["status"], "UNVERIFIED")
+        self.assertEqual(info_future["reason"], "Date of birth cannot be in the future.")
+
+    def test_age_17_minor_safeguards_enforced(self):
+        from datetime import date
+        today = date.today()
+        # Exactly 17 years old
+        dob_17 = f"{today.year - 17}-{today.month:02d}-{today.day:02d}"
+        info = parse_and_calculate_age(dob_17)
+        self.assertEqual(info["status"], "VERIFIED")
+        self.assertEqual(info["age"], 17)
+        self.assertTrue(info["is_minor"])
+
+        # Minor paying $89 (above $50 allowance) must require parent approval
+        res = verify_student_payment_intent({
+            "date_of_birth": dob_17,
+            "guardian_consent_status": "ACTIVE",
+            "merchant_category": "online_courses",
+            "amount": 89.00,
+            "auto_approval_threshold": 50.0
+        })
+        self.assertEqual(res["status"], "PENDING_APPROVAL")
+        self.assertEqual(res["decision"], "REQUIRES_PARENT_APPROVAL")
+        self.assertTrue(res["requires_parent_approval"])
+
+    def test_age_18_adult_student_allowed_without_guardian(self):
+        from datetime import date
+        today = date.today()
+        # Exactly 18 years old today
+        dob_18 = f"{today.year - 18}-{today.month:02d}-{today.day:02d}"
+        info = parse_and_calculate_age(dob_18)
+        self.assertEqual(info["status"], "VERIFIED")
+        self.assertEqual(info["age"], 18)
+        self.assertFalse(info["is_minor"])
+
+        # Adult student paying $89 (above minor allowance) does NOT require guardian approval
+        res = verify_student_payment_intent({
+            "date_of_birth": dob_18,
+            "merchant_category": "online_courses",
+            "amount": 89.00,
+            "auto_approval_threshold": 50.0
+        })
+        self.assertEqual(res["status"], "APPROVED")
+        self.assertEqual(res["decision"], "INSTANT_ALLOWANCE_APPROVED")
+        self.assertFalse(res["requires_parent_approval"])
 
 if __name__ == "__main__":
     unittest.main()

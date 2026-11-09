@@ -104,25 +104,76 @@ export const api = {
   // Agentic Refund & Autonomous Recovery
   agenticRefund: {
     analyze: (txId, reason) => request(`/agentic-refund/analyze/${txId}`, { method: 'POST', body: { reason } }),
+    evaluateTransaction: (txId, reason) => request(`/agentic-refund/analyze/${txId}`, { method: 'POST', body: { reason } }),
     execute: (txId, reason, overrideByHuman = false) => request(`/agentic-refund/execute/${txId}`, { method: 'POST', body: { reason, overrideByHuman } }),
+    executeRefund: (payload) => {
+      const txId = typeof payload === 'string' ? payload : (payload?.transaction_id || payload?.txId);
+      const reason = payload?.refund_reason || payload?.reason || 'Automatic refund processed';
+      const override = Boolean(payload?.overrideByHuman || payload?.is_human_override);
+      return request(`/agentic-refund/execute/${txId}`, { method: 'POST', body: { reason, overrideByHuman: override } });
+    },
     getHistory: () => request('/agentic-refund/history'),
+    getAuditTrail: async () => {
+      try {
+        const res = await request('/agentic-refund/history');
+        return { logs: res.audit_logs || [] };
+      } catch (err) {
+        console.warn('[API Client] Error fetching refund audit trail:', err.message);
+        return { logs: [] };
+      }
+    },
+    getPendingRefunds: async () => {
+      try {
+        const res = await request('/transactions?status=failed&limit=10');
+        return { stuck_transactions: res.transactions || [] };
+      } catch (err) {
+        console.warn('[API Client] Error fetching pending refunds:', err.message);
+        return { stuck_transactions: [] };
+      }
+    },
     getApprovalsQueue: () => request('/agentic-refund/approvals-queue'),
-    approveManual: (refundId) => request(`/agentic-refund/approve-manual/${refundId}`, { method: 'POST' })
+    getComplianceQueue: async () => {
+      try {
+        const res = await request('/agentic-refund/approvals-queue');
+        return { queue: res.pending_approvals || [] };
+      } catch (err) {
+        console.warn('[API Client] Error fetching compliance queue:', err.message);
+        return { queue: [] };
+      }
+    },
+    approveManual: (refundId) => request(`/agentic-refund/approve-manual/${refundId}`, { method: 'POST' }),
+    approveCompliance: (queueId, notes) => request(`/agentic-refund/approve-manual/${queueId}`, { method: 'POST', body: { notes } }),
+    rejectCompliance: (queueId, reason) => request(`/agentic-refund/approve-manual/${queueId}`, { method: 'POST', body: { decision: 'REJECT', reason } })
   },
 
   // Student & Under-18 Management
   student: {
     getProfile: (studentId) => request(`/student/profile${studentId ? `?student_id=${studentId}` : ''}`),
     verifyIntent: (payload) => request('/student/verify-intent', { method: 'POST', body: payload }),
-    updateLimits: (limits) => request('/student/limits', { method: 'PUT', body: limits }),
+    createPaymentIntent: (data) => request('/student/create-intent', { method: 'POST', body: data }),
+    listApprovals: (studentId) => request(`/student/approvals${studentId ? `?student_id=${studentId}` : ''}`),
+    getRecentTransactions: (studentId) => request(`/student/transactions${studentId ? `?student_id=${studentId}` : ''}`),
+    updateLimits: (studentIdOrPayload, maybeLimits) => {
+      const body = typeof studentIdOrPayload === 'object' && studentIdOrPayload !== null
+        ? studentIdOrPayload
+        : { student_id: studentIdOrPayload, ...(maybeLimits || {}) };
+      return request('/student/limits', { method: 'PUT', body });
+    },
     getCategories: () => request('/student/categories')
   },
 
   // Parent / Guardian Approval Portal
   guardian: {
+    getPending: (guardianId) => request(`/guardian/pending-approvals${guardianId ? `?guardian_id=${guardianId}` : ''}`),
     getPendingApprovals: (guardianId) => request(`/guardian/pending-approvals${guardianId ? `?guardian_id=${guardianId}` : ''}`),
     approve: (id, reason) => request(`/guardian/approve/${id}`, { method: 'POST', body: { reason } }),
     reject: (id, reason) => request(`/guardian/reject/${id}`, { method: 'POST', body: { reason } }),
+    updateLimits: (studentIdOrPayload, maybeLimits) => {
+      const body = typeof studentIdOrPayload === 'object' && studentIdOrPayload !== null
+        ? studentIdOrPayload
+        : { student_id: studentIdOrPayload, ...(maybeLimits || {}) };
+      return request('/guardian/limits', { method: 'PUT', body });
+    },
     getOverview: (guardianId) => request(`/guardian/overview${guardianId ? `?guardian_id=${guardianId}` : ''}`)
   },
 

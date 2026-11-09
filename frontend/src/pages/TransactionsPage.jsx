@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   ArrowRight,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Info
 } from 'lucide-react';
 
 export default function TransactionsPage() {
@@ -78,13 +79,13 @@ export default function TransactionsPage() {
         <div>
           <div className="flex items-center space-x-2 text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
             <ListOrdered className="w-4 h-4" />
-            <span>Multi-Rail Ledger</span>
+            <span>Payment Records</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
-            Global Transaction Ledger & Audit Trail
+            Payment History & Details
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Search, filter, and inspect routing decision timelines for cross-border payments.
+            Search, filter, and inspect step-by-step history and routing decisions for all international payments.
           </p>
         </div>
 
@@ -93,18 +94,18 @@ export default function TransactionsPage() {
           <a
             href={api.transactions.getCsvExportUrl()}
             download
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-blue-500" />
-            <span>Export CSV</span>
+            <span>Download CSV</span>
           </a>
           <a
             href={api.transactions.getJsonExportUrl()}
             download
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-purple-500" />
-            <span>Export JSON</span>
+            <span>Download JSON</span>
           </a>
         </div>
       </div>
@@ -120,7 +121,7 @@ export default function TransactionsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by ID, email, country..."
+              placeholder="Search by Payment ID, email, country..."
               className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
             />
           </form>
@@ -133,11 +134,11 @@ export default function TransactionsPage() {
               className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium"
             >
               <option value="all">Status: All</option>
-              <option value="settled">Settled</option>
-              <option value="recovered">Recovered</option>
+              <option value="settled">Completed</option>
+              <option value="recovered">Recovered via Backup</option>
               <option value="failed">Failed</option>
-              <option value="blocked">Blocked</option>
-              <option value="pending_3ds">Pending 3DS</option>
+              <option value="blocked">Blocked (Suspicious)</option>
+              <option value="pending_3ds">Waiting for Bank Check</option>
             </select>
           </div>
 
@@ -149,12 +150,12 @@ export default function TransactionsPage() {
               className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium font-mono"
             >
               <option value="all">Currency: All</option>
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
-              <option value="INR">INR</option>
-              <option value="BRL">BRL</option>
-              <option value="JPY">JPY</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="GBP">GBP (£)</option>
+              <option value="INR">INR (₹)</option>
+              <option value="BRL">BRL (R$)</option>
+              <option value="JPY">JPY (¥)</option>
             </select>
           </div>
 
@@ -165,7 +166,7 @@ export default function TransactionsPage() {
               onChange={(e) => setProviderFilter(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium"
             >
-              <option value="all">Gateway: All</option>
+              <option value="all">Provider: All</option>
               <option value="stripe">Stripe Global</option>
               <option value="adyen">Adyen European</option>
               <option value="paypal">PayPal Sandbox</option>
@@ -180,22 +181,22 @@ export default function TransactionsPage() {
       {/* Transactions Table */}
       <div className="p-6 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 shadow-sm">
         {loading ? (
-          <div className="py-12 text-center text-xs text-slate-400">Loading transactions...</div>
+          <div className="py-12 text-center text-xs text-slate-400">Loading payment history...</div>
         ) : transactions.length === 0 ? (
-          <div className="py-12 text-center text-xs text-slate-400">No transactions match your search criteria.</div>
+          <div className="py-12 text-center text-xs text-slate-400">No payments match your search criteria.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
-                  <th className="pb-3">Transaction ID</th>
+                  <th className="pb-3">Payment ID</th>
                   <th className="pb-3">Customer</th>
                   <th className="pb-3">Amount</th>
-                  <th className="pb-3">Method</th>
-                  <th className="pb-3">Primary / Executed</th>
+                  <th className="pb-3">Payment Method</th>
+                  <th className="pb-3">Provider Used</th>
                   <th className="pb-3">Status</th>
                   <th className="pb-3">Fee</th>
-                  <th className="pb-3 text-right">Inspect</th>
+                  <th className="pb-3 text-right">View Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
@@ -239,7 +240,15 @@ export default function TransactionsPage() {
                           ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
                           : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                       }`}>
-                        {tx.status}
+                        {tx.status === 'settled'
+                          ? 'Completed'
+                          : tx.status === 'recovered'
+                          ? 'Recovered'
+                          : tx.status === 'blocked'
+                          ? 'Blocked'
+                          : tx.status === 'pending_3ds'
+                          ? 'Verification Pending'
+                          : 'Failed'}
                       </span>
                     </td>
                     <td className="py-3 font-mono text-emerald-600">
@@ -248,8 +257,8 @@ export default function TransactionsPage() {
                     <td className="py-3 text-right">
                       <button
                         onClick={() => handleOpenDetail(tx.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition"
-                        title="View Full Audit Timeline"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+                        title="View Full Payment History"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -270,18 +279,18 @@ export default function TransactionsPage() {
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
               <div>
                 <span className="text-xs font-mono text-blue-500 font-bold">{selectedTxId}</span>
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Transaction Audit Trail</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Payment Step-by-Step History</h3>
               </div>
               <button
                 onClick={() => setSelectedTxId(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {loadingDetail ? (
-              <div className="py-8 text-center text-xs text-slate-400">Loading audit details...</div>
+              <div className="py-8 text-center text-xs text-slate-400">Loading payment details...</div>
             ) : detailData ? (
               <div className="space-y-6">
                 
@@ -296,17 +305,17 @@ export default function TransactionsPage() {
                   <div>
                     <span className="text-slate-500 block">Final Status</span>
                     <span className="font-bold uppercase text-emerald-500">
-                      {detailData.transaction.status}
+                      {detailData.transaction.status === 'settled' ? 'Completed' : detailData.transaction.status}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block">Gateway Used</span>
+                    <span className="text-slate-500 block">Provider Used</span>
                     <span className="font-mono uppercase font-bold text-blue-500">
                       {detailData.transaction.executed_provider}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block">Risk Score</span>
+                    <span className="text-slate-500 block">Fraud Score</span>
                     <span className="font-mono font-bold text-amber-500">
                       {detailData.transaction.risk_score || 0}/100
                     </span>
@@ -316,7 +325,7 @@ export default function TransactionsPage() {
                 {/* Chronological Audit Trail Timeline */}
                 <div>
                   <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-4">
-                    Orchestration Decision Timeline
+                    What Happened During This Payment
                   </h4>
 
                   <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-800">
@@ -351,4 +360,3 @@ export default function TransactionsPage() {
     </div>
   );
 }
-

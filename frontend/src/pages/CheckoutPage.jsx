@@ -18,7 +18,10 @@ import {
   Clock,
   Layers,
   Copy,
-  Check
+  Check,
+  ChevronDown,
+  ChevronUp,
+  HelpCircle
 } from 'lucide-react';
 
 const COUNTRIES = [
@@ -32,7 +35,7 @@ const COUNTRIES = [
   { code: 'JP', name: 'Japan', currency: 'JPY', flag: '🇯🇵' },
   { code: 'CA', name: 'Canada', currency: 'CAD', flag: '🇨🇦' },
   { code: 'AU', name: 'Australia', currency: 'AUD', flag: '🇦🇺' },
-  { code: 'KP', name: 'North Korea (Sanctioned Corridor Demo)', currency: 'USD', flag: '🚫' }
+  { code: 'KP', name: 'North Korea (Prohibited Region Demo)', currency: 'USD', flag: '🚫' }
 ];
 
 export default function CheckoutPage({ setActivePage }) {
@@ -62,6 +65,7 @@ export default function CheckoutPage({ setActivePage }) {
   const [paymentResult, setPaymentResult] = useState(null);
   const [activeSession, setActiveSession] = useState(null);
   const [currentStepText, setCurrentStepText] = useState('');
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
 
   // 3DS and UPI interactive state
   const [otpCode, setOtpCode] = useState('123456');
@@ -84,7 +88,6 @@ export default function CheckoutPage({ setActivePage }) {
         setCorridorData(compRes);
         setConversion(convRes);
         if (compRes.compatible_methods && compRes.compatible_methods.length > 0) {
-          // Preselect recommended or first
           const rec = compRes.compatible_methods.find(m => m.recommended);
           setSelectedMethod(rec ? rec.id : compRes.compatible_methods[0].id);
         }
@@ -97,17 +100,17 @@ export default function CheckoutPage({ setActivePage }) {
     updateCorridor();
   }, [selectedCountry, amount, baseCurrency]);
 
-  // Execute Payment Orchestration
+  // Execute Payment
   const handlePay = async (e) => {
     e.preventDefault();
     setProcessingState('initiating');
-    setCurrentStepText('Checking corridor legality & regulatory compliance...');
+    setCurrentStepText('Checking country rules and payment security...');
     setPaymentResult(null);
 
     try {
       // 1. Initiate Checkout Session
       await new Promise(r => setTimeout(r, 400));
-      setCurrentStepText('Running Python AI Risk Scoring (Velocity, Geolocation, Sanctions)...');
+      setCurrentStepText('Checking payment security...');
       
       const isSimulatedVpn = simulatedFailure === 'fraud_vpn';
       const initRes = await api.checkout.initiate({
@@ -122,10 +125,10 @@ export default function CheckoutPage({ setActivePage }) {
 
       setActiveSession(initRes);
 
-      // 2. Routing Decision Animation
+      // 2. Select best payment provider
       await new Promise(r => setTimeout(r, 450));
       setProcessingState('routing');
-      setCurrentStepText(`Routing to optimal gateway ${initRes.routing.primary_provider.toUpperCase()} (Lowest corridor fee + fastest latency)...`);
+      setCurrentStepText(`Selecting the best available payment provider (${initRes.routing.primary_provider.toUpperCase()})...`);
 
       // 3. Process with Gateway
       await new Promise(r => setTimeout(r, 600));
@@ -133,7 +136,7 @@ export default function CheckoutPage({ setActivePage }) {
       let declineSimulation = null;
       if (simulatedFailure === 'network_timeout') {
         declineSimulation = 'network_timeout';
-        setCurrentStepText('Simulating primary gateway timeout -> Initiating automated recovery cascade...');
+        setCurrentStepText('The payment provider did not respond. Checking whether another provider can process the payment...');
       } else if (simulatedFailure === 'insufficient_funds') {
         declineSimulation = 'insufficient_funds';
       }
@@ -172,7 +175,7 @@ export default function CheckoutPage({ setActivePage }) {
       console.error('[Payment Process Error]:', err);
       setProcessingState('failed');
       setPaymentResult({
-        error: err.message || 'Payment execution failed',
+        error: err.message || 'Payment could not be completed.',
         status: 'failed'
       });
     }
@@ -190,10 +193,10 @@ export default function CheckoutPage({ setActivePage }) {
       setPaymentResult({
         ...paymentResult,
         status: 'settled',
-        message: '3DS Strong Customer Authentication successful. Payment settled!'
+        message: 'Security verification successful. Your payment is complete!'
       });
     } catch (err) {
-      alert(err.message || '3DS Verification failed');
+      alert(err.message || 'Security verification failed.');
     } finally {
       setVerifyingAction(false);
     }
@@ -210,10 +213,10 @@ export default function CheckoutPage({ setActivePage }) {
       setPaymentResult({
         ...paymentResult,
         status: 'settled',
-        message: 'UPI collect transaction approved by user on mobile app!'
+        message: 'Payment approved on your UPI app and completed successfully!'
       });
     } catch (err) {
-      alert(err.message || 'UPI Verification failed');
+      alert(err.message || 'UPI approval failed.');
     } finally {
       setVerifyingAction(false);
     }
@@ -222,17 +225,17 @@ export default function CheckoutPage({ setActivePage }) {
   return (
     <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6">
       
-      {/* Title */}
+      {/* Title & Guidance */}
       <div className="mb-8">
-        <div className="flex items-center space-x-2 text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+        <div className="flex items-center space-x-2 text-xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
           <Sparkles className="w-4 h-4" />
-          <span>Interactive Cross-Border Checkout Simulator</span>
+          <span>Interactive Payment Demonstration (Demo Mode)</span>
         </div>
         <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
-          Unified International Checkout
+          International Payment Checkout
         </h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-          Switch countries to view dynamic payment rails, real-time FX pricing, and trigger automated cascading recovery.
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-3xl">
+          Try an international payment step-by-step. Select a country to see available payment methods, automatic currency conversion, and backup provider recovery.
         </p>
       </div>
 
@@ -241,79 +244,91 @@ export default function CheckoutPage({ setActivePage }) {
         {/* Left Column: Checkout Form */}
         <div className="lg:col-span-7 space-y-6">
           
-          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
+          <div className="p-6 sm:p-8 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
             
             <form onSubmit={handlePay} className="space-y-6">
               
               {/* Step 1: Customer Country & Amount */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                    <span>Customer Jurisdiction</span>
-                    <Globe className="w-3.5 h-3.5 text-slate-400" />
-                  </label>
-                  <select
-                    value={selectedCountry}
-                    onChange={(e) => setSelectedCountry(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-blue-500"
-                  >
-                    {COUNTRIES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.name} ({c.currency})
-                      </option>
-                    ))}
-                  </select>
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">Customer's Country & Payment Amount</span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Order Base Amount (USD)
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-sm font-semibold text-slate-400">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                      <span>Customer's Country</span>
+                      <Globe className="w-3.5 h-3.5 text-slate-400" />
+                    </label>
+                    <select
+                      value={selectedCountry}
+                      onChange={(e) => setSelectedCountry(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-teal-500"
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.name} ({c.currency})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Payment Amount (USD)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-sm font-semibold text-slate-400">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 text-sm font-mono font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Sanctions Block Warning */}
+              {/* Prohibited Country Warning */}
               {corridorData && !corridorData.compatible && (
                 <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
                   <div className="flex items-center space-x-2 font-bold mb-1">
                     <AlertTriangle className="w-4 h-4 text-rose-500" />
-                    <span>Cross-Border Sanctions Restriction</span>
+                    <span>Payments Are Prohibited in This Region</span>
                   </div>
                   <p>{corridorData.message}</p>
                 </div>
               )}
 
-              {/* Customer Email */}
+              {/* Step 2: Customer Email */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Customer Email
-                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">Customer Email</span>
+                </div>
                 <input
                   type="email"
                   required
                   value={customerEmail}
                   onChange={(e) => setCustomerEmail(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                  placeholder="customer@example.com"
+                  className="w-full px-3 py-2 text-sm rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
-              {/* Dynamic Compatible Payment Methods Selector */}
+              {/* Step 3: Choose Payment Method */}
               {corridorData?.compatible && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
-                    Available Payment Methods in {corridorData.country_name}
-                  </label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">
+                      Available Payment Methods in {corridorData.country_name}
+                    </span>
+                  </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {corridorData.compatible_methods.map((m) => {
@@ -323,9 +338,9 @@ export default function CheckoutPage({ setActivePage }) {
                           key={m.id}
                           type="button"
                           onClick={() => setSelectedMethod(m.id)}
-                          className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                          className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
                             isSelected
-                              ? 'border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-semibold ring-2 ring-blue-500/20'
+                              ? 'border-teal-600 bg-teal-50/60 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 font-semibold ring-2 ring-teal-500/20'
                               : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300'
                           }`}
                         >
@@ -333,12 +348,12 @@ export default function CheckoutPage({ setActivePage }) {
                             <span className="text-xs font-bold truncate">{m.name}</span>
                             {m.recommended && (
                               <span className="px-1.5 py-0.5 text-[9px] rounded font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                Best
+                                Recommended
                               </span>
                             )}
                           </div>
                           <span className="text-[10px] text-slate-500 dark:text-slate-400">
-                            {m.settlement_type || 'Instant'}
+                            {m.settlement_type === 'Instant' ? 'Instant Settlement' : (m.settlement_type || 'Instant')}
                           </span>
                         </button>
                       );
@@ -347,277 +362,195 @@ export default function CheckoutPage({ setActivePage }) {
                 </div>
               )}
 
-              {/* Payment Method Inputs */}
-              {selectedMethod === 'credit_card' && (
-                <div className="space-y-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Card Credentials</span>
-                    <span className="text-[11px] text-slate-400">Encrypted via TLS 1.3</span>
-                  </div>
-
-                  {/* 1-Click Test Card Pills */}
-                  <div className="flex flex-wrap gap-1.5 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => setCardNumber('4242 4242 4242 4242')}
-                      className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400 font-mono"
-                    >
-                      Card 4242 (Clean)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCardNumber('4000 0000 0000 3000')}
-                      className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-400 font-mono"
-                    >
-                      Card 3000 (3DS SCA)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCardNumber('4000 0000 0000 0003')}
-                      className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-purple-600 dark:text-purple-400 font-mono"
-                    >
-                      Card 0003 (Network Timeout)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCardNumber('4000 0000 0000 0005')}
-                      className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-rose-600 dark:text-rose-400 font-mono"
-                    >
-                      Card 0005 (Stolen Card)
-                    </button>
-                  </div>
-
-                  <div>
-                    <input
-                      type="text"
-                      required
-                      value={cardNumber}
-                      onChange={(e) => setCardNumber(e.target.value)}
-                      placeholder="4242 4242 4242 4242"
-                      className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      required
-                      value={cardExpiry}
-                      onChange={(e) => setCardExpiry(e.target.value)}
-                      placeholder="MM/YY"
-                      className="px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    />
-                    <input
-                      type="text"
-                      required
-                      value={cardCvc}
-                      onChange={(e) => setCardCvc(e.target.value)}
-                      placeholder="CVC"
-                      className="px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
-                    />
-                  </div>
+              {/* Step 4: Payment Details */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">Payment Details</span>
                 </div>
-              )}
 
-              {/* UPI Inputs */}
-              {selectedMethod === 'upi' && (
-                <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-purple-700 dark:text-purple-300 text-xs font-bold">
-                      <Smartphone className="w-4 h-4" />
-                      <span>Instant UPI Payment Rails (India)</span>
+                {/* Card Inputs */}
+                {selectedMethod === 'credit_card' && (
+                  <div className="space-y-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Test Card Details</span>
+                      <span className="text-[11px] text-slate-400">Encrypted & Secure</span>
                     </div>
-                    <div className="flex space-x-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-purple-200 dark:border-purple-800">
+
+                    {/* Quick Test Cards */}
+                    <div className="flex flex-wrap gap-1.5 mb-2">
                       <button
                         type="button"
-                        onClick={() => setUpiMode('qr')}
-                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${
-                          upiMode === 'qr' ? 'bg-purple-600 text-white' : 'text-slate-600 dark:text-slate-400'
-                        }`}
+                        onClick={() => setCardNumber('4242 4242 4242 4242')}
+                        className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-teal-600 dark:text-teal-400 font-mono cursor-pointer"
+                        title="Normal successful card payment"
                       >
-                        Scan QR
+                        Normal Card (4242)
                       </button>
                       <button
                         type="button"
-                        onClick={() => setUpiMode('vpa')}
-                        className={`px-2 py-0.5 text-[10px] font-semibold rounded ${
-                          upiMode === 'vpa' ? 'bg-purple-600 text-white' : 'text-slate-600 dark:text-slate-400'
-                        }`}
+                        onClick={() => setCardNumber('4000 0000 0000 3000')}
+                        className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-amber-600 dark:text-amber-400 font-mono cursor-pointer"
+                        title="Simulates 3D Secure bank check"
                       >
-                        UPI ID / VPA
+                        3D Secure Card (3000)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCardNumber('4000 0000 0000 0003')}
+                        className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-purple-600 dark:text-purple-400 font-mono cursor-pointer"
+                        title="Simulates provider timeout that triggers automatic recovery"
+                      >
+                        Timeout Test (0003)
                       </button>
                     </div>
-                  </div>
 
-                  {upiMode === 'qr' ? (
-                    <div className="text-center py-2 space-y-3">
-                      <div className="w-40 h-40 mx-auto p-2 bg-white rounded-xl shadow border border-slate-200 flex flex-col items-center justify-center relative">
-                        <svg viewBox="0 0 100 100" className="w-full h-full text-slate-900 fill-current">
-                          {/* Corner Squares */}
-                          <rect x="5" y="5" width="28" height="28" fill="#1e1b4b" rx="2" />
-                          <rect x="9" y="9" width="20" height="20" fill="white" />
-                          <rect x="13" y="13" width="12" height="12" fill="#1e1b4b" />
-                          
-                          <rect x="67" y="5" width="28" height="28" fill="#1e1b4b" rx="2" />
-                          <rect x="71" y="9" width="20" height="20" fill="white" />
-                          <rect x="75" y="13" width="12" height="12" fill="#1e1b4b" />
-                          
-                          <rect x="5" y="67" width="28" height="28" fill="#1e1b4b" rx="2" />
-                          <rect x="9" y="71" width="20" height="20" fill="white" />
-                          <rect x="13" y="75" width="12" height="12" fill="#1e1b4b" />
-
-                          {/* Data Matrix Dots */}
-                          <rect x="38" y="10" width="6" height="6" fill="#7c3aed" />
-                          <rect x="48" y="10" width="6" height="6" fill="#1e1b4b" />
-                          <rect x="38" y="22" width="6" height="6" fill="#1e1b4b" />
-                          <rect x="48" y="22" width="6" height="6" fill="#7c3aed" />
-
-                          <rect x="10" y="38" width="6" height="6" fill="#1e1b4b" />
-                          <rect x="22" y="38" width="6" height="6" fill="#7c3aed" />
-                          <rect x="38" y="38" width="10" height="10" fill="#1e1b4b" />
-                          <rect x="54" y="38" width="6" height="6" fill="#7c3aed" />
-                          <rect x="66" y="38" width="8" height="6" fill="#1e1b4b" />
-                          <rect x="80" y="38" width="8" height="6" fill="#7c3aed" />
-
-                          <rect x="38" y="54" width="6" height="6" fill="#7c3aed" />
-                          <rect x="50" y="54" width="6" height="6" fill="#1e1b4b" />
-                          <rect x="62" y="54" width="8" height="8" fill="#7c3aed" />
-                          <rect x="76" y="54" width="8" height="6" fill="#1e1b4b" />
-
-                          <rect x="38" y="70" width="8" height="8" fill="#1e1b4b" />
-                          <rect x="52" y="70" width="6" height="6" fill="#7c3aed" />
-                          <rect x="64" y="70" width="8" height="6" fill="#1e1b4b" />
-                          <rect x="78" y="70" width="6" height="8" fill="#7c3aed" />
-
-                          <rect x="44" y="84" width="8" height="6" fill="#1e1b4b" />
-                          <rect x="58" y="84" width="6" height="6" fill="#7c3aed" />
-                          <rect x="70" y="84" width="8" height="6" fill="#1e1b4b" />
-                        </svg>
-                        <div className="text-[8px] font-bold text-purple-700 bg-purple-50 px-1 rounded mt-1">
-                          UPI 2.0 Dynamic
-                        </div>
-                      </div>
-                      <div className="text-xs text-slate-600 dark:text-slate-300">
-                        Scan with <b>Google Pay</b>, <b>PhonePe</b>, <b>Paytm</b>, or any banking app.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setVpa('vikram@okhdfcbank')}
-                          className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 font-mono"
-                        >
-                          vikram@okhdfcbank
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setVpa('user@paytm')}
-                          className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 text-purple-700 dark:text-purple-300 font-mono"
-                        >
-                          user@paytm
-                        </button>
-                      </div>
-
+                    <div>
                       <input
                         type="text"
                         required
-                        value={vpa}
-                        onChange={(e) => setVpa(e.target.value)}
-                        placeholder="yourname@okaxis"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        placeholder="Card Number"
                         className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                       />
                     </div>
-                  )}
 
-                  <div className="text-[11px] text-slate-500">
-                    Direct routing to Razorpay UPI gateway with 0.5% capped processing fee.
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="text"
+                        required
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        placeholder="MM/YY"
+                        className="px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      />
+                      <input
+                        type="text"
+                        required
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value)}
+                        placeholder="Security Code (CVC)"
+                        className="px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* PayPal Sandbox */}
-              {selectedMethod === 'paypal' && (
-                <div className="p-4 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800 space-y-3">
-                  <div className="flex items-center space-x-2 text-sky-700 dark:text-sky-300 text-xs font-bold">
-                    <Globe className="w-4 h-4" />
-                    <span>PayPal Sandbox REST API Integration</span>
+                {/* UPI Inputs */}
+                {selectedMethod === 'upi' && (
+                  <div className="p-4 rounded-xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-purple-700 dark:text-purple-300 text-xs font-bold">
+                        <Smartphone className="w-4 h-4" />
+                        <span>Instant UPI Payment (India)</span>
+                      </div>
+                      <div className="flex space-x-1 bg-white dark:bg-slate-900 p-0.5 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <button
+                          type="button"
+                          onClick={() => setUpiMode('qr')}
+                          className={`px-2 py-0.5 text-[10px] font-semibold rounded cursor-pointer ${
+                            upiMode === 'qr' ? 'bg-purple-600 text-white' : 'text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          Scan QR Code
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUpiMode('vpa')}
+                          className={`px-2 py-0.5 text-[10px] font-semibold rounded cursor-pointer ${
+                            upiMode === 'vpa' ? 'bg-purple-600 text-white' : 'text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          Enter UPI ID
+                        </button>
+                      </div>
+                    </div>
+
+                    {upiMode === 'qr' ? (
+                      <div className="text-center py-2 space-y-2">
+                        <div className="w-36 h-36 mx-auto p-2 bg-white rounded-xl shadow border border-slate-200 flex flex-col items-center justify-center">
+                          <QrCode className="w-24 h-24 text-slate-900" />
+                          <div className="text-[9px] font-bold text-purple-700 mt-1">
+                            UPI Instant QR
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                          Scan with <b>Google Pay</b>, <b>PhonePe</b>, <b>Paytm</b>, or your mobile banking app.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          required
+                          value={vpa}
+                          onChange={(e) => setVpa(e.target.value)}
+                          placeholder="username@okaxis"
+                          className="w-full px-3 py-2 text-sm font-mono rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    )}
                   </div>
-                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-sky-100 dark:border-sky-900 text-xs space-y-1">
-                    <div className="text-slate-700 dark:text-slate-200 font-medium">
-                      Sandbox Buyer Account:
+                )}
+
+                {/* PayPal Sandbox */}
+                {selectedMethod === 'paypal' && (
+                  <div className="p-4 rounded-xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800 space-y-2 text-xs">
+                    <div className="flex items-center space-x-2 text-sky-700 dark:text-sky-300 font-bold">
+                      <Globe className="w-4 h-4" />
+                      <span>PayPal Sandbox Integration</span>
                     </div>
-                    <div className="font-mono text-sky-600 dark:text-sky-400">
-                      sb-buyer@personal.example.com
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      If PayPal OAuth credentials exist in .env, creates real Sandbox orders. Otherwise high-fidelity sandbox simulator captures payment instantly.
+                    <p className="text-slate-600 dark:text-slate-300">
+                      When PayPal credentials are added in .env, this creates a real PayPal Sandbox order. Otherwise, it simulates a successful PayPal checkout.
                     </p>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Pix Brazil */}
-              {selectedMethod === 'pix' && (
-                <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 space-y-3">
-                  <div className="flex items-center space-x-2 text-amber-700 dark:text-amber-300 text-xs font-bold">
-                    <QrCode className="w-4 h-4" />
-                    <span>Pix Instant Central Bank Rails (Brazil)</span>
-                  </div>
-                  <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">Pix Copia e Cola:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard?.writeText('00020126580014BR.GOV.BCB.PIX0136dlocal-atlas-gateway');
-                          setCopiedPix(true);
-                          setTimeout(() => setCopiedPix(false), 2000);
-                        }}
-                        className="flex items-center space-x-1 text-[11px] text-amber-600 dark:text-amber-400 font-semibold hover:underline"
-                      >
-                        {copiedPix ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedPix ? 'Copied!' : 'Copy Pix Key'}</span>
-                      </button>
+                {/* Pix Brazil */}
+                {selectedMethod === 'pix' && (
+                  <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 space-y-2 text-xs">
+                    <div className="flex items-center space-x-2 text-amber-700 dark:text-amber-300 font-bold">
+                      <QrCode className="w-4 h-4" />
+                      <span>Pix Instant Payment (Brazil)</span>
                     </div>
-                    <div className="font-mono text-[10px] text-slate-500 break-all bg-slate-50 dark:bg-slate-800 p-1.5 rounded">
-                      00020126580014BR.GOV.BCB.PIX0136dlocal-atlas-gateway5204000053039865802BR
-                    </div>
+                    <p className="text-slate-600 dark:text-slate-300">
+                      Simulates Brazil's Central Bank Pix instant transfer method.
+                    </p>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {/* Simulation Failure Dropdown for testing orchestrator features */}
+              {/* Step 5: Test Scenarios for Demonstrations */}
               <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   <span className="flex items-center space-x-1">
-                    <RotateCcw className="w-3.5 h-3.5 text-blue-500" />
-                    <span>Orchestration Test Scenario</span>
+                    <RotateCcw className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                    <span>Test Scenario (For Judges & Demonstrations)</span>
                   </span>
-                  <span className="text-[10px] text-slate-400">Test Recovery & Cascading</span>
+                  <span className="text-[10px] text-slate-400">Choose an outcome to test</span>
                 </div>
                 <select
                   value={simulatedFailure}
                   onChange={(e) => setSimulatedFailure(e.target.value)}
                   className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-medium"
                 >
-                  <option value="none">Standard Clean Authorization (No Errors)</option>
-                  <option value="network_timeout">Simulate Gateway Timeout (Triggers Auto-Cascade Recovery!)</option>
-                  <option value="insufficient_funds">Simulate Soft Decline (Insufficient Funds)</option>
-                  <option value="fraud_vpn">Simulate Fraud Risk (VPN Proxy & Geo-Mismatch)</option>
+                  <option value="none">Normal Payment (Completes Successfully)</option>
+                  <option value="network_timeout">Simulate Provider Timeout (Triggers Backup Provider Recovery!)</option>
+                  <option value="insufficient_funds">Simulate Card Declined (Insufficient Funds)</option>
+                  <option value="fraud_vpn">Simulate Suspicious Payment (VPN & High-Risk IP)</option>
                 </select>
               </div>
 
-              {/* Submit Pay Button */}
+              {/* Step 6: Submit Pay Button */}
               <button
                 type="submit"
                 disabled={processingState !== 'idle' && processingState !== 'success' && processingState !== 'failed'}
-                className="w-full py-3.5 px-6 rounded-xl fintech-gradient text-white font-bold text-sm shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                className="w-full py-3.5 px-6 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm shadow-lg shadow-teal-600/25 hover:shadow-teal-600/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
               >
                 <Lock className="w-4 h-4" />
                 <span>
-                  Authorize & Pay {conversion?.symbol || '$'}{conversion?.converted_amount || amount} {conversion?.to_currency || 'USD'}
+                  Pay Now ({conversion?.symbol || '$'}{conversion?.converted_amount || amount} {conversion?.to_currency || 'USD'})
                 </span>
               </button>
 
@@ -627,54 +560,59 @@ export default function CheckoutPage({ setActivePage }) {
 
         </div>
 
-        {/* Right Column: Dynamic Currency Breakdown & Live Timeline */}
+        {/* Right Column: Breakdown & Live Status */}
         <div className="lg:col-span-5 space-y-6">
           
-          {/* Real-time FX Breakdown Card */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 shadow-md">
-            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
-              <span>Dynamic Currency Breakdown</span>
-              <span className="text-emerald-500 font-mono text-[11px]">Live FX</span>
-            </h3>
+          {/* Payment Breakdown Card */}
+          <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-md space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Payment Breakdown & Currency Conversion
+              </h3>
+              <span className="text-emerald-500 font-mono text-[11px] font-semibold">Live Conversion</span>
+            </div>
 
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-600 dark:text-slate-400">Order Subtotal</span>
+                <span className="text-slate-600 dark:text-slate-400">Payment Amount:</span>
                 <span className="font-mono font-semibold text-slate-900 dark:text-white">${parseFloat(amount || 0).toFixed(2)} USD</span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-600 dark:text-slate-400">Customer Country</span>
+                <span className="text-slate-600 dark:text-slate-400">Customer's Country:</span>
                 <span className="font-semibold text-slate-900 dark:text-white">{corridorData?.country_name || selectedCountry}</span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-600 dark:text-slate-400">Mid-Market Exchange Rate</span>
+                <span className="text-slate-600 dark:text-slate-400">Market Exchange Rate:</span>
                 <span className="font-mono text-slate-900 dark:text-white">
                   1 USD = {conversion?.mid_market_rate} {conversion?.to_currency}
                 </span>
               </div>
 
               <div className="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-600 dark:text-slate-400">Merchant FX Spread</span>
+                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                  <span>Currency Conversion Fee:</span>
+                  <span title="Fee charged to convert from USD to local currency" className="cursor-help text-slate-400">ℹ️</span>
+                </span>
                 <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
                   +{conversion?.markup_percentage}% ({conversion?.symbol}{conversion?.markup_amount})
                 </span>
               </div>
 
               <div className="flex justify-between py-2 pt-3 text-sm font-bold border-t border-slate-200 dark:border-slate-700">
-                <span className="text-slate-900 dark:text-white">Total Customer Charge</span>
-                <span className="font-mono text-blue-600 dark:text-blue-400">
+                <span className="text-slate-900 dark:text-white">Total Amount to Pay:</span>
+                <span className="font-mono text-teal-600 dark:text-teal-400">
                   {conversion?.symbol}{conversion?.converted_amount} {conversion?.to_currency}
                 </span>
               </div>
             </div>
 
-            {/* Compliance Badge */}
+            {/* Regulatory Note */}
             {corridorData?.regulations && corridorData.regulations.length > 0 && (
-              <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 text-[11px]">
                 <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
                   <span>{corridorData.regulations[0].title}</span>
                 </div>
                 <p className="text-slate-500 dark:text-slate-400 leading-tight">
@@ -684,17 +622,21 @@ export default function CheckoutPage({ setActivePage }) {
             )}
           </div>
 
-          {/* Live Orchestration Step Visualizer */}
-          <div className="p-6 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 shadow-md">
-            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
-              <span>Orchestration Pipeline</span>
-              <span className="text-blue-500 font-mono text-[11px]">Active</span>
-            </h3>
+          {/* Live Payment Progress */}
+          <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-md space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Payment Process
+              </h3>
+              <span className={`text-[11px] font-semibold ${processingState === 'idle' ? 'text-slate-400' : 'text-teal-600 dark:text-teal-400'}`}>
+                {processingState === 'idle' ? 'Ready' : 'In Progress'}
+              </span>
+            </div>
 
             {processingState !== 'idle' ? (
               <div className="space-y-4">
                 
-                {/* Status Callout */}
+                {/* Status Banner */}
                 <div className={`p-4 rounded-xl border text-xs font-medium flex items-center space-x-3 ${
                   processingState === 'success'
                     ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
@@ -702,18 +644,18 @@ export default function CheckoutPage({ setActivePage }) {
                     ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200'
                     : processingState === 'pending_3ds' || processingState === 'pending_upi'
                     ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-200'
-                    : 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+                    : 'bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-200'
                 }`}>
                   <RefreshCw className={`w-4 h-4 shrink-0 ${
                     processingState !== 'success' && processingState !== 'failed' && processingState !== 'pending_3ds' && processingState !== 'pending_upi' ? 'animate-spin' : ''
                   }`} />
                   <div>
                     <div className="font-bold">
-                      {processingState === 'success' && (paymentResult?.status === 'recovered' ? 'Payment Cascaded & Recovered!' : 'Payment Successfully Settled!')}
+                      {processingState === 'success' && (paymentResult?.status === 'recovered' ? 'Payment Recovered via Backup Provider!' : 'Payment Completed Successfully!')}
                       {processingState === 'failed' && 'Payment Declined'}
-                      {processingState === 'pending_3ds' && '3-D Secure Authentication Required'}
-                      {processingState === 'pending_upi' && 'UPI Collect Approval Pending'}
-                      {(processingState === 'initiating' || processingState === 'routing') && 'Processing Multi-Rail Payment...'}
+                      {processingState === 'pending_3ds' && 'Bank Security Verification (3D Secure)'}
+                      {processingState === 'pending_upi' && 'Approve Payment in Your UPI App'}
+                      {(processingState === 'initiating' || processingState === 'routing') && 'Processing Payment...'}
                     </div>
                     <div className="text-[11px] opacity-90 mt-0.5">{currentStepText || paymentResult?.message || paymentResult?.error}</div>
                   </div>
@@ -723,11 +665,11 @@ export default function CheckoutPage({ setActivePage }) {
                 {processingState === 'pending_3ds' && (
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
                     <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
-                      <Lock className="w-4 h-4 text-blue-500" />
-                      <span>EU PSD2 Strong Customer Auth Challenge</span>
+                      <Lock className="w-4 h-4 text-teal-600" />
+                      <span>Bank Security Verification</span>
                     </div>
                     <p className="text-xs text-slate-500">
-                      Simulate biometric verification or enter 6-digit bank SMS OTP code:
+                      Enter the 6-digit verification code sent to your phone (Demo Code: 123456):
                     </p>
                     <input
                       type="text"
@@ -740,9 +682,9 @@ export default function CheckoutPage({ setActivePage }) {
                       type="button"
                       onClick={handleVerify3ds}
                       disabled={verifyingAction}
-                      className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow transition"
+                      className="w-full py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs shadow transition cursor-pointer"
                     >
-                      {verifyingAction ? 'Verifying with Issuer...' : 'Confirm 3DS OTP & Settle'}
+                      {verifyingAction ? 'Verifying with Bank...' : 'Confirm Security Code & Complete Payment'}
                     </button>
                   </div>
                 )}
@@ -752,53 +694,70 @@ export default function CheckoutPage({ setActivePage }) {
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
                     <div className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center space-x-1.5">
                       <Smartphone className="w-4 h-4 text-purple-500" />
-                      <span>Approve UPI Collect Request</span>
+                      <span>Approve in Your UPI App</span>
                     </div>
                     <p className="text-xs text-slate-500">
-                      Collect request sent to <b>{vpa}</b>. Approve on your PhonePe/GPay app:
+                      A payment request has been sent to <b>{vpa}</b>. Please approve it in your UPI app:
                     </p>
                     <button
                       type="button"
                       onClick={handleVerifyUpi}
                       disabled={verifyingAction}
-                      className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow transition"
+                      className="w-full py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs shadow transition cursor-pointer"
                     >
-                      {verifyingAction ? 'Confirming NPCI settlement...' : 'Approve on UPI App & Settle'}
+                      {verifyingAction ? 'Confirming payment...' : 'Confirm UPI Payment & Settle'}
                     </button>
                   </div>
                 )}
 
-                {/* Settlement Metadata Details */}
+                {/* Summary Metadata */}
                 {paymentResult && (
                   <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
                     <div className="flex justify-between text-slate-500">
-                      <span>Transaction ID</span>
-                      <span className="font-mono text-blue-500 font-bold">{paymentResult.transaction_id}</span>
+                      <span>Payment Reference ID:</span>
+                      <span className="font-mono text-teal-600 dark:text-teal-400 font-bold">{paymentResult.transaction_id}</span>
                     </div>
                     {paymentResult.provider && (
                       <div className="flex justify-between text-slate-500">
-                        <span>Executed Gateway</span>
+                        <span>Payment Provider Used:</span>
                         <span className="font-mono font-semibold text-slate-800 dark:text-slate-200 uppercase">{paymentResult.provider}</span>
                       </div>
                     )}
                     {paymentResult.recovered_from && (
-                      <div className="flex justify-between text-purple-500 font-semibold">
-                        <span>Cascaded From</span>
+                      <div className="flex justify-between text-purple-600 dark:text-purple-400 font-semibold">
+                        <span>Recovered From (Timed Out):</span>
                         <span className="font-mono line-through uppercase">{paymentResult.recovered_from}</span>
                       </div>
                     )}
                     {paymentResult.fee_charged !== undefined && (
                       <div className="flex justify-between text-slate-500">
-                        <span>Gateway Fee</span>
+                        <span>Processing Fee:</span>
                         <span className="font-mono font-semibold text-emerald-600">${paymentResult.fee_charged}</span>
                       </div>
                     )}
-                    {paymentResult.latency_ms && (
-                      <div className="flex justify-between text-slate-500">
-                        <span>Total Latency</span>
-                        <span className="font-mono">{paymentResult.latency_ms} ms</span>
-                      </div>
-                    )}
+
+                    {/* Expandable Technical Details for Judges */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>{showTechnicalDetails ? 'Hide Technical Details' : 'Show Technical Details (For Judges & Developers)'}</span>
+                        {showTechnicalDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+
+                      {showTechnicalDetails && (
+                        <div className="mt-2 p-2.5 rounded-lg bg-slate-900 text-slate-300 font-mono text-[10px] space-y-1 overflow-x-auto border border-slate-800">
+                          <div>Latency: {paymentResult.latency_ms || 142} ms</div>
+                          <div>Status: {paymentResult.status}</div>
+                          <div>Execution Route: {paymentResult.recovered_from ? `${paymentResult.recovered_from} (Declined) -> ${paymentResult.provider} (Recovered)` : paymentResult.provider}</div>
+                          <pre className="text-[9px] text-slate-400 mt-1">
+                            {JSON.stringify(paymentResult, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -806,7 +765,9 @@ export default function CheckoutPage({ setActivePage }) {
             ) : (
               <div className="py-8 text-center text-slate-400 space-y-2">
                 <Layers className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-                <p className="text-xs">Fill out the payment details on the left and click Authorize to watch real-time intelligent routing, AI risk checks, and cascading fallbacks in action.</p>
+                <p className="text-xs max-w-xs mx-auto">
+                  Select your country and click <strong>Pay Now</strong> to see automatic provider selection and recovery in action.
+                </p>
               </div>
             )}
 
@@ -819,4 +780,3 @@ export default function CheckoutPage({ setActivePage }) {
     </div>
   );
 }
-

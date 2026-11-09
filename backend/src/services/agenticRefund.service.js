@@ -25,6 +25,8 @@ async function analyzeTransactionForRefund(transactionId, reason = 'customer_req
     providerActualStatus = 'FAILED';
   } else if (tx.status === 'failed' && !tx.decline_code?.includes('timeout')) {
     providerActualStatus = 'FAILED';
+  } else if (tx.status === 'pending_3ds' || tx.status === 'pending') {
+    providerActualStatus = 'PENDING';
   }
 
   const evaluationPayload = {
@@ -143,6 +145,8 @@ async function executeRefund(transactionId, options = {}) {
     agent_evaluated: true,
     agent_confidence_score: 0.98,
     customer_notified: true,
+    is_simulated: true,
+    simulation_notice: 'Simulated sandbox transaction. No actual currency was debited or returned.',
     initiated_by: overrideByHuman ? 'COMPLIANCE_OFFICER' : 'AI_AGENT_AUTONOMOUS',
     created_at: new Date().toISOString()
   };
@@ -151,7 +155,7 @@ async function executeRefund(transactionId, options = {}) {
   // Update transaction status
   await db.table('transactions').update(tx.id, {
     status: 'refunded',
-    decline_reason: `Refund settled ($${tx.amount} ${tx.currency}) via ${tx.executed_provider}. Ref: ${refundReference}`
+    decline_reason: `[Simulated Refund] Sandbox refund recorded ($${tx.amount} ${tx.currency}) via ${tx.executed_provider}. Ref: ${refundReference}. No actual money was returned.`
   });
 
   // Log completion in agentic audit
@@ -161,7 +165,7 @@ async function executeRefund(transactionId, options = {}) {
     action_type: 'REFUND_SETTLEMENT_EXECUTED',
     provider: tx.executed_provider,
     provider_status_verified: 'REFUNDED',
-    agent_reasoning: `Successfully refunded ${tx.currency} ${tx.amount} via gateway API with idempotency key ${evaluation.idempotency_key}.`,
+    agent_reasoning: `[Simulated Refund] Processed sandbox refund record for ${tx.currency} ${tx.amount} via gateway API with idempotency key ${evaluation.idempotency_key}. No actual currency moved.`,
     decision: 'SETTLED',
     requires_human_approval: false,
     created_at: new Date().toISOString()
@@ -172,7 +176,9 @@ async function executeRefund(transactionId, options = {}) {
     status: 'settled',
     refund_id: refundRecord.id,
     provider_refund_id: refundReference,
-    message: `Refund of ${tx.currency} ${tx.amount} successfully settled via ${tx.executed_provider}.`,
+    is_simulated: true,
+    simulation_notice: 'Simulated sandbox transaction. No actual currency was debited or returned.',
+    message: `[Simulated Refund] Sandbox refund of ${tx.currency} ${tx.amount} completed via ${tx.executed_provider}. No actual money returned.`,
     evaluation
   };
 }

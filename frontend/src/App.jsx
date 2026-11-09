@@ -30,6 +30,17 @@ function AppContent() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [userRole, setUserRole] = useState('merchant'); // 'merchant' | 'student' | 'guardian'
 
+  // Synchronize perspective role with active page so Parent / Student / Merchant is clearly reflected
+  React.useEffect(() => {
+    if (activePage === 'guardian') {
+      setUserRole('guardian');
+    } else if (activePage === 'student') {
+      setUserRole('student');
+    } else if (['dashboard', 'checkout', 'compatibility', 'routing', 'currency', 'analytics', 'providers', 'transactions', 'settings', 'fraud', 'agentic-refund', 'recovery'].includes(activePage)) {
+      setUserRole('merchant');
+    }
+  }, [activePage]);
+
   const isPublicView = ['landing', 'login', 'register'].includes(activePage);
 
   return (
@@ -78,7 +89,7 @@ function AppContent() {
               {activePage === 'student' && <StudentPaymentsPage setActivePage={setActivePage} />}
               {activePage === 'guardian' && <ParentApprovalPage setActivePage={setActivePage} />}
               {activePage === 'agentic-refund' && <AgenticRefundPage setActivePage={setActivePage} />}
-              {activePage === 'recovery' && <AgenticRefundPage setActivePage={setActivePage} />}
+              {activePage === 'recovery' && <RecoveryPage setActivePage={setActivePage} />}
               {activePage === 'fraud' && <FraudDashboardPage setActivePage={setActivePage} />}
               {activePage === 'currency' && <CurrencyEnginePage setActivePage={setActivePage} />}
               {activePage === 'analytics' && <AnalyticsPage setActivePage={setActivePage} />}

@@ -51,7 +51,25 @@ def evaluate_agentic_refund(payload: Dict[str, Any]) -> Dict[str, Any]:
     })
 
     # Step 2: Analyze actual gateway state vs frontend state
-    # Rule 1: Gateway did NOT capture (Authorization failed or voided)
+    # Rule 1a: Gateway status is PENDING / in-flight (cannot refund an un-settled transaction)
+    if gateway_status in ["PENDING", "PROCESSING", "REQUIRES_ACTION"]:
+        agent_steps.append({
+            "step": "TRANSACTION_IN_FLIGHT",
+            "status": "PENDING_RESOLUTION",
+            "detail": f"Provider transaction is currently '{gateway_status}'. Payment has not yet completed settlement or decline."
+        })
+        return {
+            "decision": "REFUND_REJECTED",
+            "reason_code": "TRANSACTION_STILL_PENDING",
+            "explanation": "Transaction is currently pending with the payment provider. Wait for settlement or final decline before evaluating refund.",
+            "requires_human_approval": False,
+            "refund_eligible": False,
+            "safe_retry_viable": False,
+            "idempotency_key": idempotency_key,
+            "agent_steps": agent_steps
+        }
+
+    # Rule 1b: Gateway did NOT capture (Authorization failed or voided)
     if gateway_status in ["FAILED", "VOIDED", "NOT_FOUND"]:
         agent_steps.append({
             "step": "FUNDS_MOVEMENT_AUDIT",

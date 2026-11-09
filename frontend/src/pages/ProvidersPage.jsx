@@ -10,7 +10,9 @@ import {
   RotateCcw,
   RefreshCw,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Info,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function ProvidersPage() {
@@ -55,22 +57,41 @@ export default function ProvidersPage() {
         <div>
           <div className="flex items-center space-x-2 text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
             <Layers className="w-4 h-4" />
-            <span>Gateway Ecosystem</span>
+            <span>Connected Gateways</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
-            Payment Provider Benchmark Matrix
+            Payment Providers
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Compare gateway fees, corridor strengths, latencies, and toggle providers in real time.
+            Compare processing fees, speeds, and regional strengths across connected payment providers. You can turn individual providers on or off at any time.
           </p>
         </div>
 
         <button
           onClick={loadData}
-          className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition self-start sm:self-auto"
+          className="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition self-start sm:self-auto flex items-center space-x-1.5 text-xs font-medium cursor-pointer"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span>Refresh Providers</span>
         </button>
+      </div>
+
+      {/* Real vs Simulated Sandbox Transparency Banner */}
+      <div className="p-4 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 text-xs space-y-2">
+        <div className="flex items-center space-x-2 font-bold text-blue-900 dark:text-blue-300">
+          <Info className="w-4 h-4 text-blue-600" />
+          <span>About Connected Providers & Integrations</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+          <div>
+            <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">PayPal Sandbox (Live Sandbox API)</strong>
+            Connected directly to PayPal's official developer sandbox. Live transactions and sandbox buyer accounts are processed in real time.
+          </div>
+          <div>
+            <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">Stripe, Adyen, Razorpay, dLocal (Simulated Sandbox)</strong>
+            High-fidelity simulated providers designed to test smart failover, regional routing, and fee savings without requiring live merchant contracts.
+          </div>
+        </div>
       </div>
 
       {/* Provider Status Cards */}
@@ -89,7 +110,8 @@ export default function ProvidersPage() {
                 <span className="font-bold text-slate-900 dark:text-white text-sm">{p.name}</span>
                 <button
                   onClick={() => handleToggle(p.id, p.is_active)}
-                  title={p.is_active ? 'Disable Provider' : 'Enable Provider'}
+                  title={p.is_active ? 'Pause Provider' : 'Enable Provider'}
+                  className="cursor-pointer"
                 >
                   {p.is_active ? (
                     <ToggleRight className="w-6 h-6 text-emerald-500" />
@@ -105,15 +127,15 @@ export default function ProvidersPage() {
 
               <div className="space-y-1.5 text-[11px] text-slate-500">
                 <div className="flex justify-between">
-                  <span>Latency:</span>
+                  <span>Speed:</span>
                   <span className="font-mono text-slate-800 dark:text-slate-200">{p.avg_latency_ms} ms</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Success SLA:</span>
+                  <span>Success Rate:</span>
                   <span className="font-mono text-emerald-600">{(p.success_rate * 100).toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Uptime:</span>
+                  <span>Availability:</span>
                   <span className="font-mono text-slate-800 dark:text-slate-200">{(p.uptime * 100).toFixed(2)}%</span>
                 </div>
               </div>
@@ -125,7 +147,7 @@ export default function ProvidersPage() {
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                   : 'bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
               }`}>
-                {p.is_active ? 'Active Rail' : 'Disabled'}
+                {p.is_active ? 'Active (In Use)' : 'Paused'}
               </span>
             </div>
           </div>
@@ -134,21 +156,24 @@ export default function ProvidersPage() {
 
       {/* Side-by-Side Benchmark Matrix Table */}
       <div className="p-6 rounded-2xl bg-white dark:bg-[#121826] border border-slate-200 dark:border-slate-800 shadow-sm">
-        <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4">
-          Comparative Feature & Corridor Benchmark
+        <h3 className="font-bold text-slate-900 dark:text-white text-base mb-1">
+          Side-by-Side Provider Comparison
         </h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+          Compare fees, latency speeds, and regional strengths to see how each provider fits your business.
+        </p>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
-                <th className="pb-3">Provider</th>
-                <th className="pb-3">Processing Fee</th>
-                <th className="pb-3">Cross-Border Fee</th>
-                <th className="pb-3">Avg Latency</th>
-                <th className="pb-3">Supported Corridors</th>
-                <th className="pb-3">Best Application</th>
-                <th className="pb-3">Smart Retries</th>
+                <th className="pb-3">Payment Provider</th>
+                <th className="pb-3">Standard Fee</th>
+                <th className="pb-3">International Fee</th>
+                <th className="pb-3">Average Speed</th>
+                <th className="pb-3">Best Regions</th>
+                <th className="pb-3">Recommended For</th>
+                <th className="pb-3">Automatic Retries</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
@@ -176,12 +201,12 @@ export default function ProvidersPage() {
                     {b.smart_retries ? (
                       <span className="flex items-center space-x-1 text-emerald-600 font-semibold">
                         <CheckCircle2 className="w-4 h-4" />
-                        <span>Enabled</span>
+                        <span>Supported</span>
                       </span>
                     ) : (
                       <span className="flex items-center space-x-1 text-slate-400">
                         <XCircle className="w-4 h-4" />
-                        <span>Manual</span>
+                        <span>Manual Only</span>
                       </span>
                     )}
                   </td>
@@ -195,4 +220,3 @@ export default function ProvidersPage() {
     </div>
   );
 }
-

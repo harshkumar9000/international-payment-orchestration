@@ -17,7 +17,8 @@ import {
   Send,
   UserCheck,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Info
 } from 'lucide-react';
 
 export default function StudentPaymentsPage({ setActivePage }) {
@@ -33,13 +34,17 @@ export default function StudentPaymentsPage({ setActivePage }) {
   const [currency, setCurrency] = useState('USD');
   const [submitting, setSubmitting] = useState(false);
   const [intentResult, setIntentResult] = useState(null);
+  const submittingRef = React.useRef(false);
 
   async function loadStudentData() {
     setLoading(true);
     try {
       const studentId = 'stu_aarav_sharma';
       const [pRes, aRes, tRes] = await Promise.all([
-        api.student.getProfile(studentId).catch(() => ({
+        (typeof api.student?.getProfile === 'function'
+          ? api.student.getProfile(studentId)
+          : Promise.resolve(null)
+        ).catch(() => ({
           student: {
             id: 'stu_aarav_sharma',
             first_name: 'Aarav',
@@ -60,13 +65,28 @@ export default function StudentPaymentsPage({ setActivePage }) {
             whitelisted_categories: ['education', 'books', 'software_tools', 'certification_fees']
           }
         })),
-        api.student.listApprovals(studentId).catch(() => ({ approvals: [] })),
-        api.student.getRecentTransactions(studentId).catch(() => ({ transactions: [] }))
+        (typeof api.student?.listApprovals === 'function'
+          ? api.student.listApprovals(studentId)
+          : Promise.resolve({ approvals: [] })
+        ).catch(() => ({ approvals: [] })),
+        (typeof api.student?.getRecentTransactions === 'function'
+          ? api.student.getRecentTransactions(studentId)
+          : Promise.resolve({ transactions: [] })
+        ).catch(() => ({ transactions: [] }))
       ]);
 
-      setProfile(pRes.student || pRes);
-      setApprovals(aRes.approvals || []);
-      setRecentTxs(tRes.transactions || []);
+      setProfile(pRes?.student || pRes?.profile || pRes);
+      const rawApprovals = aRes?.approvals || [];
+      const uniqueApprovals = [];
+      const seenApprIds = new Set();
+      for (const item of rawApprovals) {
+        if (item && item.id && !seenApprIds.has(item.id)) {
+          seenApprIds.add(item.id);
+          uniqueApprovals.push(item);
+        }
+      }
+      setApprovals(uniqueApprovals);
+      setRecentTxs(tRes?.transactions || []);
     } catch (err) {
       console.error('Error loading student data:', err);
     } finally {
@@ -76,41 +96,125 @@ export default function StudentPaymentsPage({ setActivePage }) {
 
   useEffect(() => {
     loadStudentData();
+
+    // Auto-sync every 4 seconds so approval changes reflect immediately
+    const interval = setInterval(() => {
+      loadStudentData();
+    }, 4000);
+
+    const handleSync = () => loadStudentData();
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('guardian_approval_updated', handleSync);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('guardian_approval_updated', handleSync);
+    };
   }, []);
 
   async function handleCreatePaymentIntent(e) {
     e.preventDefault();
+    if (submittingRef.current || submitting) {
+      return;
+    }
+    submittingRef.current = true;
     setSubmitting(true);
     setIntentResult(null);
 
     try {
+      if (typeof api.student?.createPaymentIntent !== 'function') {
+        throw new Error('Student payment service is currently not connected.');
+      }
+      const idempotencyKey = `idem_${profile?.id || 'stu_aarav_sharma'}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const res = await api.student.createPaymentIntent({
         student_id: profile?.id || 'stu_aarav_sharma',
         merchant_name: courseName,
         merchant_category: merchantCategory,
         amount: parseFloat(amount),
         currency,
-        course_name: courseName
+        course_name: courseName,
+        idempotency_key: idempotencyKey
       });
       setIntentResult(res);
-      // Reload approvals
-      loadStudentData();
+      await loadStudentData();
     } catch (err) {
       console.error('Error creating student payment intent:', err);
       setIntentResult({
         success: false,
         status: 'error',
-        message: err.message || 'Payment intent submission failed.'
+        message: err.message || 'Payment request could not be submitted.'
       });
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   }
 
-  const monthlyLimit = profile?.spending_limits?.monthly_limit || 500;
-  const currentMonthlySpend = profile?.spending_limits?.current_monthly_spend || 128;
-  const remainingAllowance = Math.max(0, monthlyLimit - currentMonthlySpend);
-  const percentUsed = Math.min(100, Math.round((currentMonthlySpend / monthlyLimit) * 100));
+  // Dynamically compute approved payments from settled transactions and approved guardian approvals
+  const approvedPayments = React.useMemo(() => {
+    const list = [];
+    const seen = new Set();
+
+    // 1. Add from recent settled transactions
+    for (const tx of recentTxs) {
+      if (tx.status === 'settled') {
+        let meta = {};
+        try {
+          meta = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json) : (tx.metadata_json || {});
+        } catch (e) {}
+
+        const courseName = meta.course_name || meta.order_id || 'Educational Payment';
+        const normKey = `${courseName.toLowerCase().trim()}_${parseFloat(tx.amount || 0).toFixed(2)}`;
+        if (!seen.has(normKey)) {
+          seen.add(normKey);
+          list.push({
+            id: tx.id,
+            course_name: courseName,
+            amount: parseFloat(tx.amount || 0).toFixed(2),
+            currency: tx.currency || 'USD',
+            provider: tx.executed_provider || meta.provider_channel || 'Stripe',
+            approved_by: 'Priya Sharma',
+            date: tx.created_at,
+            is_sandbox: true
+          });
+        }
+      }
+    }
+
+    // 2. Also incorporate approved guardian requests if not already covered
+    for (const appr of approvals) {
+      if (appr.status?.toUpperCase() === 'APPROVED') {
+        const courseName = appr.merchant_name || 'Educational Course';
+        const normKey = `${courseName.toLowerCase().trim()}_${parseFloat(appr.amount || 0).toFixed(2)}`;
+        if (!seen.has(normKey)) {
+          seen.add(normKey);
+          list.push({
+            id: appr.id,
+            course_name: courseName,
+            amount: parseFloat(appr.amount || 0).toFixed(2),
+            currency: appr.currency || 'USD',
+            provider: 'Stripe',
+            approved_by: 'Priya Sharma',
+            date: appr.decided_at || appr.requested_at,
+            is_sandbox: true
+          });
+        }
+      }
+    }
+
+    return list;
+  }, [recentTxs, approvals]);
+
+  const monthlyLimit = parseFloat(profile?.spending_limits?.monthly_limit || 500);
+  const calculatedSpend = recentTxs
+    .filter(t => t.status === 'settled')
+    .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+  const currentMonthlySpend = typeof profile?.spending_limits?.current_monthly_spend === 'number' && profile.spending_limits.current_monthly_spend > 0
+    ? profile.spending_limits.current_monthly_spend
+    : parseFloat(calculatedSpend.toFixed(2));
+  const remainingAllowance = Math.max(0, parseFloat((monthlyLimit - currentMonthlySpend).toFixed(2)));
+  const percentUsed = Math.min(100, Math.round((currentMonthlySpend / (monthlyLimit || 1)) * 100));
 
   return (
     <div className="space-y-6 pb-12">
@@ -120,17 +224,17 @@ export default function StudentPaymentsPage({ setActivePage }) {
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
               <GraduationCap className="w-3.5 h-3.5" />
-              Under-18 Student Account
+              Student Account (Under 18)
             </span>
             <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-              Guardian Active: {profile?.guardian_email || 'priya.sharma@guardian.com'}
+              Parent Linked: {profile?.guardian_email || 'priya.sharma@guardian.com'}
             </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            {profile?.first_name} {profile?.last_name} ({profile?.age || 17} yrs)
+            {profile?.student_name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Aarav Sharma'} ({profile?.age || 17} Years Old)
           </h1>
           <p className="text-xs text-slate-300 max-w-2xl">
-            Empowered for verified global education, international tuition, and technical certifications under parent/guardian supervision.
+            Pay safely for international university courses, tech certifications, and learning tools with spending limits and parent guidance.
           </p>
         </div>
 
@@ -140,13 +244,13 @@ export default function StudentPaymentsPage({ setActivePage }) {
             className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
           >
             <UserCheck className="w-4 h-4" />
-            Switch to Guardian View
+            Open Parent Approval Portal
           </button>
           <button
             onClick={loadStudentData}
             disabled={loading}
             className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all cursor-pointer"
-            title="Refresh"
+            title="Refresh Student Data"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -158,12 +262,12 @@ export default function StudentPaymentsPage({ setActivePage }) {
         {/* Monthly Limit Progress */}
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-slate-500 dark:text-slate-400">Monthly Spending Limit</span>
+            <span className="font-semibold text-slate-500 dark:text-slate-400">Monthly Spending Allowance</span>
             <span className="font-bold text-indigo-600 dark:text-indigo-400">{percentUsed}% used</span>
           </div>
           <div className="text-2xl font-extrabold text-slate-900 dark:text-white">
             ${currentMonthlySpend}{' '}
-            <span className="text-sm font-normal text-slate-400">/ ${monthlyLimit}</span>
+            <span className="text-sm font-normal text-slate-400">spent / ${monthlyLimit} limit</span>
           </div>
           <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
             <div
@@ -174,48 +278,48 @@ export default function StudentPaymentsPage({ setActivePage }) {
             />
           </div>
           <span className="text-[11px] text-slate-400 block pt-1">
-            Available Allowance: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">${remainingAllowance} USD</strong>
+            Remaining Allowance: <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">${remainingAllowance} USD</strong>
           </span>
         </div>
 
         {/* Daily & Weekly Cap */}
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-          <span className="font-semibold text-xs text-slate-500 dark:text-slate-400">Velocity & Daily Safety Cap</span>
+          <span className="font-semibold text-xs text-slate-500 dark:text-slate-400">Daily & Weekly Safety Limits</span>
           <div className="space-y-1.5 pt-1">
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500 dark:text-slate-400">Daily Max:</span>
+              <span className="text-slate-500 dark:text-slate-400">Daily Maximum:</span>
               <span className="font-semibold text-slate-900 dark:text-white">
                 ${profile?.spending_limits?.daily_limit || 100} USD
               </span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500 dark:text-slate-400">Weekly Max:</span>
+              <span className="text-slate-500 dark:text-slate-400">Weekly Maximum:</span>
               <span className="font-semibold text-slate-900 dark:text-white">
                 ${profile?.spending_limits?.weekly_limit || 250} USD
               </span>
             </div>
             <div className="flex justify-between text-xs">
-              <span className="text-slate-500 dark:text-slate-400">Consent Rule:</span>
-              <span className="font-semibold text-teal-600 dark:text-teal-400">Required if &gt; $50</span>
+              <span className="text-slate-500 dark:text-slate-400">Parent Approval Rule:</span>
+              <span className="font-semibold text-teal-600 dark:text-teal-400">Needed for payments over $50</span>
             </div>
           </div>
         </div>
 
-        {/* Regulatory Protection & Prohibited Categories */}
+        {/* Safety Guardrails */}
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
-          <span className="font-semibold text-xs text-slate-500 dark:text-slate-400">Under-18 Safety Guardrails</span>
+          <span className="font-semibold text-xs text-slate-500 dark:text-slate-400">Allowed & Blocked Categories</span>
           <div className="flex flex-wrap gap-1.5 pt-1">
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-              ✓ Education Whitelisted
+              ✓ Education & Courses
+            </span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+              ✓ Academic Books
             </span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
               ✕ No Gambling / Crypto
             </span>
             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-              ✕ No Alcohol / Adult
-            </span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-              ✓ 2FA Guardian Push
+              ✕ No Adult / Alcohol
             </span>
           </div>
         </div>
@@ -229,10 +333,10 @@ export default function StudentPaymentsPage({ setActivePage }) {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <BookOpen className="w-4 h-4 text-indigo-500" />
-              Pay for Course or Educational Subscription
+              Pay for an Online Course or Learning Subscription
             </h2>
             <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded border border-teal-200 dark:border-teal-800">
-              5% LRS TCS Rate
+              5% Education Tax Rate (TCS)
             </span>
           </div>
 
@@ -240,7 +344,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
             {/* Quick Presets */}
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1.5">
-                Quick Select Verified Educational Providers:
+                Quick-Select Sample Educational Courses:
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <button
@@ -298,7 +402,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
 
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                Course / Program Description
+                Course or Program Name
               </label>
               <input
                 type="text"
@@ -344,7 +448,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
             {/* Ineligible test alert: Prohibited Category Demo */}
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                Simulate Category Compliance:
+                Simulate Category Safety Check:
               </label>
               <div className="flex gap-2">
                 <button
@@ -367,7 +471,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}
                 >
-                  Gambling/Crypto (Blocked Demo)
+                  Gambling / Crypto (Blocked Demo)
                 </button>
               </div>
             </div>
@@ -375,14 +479,23 @@ export default function StudentPaymentsPage({ setActivePage }) {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className={`w-full py-2.5 px-4 font-semibold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
+                submitting
+                  ? 'bg-indigo-400 dark:bg-indigo-700/60 cursor-not-allowed opacity-75 text-white'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 cursor-pointer'
+              }`}
             >
               {submitting ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Submitting Request...</span>
+                </>
               ) : (
-                <Send className="w-4 h-4" />
+                <>
+                  <Send className="w-4 h-4" />
+                  <span>Submit Request for Parent Approval</span>
+                </>
               )}
-              Submit for Guardian Consent & Payment
             </button>
           </form>
 
@@ -400,22 +513,24 @@ export default function StudentPaymentsPage({ setActivePage }) {
               <div className="flex items-center gap-2 font-bold uppercase tracking-wider">
                 {intentResult.status === 'approved' ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                ) : intentResult.status === 'requires_guardian_approval' ? (
+                ) : intentResult.status === 'requires_guardian_approval' || intentResult.status === 'pending_parent_approval' ? (
                   <Clock className="w-4 h-4 text-amber-600" />
                 ) : (
                   <XCircle className="w-4 h-4 text-rose-600" />
                 )}
-                <span>Status: {intentResult.status}</span>
+                <span>
+                  {intentResult.status === 'approved' ? 'Payment Approved!' : (intentResult.status === 'requires_guardian_approval' || intentResult.status === 'pending_parent_approval') ? 'Waiting for Parent Approval' : 'Payment Blocked'}
+                </span>
               </div>
-              <p>{intentResult.message || intentResult.reason || 'Payment intent evaluated by Student Engine.'}</p>
+              <p>{intentResult.message || intentResult.reason || 'Payment intent evaluated by Student Safety Engine.'}</p>
               {intentResult.approval_id && (
                 <div className="flex items-center justify-between pt-1">
-                  <span className="font-mono text-[11px]">Approval ID: {intentResult.approval_id}</span>
+                  <span className="font-mono text-[11px]">Request ID: {intentResult.approval_id}</span>
                   <button
                     onClick={() => setActivePage('guardian')}
                     className="font-bold underline text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 cursor-pointer"
                   >
-                    Open Guardian Approval Screen →
+                    Open Parent Approval Screen →
                   </button>
                 </div>
               )}
@@ -429,21 +544,21 @@ export default function StudentPaymentsPage({ setActivePage }) {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-500" />
-                Pending Guardian Requests
+                Requests Waiting for Parent Approval
               </h2>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                {approvals.filter((a) => a.status === 'pending').length} Pending
+                {approvals.filter((a) => a.status?.toLowerCase() === 'pending').length} Waiting
               </span>
             </div>
 
             <div className="space-y-2">
-              {approvals.filter((a) => a.status === 'pending').length === 0 ? (
+              {approvals.filter((a) => a.status?.toLowerCase() === 'pending').length === 0 ? (
                 <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900 text-center text-xs text-slate-400">
                   No pending requests waiting for parent review.
                 </div>
               ) : (
                 approvals
-                  .filter((a) => a.status === 'pending')
+                  .filter((a) => a.status?.toLowerCase() === 'pending')
                   .map((appr) => (
                     <div
                       key={appr.id}
@@ -468,7 +583,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
                           onClick={() => setActivePage('guardian')}
                           className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                         >
-                          Review in Guardian Portal →
+                          Review in Parent Portal →
                         </button>
                       </div>
                     </div>
@@ -479,35 +594,41 @@ export default function StudentPaymentsPage({ setActivePage }) {
 
           {/* Student Educational History */}
           <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-            <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              Approved Educational Payments
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                Approved Learning Payments
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                {approvedPayments.length} Approved
+              </span>
+            </div>
 
             <div className="space-y-2 text-xs">
-              <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 block">
-                    Coursera: Machine Learning by Andrew Ng
-                  </span>
-                  <span className="text-[10px] text-slate-400">Approved by Priya Sharma • Settled via Stripe</span>
+              {approvedPayments.length === 0 ? (
+                <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-900 text-center text-xs text-slate-400">
+                  No approved learning payments yet.
                 </div>
-                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                  $49.00 USD
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-800 dark:text-slate-200 block">
-                    AWS Certified Cloud Practitioner Exam
-                  </span>
-                  <span className="text-[10px] text-slate-400">Approved by Priya Sharma • Settled via PayPal</span>
-                </div>
-                <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                  $79.00 USD
-                </span>
-              </div>
+              ) : (
+                approvedPayments.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 block">
+                        {item.course_name}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        Approved by {item.approved_by} • Settled via {item.provider?.toUpperCase()} <span className="font-semibold text-teal-600 dark:text-teal-400">[Sandbox]</span>
+                      </span>
+                    </div>
+                    <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                      ${item.amount} {item.currency}
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -516,4 +637,3 @@ export default function StudentPaymentsPage({ setActivePage }) {
     </div>
   );
 }
-

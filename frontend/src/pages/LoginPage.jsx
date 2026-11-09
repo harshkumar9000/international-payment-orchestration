@@ -17,7 +17,7 @@ export default function LoginPage({ setActivePage }) {
       await login(email, password);
       setActivePage('dashboard');
     } catch (err) {
-      setError(err.message || 'Login failed. Please check credentials.');
+      setError(err.message || 'Login failed. Please check your email and password.');
     } finally {
       setLoading(false);
     }
@@ -45,10 +45,10 @@ export default function LoginPage({ setActivePage }) {
             <Globe className="w-6 h-6" />
           </div>
           <h2 className="mt-4 text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Merchant Sign In
+            Sign In to ATLAS.PAY
           </h2>
           <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Access your cross-border payment orchestration control plane
+            Manage your international payments, smart routing, and student accounts
           </p>
         </div>
 
@@ -56,15 +56,15 @@ export default function LoginPage({ setActivePage }) {
         <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-center">
           <div className="flex items-center justify-center space-x-1.5 text-xs text-blue-700 dark:text-blue-300 font-semibold mb-2">
             <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-            <span>Instant Evaluator Access</span>
+            <span>Instant Demo Access</span>
           </div>
           <button
             type="button"
             onClick={handleDemoClick}
             disabled={loading}
-            className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow transition active:scale-[0.98]"
+            className="w-full py-2 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs shadow transition active:scale-[0.98] cursor-pointer"
           >
-            {loading ? 'Authenticating...' : 'Sign In as Demo Merchant (merchant@example.com)'}
+            {loading ? 'Signing in...' : 'Sign In with 1 Click (merchant@example.com)'}
           </button>
         </div>
 
@@ -77,7 +77,7 @@ export default function LoginPage({ setActivePage }) {
 
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200 dark:border-slate-800" /></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-[#121826] px-2 text-slate-400">Or use credentials</span></div>
+          <div className="relative flex justify-center text-xs uppercase"><span className="bg-white dark:bg-[#121826] px-2 text-slate-400">Or use your email</span></div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -118,7 +118,7 @@ export default function LoginPage({ setActivePage }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 rounded-xl fintech-gradient text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+            className="w-full py-2.5 px-4 rounded-xl fintech-gradient text-white font-semibold text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer"
           >
             <span>{loading ? 'Signing in...' : 'Sign In'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -130,9 +130,9 @@ export default function LoginPage({ setActivePage }) {
           <button
             type="button"
             onClick={() => setActivePage('register')}
-            className="font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            className="font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
           >
-            Register Merchant
+            Create an Account
           </button>
         </div>
 
@@ -140,4 +140,3 @@ export default function LoginPage({ setActivePage }) {
     </div>
   );
 }
-

@@ -47,7 +47,6 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
       }
     }
     fetchCorridors();
-    // Run initial evaluation
     handleEvaluate();
   }, []);
 
@@ -128,13 +127,13 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
             <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
               Feature 1 Active
             </span>
-            <span className="text-xs text-slate-400">NPCI / NIPL & RBI LRS Framework</span>
+            <span className="text-xs text-slate-400">Indian Card & UPI Cross-Border Rails</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
-            Domestic Card & UPI Cross-Border Engine
+            Indian Cards & UPI Payment Checker
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Real-time validation for RuPay Global vs PMJDY domestic cards, NIPL bilateral UPI corridors, and RBI LRS TCS calculations.
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
+            Check whether your Indian RuPay card or UPI account works for international payments, discover supported routes, and view estimated taxes (TCS).
           </p>
         </div>
 
@@ -143,51 +142,81 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-teal-600/20 transition-all cursor-pointer"
         >
           <CreditCard className="w-4 h-4" />
-          Test in Live Checkout
+          Try in Payment Checkout
         </button>
+      </div>
+
+      {/* Helpful Concept Pill Explanations */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+          <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+            <Info className="w-3.5 h-3.5 text-teal-500" /> What is a Card BIN?
+          </span>
+          <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">
+            The first 6 digits of your card. They reveal whether your card is a <strong>RuPay Global</strong> card (works worldwide) or a <strong>Domestic-only</strong> card (works only in India).
+          </p>
+        </div>
+
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+          <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+            <Info className="w-3.5 h-3.5 text-teal-500" /> What is UPI International?
+          </span>
+          <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">
+            Special bilateral payment links created by NPCI. Indian UPI users can pay merchants in supported countries like Singapore, UAE, and France directly from their UPI app.
+          </p>
+        </div>
+
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+          <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+            <Info className="w-3.5 h-3.5 text-teal-500" /> What is TCS Tax?
+          </span>
+          <p className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">
+            Tax Collected at Source: Indian tax collected on foreign payments under RBI rules. You can claim this tax back when you file your annual income tax return.
+          </p>
+        </div>
       </div>
 
       {/* Preset Quick Selectors */}
       <div className="bg-white dark:bg-[#111827] rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
         <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 block mb-2.5">
-          Select Benchmark Scenarios to Test Compatibility:
+          Select a sample scenario to test compatibility:
         </span>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => handlePreset('rupay_global')}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/80 transition-all cursor-pointer"
           >
-            ✓ RuPay Global (BIN 6521)
+            ✓ RuPay Global Card (Works Worldwide)
           </button>
           <button
             onClick={() => handlePreset('rupay_domestic')}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/80 transition-all cursor-pointer"
           >
-            ✕ RuPay Domestic PMJDY (BIN 6070)
+            ✕ RuPay Domestic Card (India Only)
           </button>
           <button
             onClick={() => handlePreset('upi_singapore')}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/80 transition-all cursor-pointer"
           >
-            ✓ UPI → Singapore (PayNow)
+            ✓ UPI to Singapore (PayNow)
           </button>
           <button
             onClick={() => handlePreset('upi_uae')}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/80 transition-all cursor-pointer"
           >
-            ✓ UPI → UAE (NeoPay)
+            ✓ UPI to UAE (NeoPay)
           </button>
           <button
             onClick={() => handlePreset('upi_france')}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/80 transition-all cursor-pointer"
           >
-            ✓ UPI → France (Lyra Network)
+            ✓ UPI to France (Lyra Network)
           </button>
           <button
             onClick={() => handlePreset('upi_usa_unsupported')}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/80 transition-all cursor-pointer"
           >
-            ⚠ UPI → USA (Unsupported Corridor)
+            ⚠ UPI to USA (Not Supported - Use Card)
           </button>
         </div>
       </div>
@@ -199,13 +228,13 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
         <div className="lg:col-span-5 bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Globe2 className="w-4 h-4 text-teal-500" />
-            Corridor & Instrument Parameters
+            Payment Details to Check
           </h2>
 
           {/* Payment Method Switcher */}
           <div>
             <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-              Payment Instrument
+              Payment Method
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -218,7 +247,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 }`}
               >
                 <CreditCard className="w-3.5 h-3.5" />
-                RuPay / Domestic Card
+                RuPay Card
               </button>
               <button
                 type="button"
@@ -230,7 +259,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 }`}
               >
                 <QrCode className="w-3.5 h-3.5" />
-                UPI International
+                UPI Payment
               </button>
             </div>
           </div>
@@ -239,7 +268,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           {method === 'card' ? (
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                Card BIN (First 6 Digits)
+                First 6 Card Digits (BIN)
               </label>
               <input
                 type="text"
@@ -250,13 +279,13 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                6521/6522 = RuPay Global (Discover/JCB); 6070/6071 = PMJDY Domestic only.
+                BINs starting with 6521/6522 work worldwide; BINs starting with 6070/6071 work only in India.
               </span>
             </div>
           ) : (
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                UPI Virtual Payment Address (VPA)
+                UPI ID (VPA)
               </label>
               <input
                 type="text"
@@ -266,7 +295,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
-                NPCI International Payments Ltd (NIPL) corridor routing verification.
+                Enter any valid Indian UPI ID to check whether cross-border routes are active.
               </span>
             </div>
           )}
@@ -275,7 +304,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                Destination Country
+                Country You Are Paying To
               </label>
               <select
                 value={destCountry}
@@ -303,7 +332,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
 
             <div>
               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-                Destination Currency
+                Currency
               </label>
               <input
                 type="text"
@@ -317,7 +346,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           {/* Amount INR */}
           <div>
             <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-              Transaction Amount (INR ₹)
+              Payment Amount in Rupees (INR ₹)
             </label>
             <input
               type="number"
@@ -326,24 +355,24 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
             />
             <span className="text-[10px] text-slate-400 mt-1 block">
-              Annual RBI LRS Limit: \$250,000 USD (approx ₹2.08 Crore).
+              Annual Limit: Up to \$250,000 USD (approx ₹2.08 Crore) per year under RBI rules.
             </span>
           </div>
 
           {/* Purpose of Remittance for TCS */}
           <div>
             <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 block mb-1">
-              Purpose of Remittance (RBI LRS TCS Rate)
+              What Is This Payment For? (Determines Tax Rate / TCS)
             </label>
             <select
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-teal-500"
             >
-              <option value="educational_tuition">Education: Tuition & Courses (0.5% or 5% TCS &gt; 7L)</option>
-              <option value="medical_treatment">Medical Treatment Overseas (5% TCS &gt; 7L)</option>
-              <option value="tourist_package">Overseas Tour Package (5% up to 7L, 20% &gt; 7L)</option>
-              <option value="general_foreign_ecom">General Foreign Ecommerce (20% TCS on full remittance)</option>
+              <option value="educational_tuition">Education: Tuition & Courses (0.5% or 5% tax above ₹7 Lakh)</option>
+              <option value="medical_treatment">Medical Treatment Abroad (5% tax above ₹7 Lakh)</option>
+              <option value="tourist_package">Overseas Tour Package (5% up to ₹7 Lakh, 20% above)</option>
+              <option value="general_foreign_ecom">General Online Shopping (20% tax)</option>
             </select>
           </div>
 
@@ -354,7 +383,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
             className="w-full py-2.5 px-4 bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-teal-600/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            Evaluate Compatibility & Tax
+            Check Compatibility & Estimate Taxes
           </button>
         </div>
 
@@ -379,10 +408,10 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-extrabold text-sm uppercase tracking-wide">
-                      {result.eligible ? 'Compatible & Eligible' : 'Ineligible Payment Method'}
+                      {result.eligible ? 'This Payment Method is Supported!' : 'This Payment Method is Not Supported for International Payments'}
                     </span>
                     <span className="text-[10px] px-2 py-0.5 font-bold uppercase tracking-wider rounded-full bg-white/60 dark:bg-black/30">
-                      Rail: {result.recommended_rail || 'N/A'}
+                      Route: {result.recommended_rail || 'N/A'}
                     </span>
                   </div>
                   <p className="text-xs leading-relaxed opacity-90">{result.reason}</p>
@@ -392,25 +421,25 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
               {/* Instrument Details */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Scheme / Network</span>
+                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Card Network</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block capitalize">
                     {result.scheme || (method === 'upi' ? 'UPI / NPCI' : 'RuPay')}
                   </span>
                 </div>
                 <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Global Enabled</span>
+                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">International Support</span>
                   <span className={`font-bold mt-0.5 block ${result.eligible ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {result.is_global_enabled ? 'Yes (International)' : 'No (Domestic Only)'}
+                    {result.is_global_enabled ? 'Yes (Global)' : 'No (India Only)'}
                   </span>
                 </div>
                 <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Target Corridor</span>
+                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Destination</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200 mt-0.5 block">
                     {destCountry} ({destCurrency})
                   </span>
                 </div>
                 <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Selected Gateway</span>
+                  <span className="text-slate-400 text-[10px] uppercase font-semibold block">Recommended Provider</span>
                   <span className="font-bold text-teal-600 dark:text-teal-400 mt-0.5 block capitalize">
                     {result.suggested_provider || 'PayPal / Adyen'}
                   </span>
@@ -425,7 +454,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                     Recommended Alternative Payment Methods
                   </span>
                   <p className="text-xs text-amber-700 dark:text-amber-400">
-                    To prevent transaction drop-off, ATLAS.PAY dynamically falls back to these verified rails:
+                    To complete your purchase without disruption, try using one of these supported payment methods:
                   </p>
                   <div className="flex flex-wrap gap-2 pt-1">
                     {result.alternatives.map((alt, idx) => (
@@ -444,17 +473,17 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
               {result.fee_breakdown && (
                 <div className="space-y-3 pt-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                    Transparent Currency Conversion & Regulatory Tax (TCS)
+                    Transparent Fee & Tax Breakdown
                   </h3>
                   <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-4 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>Base Remittance:</span>
+                      <span>Base Payment Amount:</span>
                       <span className="font-mono text-slate-900 dark:text-white">
                         ₹{parseFloat(result.fee_breakdown.amount_inr || amountInr).toLocaleString()} (~{result.fee_breakdown.amount_foreign_display})
                       </span>
                     </div>
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>Gateway Processing Fee (1.5%):</span>
+                      <span>Payment Gateway Fee (1.5%):</span>
                       <span className="font-mono text-slate-900 dark:text-white">₹{result.fee_breakdown.gateway_fee_inr}</span>
                     </div>
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
@@ -462,19 +491,19 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                       <span className="font-mono text-slate-900 dark:text-white">₹{result.fee_breakdown.gst_inr}</span>
                     </div>
                     <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>RBI LRS Tax Collected at Source (TCS {result.fee_breakdown.tcs_percent}%):</span>
+                      <span>Estimated TCS Tax ({result.fee_breakdown.tcs_percent}%):</span>
                       <span className="font-mono text-amber-600 dark:text-amber-400 font-semibold">
                         ₹{result.fee_breakdown.tcs_inr}
                       </span>
                     </div>
                     <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-between font-bold text-sm text-slate-900 dark:text-white">
-                      <span>Total Debit Amount (INR):</span>
+                      <span>Total Amount You Pay in INR:</span>
                       <span className="font-mono text-teal-600 dark:text-teal-400">
                         ₹{result.fee_breakdown.total_debit_inr}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-400 pt-1">
-                      *TCS is fully adjustable against the taxpayer's annual income tax return (Form 26AS / AIS).
+                      *TCS is an advance tax collected under Indian tax rules. You can claim it back or offset it against your income tax when you file your annual tax return (Form 26AS / AIS).
                     </p>
                   </div>
                 </div>
@@ -483,7 +512,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           ) : (
             <div className="bg-white dark:bg-[#111827] rounded-xl p-8 border border-slate-200 dark:border-slate-800 text-center space-y-3">
               <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto" />
-              <p className="text-xs text-slate-400">Evaluating corridor parameters...</p>
+              <p className="text-xs text-slate-400">Checking payment method compatibility...</p>
             </div>
           )}
 
@@ -491,43 +520,43 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
               <Globe2 className="w-4 h-4 text-teal-500" />
-              NPCI / NIPL Bilateral UPI International Corridors
+              Supported Countries for UPI International
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
                 <div>
                   <span className="font-bold text-slate-800 dark:text-slate-200 block">🇸🇬 Singapore (PayNow)</span>
-                  <span className="text-[10px] text-slate-400">MAS-RBI Bilateral Fast Link</span>
+                  <span className="text-[10px] text-slate-400">Direct fast link between India & Singapore</span>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  Live
+                  Active
                 </span>
               </div>
               <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
                 <div>
                   <span className="font-bold text-slate-800 dark:text-slate-200 block">🇦🇪 UAE (NeoPay / Mashreq)</span>
-                  <span className="text-[10px] text-slate-400">Merchant QR & Terminal</span>
+                  <span className="text-[10px] text-slate-400">Accepted at UAE merchants and QR codes</span>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  Live
+                  Active
                 </span>
               </div>
               <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
                 <div>
                   <span className="font-bold text-slate-800 dark:text-slate-200 block">🇫🇷 France (Lyra Network)</span>
-                  <span className="text-[10px] text-slate-400">Eiffel Tower & Department Stores</span>
+                  <span className="text-[10px] text-slate-400">Eiffel Tower & department store payments</span>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  Live
+                  Active
                 </span>
               </div>
               <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
                 <div>
                   <span className="font-bold text-slate-800 dark:text-slate-200 block">🇲🇺 Mauritius (Bank of Mauritius)</span>
-                  <span className="text-[10px] text-slate-400">MauCAS Instant Interoperability</span>
+                  <span className="text-[10px] text-slate-400">Instant QR payments for Indian travelers</span>
                 </div>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                  Live
+                  Active
                 </span>
               </div>
             </div>
@@ -539,4 +568,3 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
     </div>
   );
 }
-

@@ -11,7 +11,8 @@ import {
   Layers,
   ArrowUpRight,
   Sparkles,
-  Zap
+  Zap,
+  Info
 } from 'lucide-react';
 import {
   BarChart,
@@ -99,15 +100,15 @@ export default function AnalyticsPage({ setActivePage }) {
         <div>
           <div className="flex items-center space-x-2">
             <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
-              Operations & BI
+              Business Reports
             </span>
-            <span className="text-xs text-slate-400">Cross-Border Settlement Intelligence</span>
+            <span className="text-xs text-slate-400">Payment Performance & Savings</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
-            Merchant Analytics & Performance
+            Business Reports & Performance
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Multi-corridor volume distribution, dynamic fee optimization savings, and gateway latency benchmarking.
+            Track your total international payment volume, see how much money smart routing saves in fees, and monitor provider speeds.
           </p>
         </div>
 
@@ -117,49 +118,75 @@ export default function AnalyticsPage({ setActivePage }) {
           className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium text-xs rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          Refresh Metrics
+          Refresh Reports
         </button>
+      </div>
+
+      {/* Plain English Guide Banner */}
+      <div className="p-4 rounded-xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-800 text-xs space-y-2">
+        <div className="flex items-center space-x-2 font-bold text-teal-900 dark:text-teal-300">
+          <Info className="w-4 h-4 text-teal-600" />
+          <span>Understanding Your Business Reports</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-slate-600 dark:text-slate-400 text-[11px] leading-relaxed">
+          <div>
+            <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">Total Completed Volume</strong>
+            Total money received from successfully finished customer purchases.
+          </div>
+          <div>
+            <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">Money Saved on Fees</strong>
+            Savings compared to paying high flat international fees (typically 3.5%).
+          </div>
+          <div>
+            <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">Success Rate</strong>
+            Percentage of customers who completed checkout successfully.
+          </div>
+          <div>
+            <strong className="text-slate-800 dark:text-slate-200 block mb-0.5">Fraud Stopped</strong>
+            Payments blocked because they showed signs of stolen cards or scams.
+          </div>
+        </div>
       </div>
 
       {/* Top 4 Quick KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Settled Volume</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Total Completed Volume</span>
           <div className="text-2xl font-extrabold text-slate-900 dark:text-white mt-1">
             ${metrics?.total_volume_usd?.toLocaleString() || '148,920.50'}
           </div>
           <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1">
-            <TrendingUp className="w-3.5 h-3.5" /> +14.8% corridor growth
+            <TrendingUp className="w-3.5 h-3.5" /> +14.8% growth this month
           </span>
         </div>
 
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Fee Savings Delivered</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Money Saved on Fees</span>
           <div className="text-2xl font-extrabold text-teal-600 dark:text-teal-400 mt-1">
             ${metrics?.cost_savings_usd?.toLocaleString() || '4,890.20'}
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            Saved vs default 3.5% non-orchestrated pricing
+            Saved by routing to lowest-fee providers
           </span>
         </div>
 
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Global Conversion Rate</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Payment Success Rate</span>
           <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
             {metrics?.conversion_rate_percent || 96.4}%
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            {metrics?.settled_transactions || 1204} successful checkouts
+            {metrics?.settled_transactions || 1204} successful purchases
           </span>
         </div>
 
         <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
-          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Fraud Mitigation Rate</span>
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Fraud Blocked Rate</span>
           <div className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">
             {metrics?.fraud_blocked_rate_percent || 1.9}%
           </div>
           <span className="text-[11px] text-slate-400 mt-1 block">
-            {metrics?.blocked_transactions || 24} malicious attempts blocked
+            {metrics?.blocked_transactions || 24} suspicious payments safely stopped
           </span>
         </div>
       </div>
@@ -167,14 +194,14 @@ export default function AnalyticsPage({ setActivePage }) {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Currency Corridor Distribution (6 cols) */}
+        {/* Currency Distribution (6 cols) */}
         <div className="lg:col-span-6 bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Globe2 className="w-4 h-4 text-teal-500" />
-            Cross-Border Volume by Currency
+            International Volume by Currency
           </h2>
           <p className="text-xs text-slate-400">
-            Share of settled volume across target global settlement currencies.
+            How your total payment volume is split across different currencies worldwide.
           </p>
 
           <div className="h-64 w-full">
@@ -203,14 +230,14 @@ export default function AnalyticsPage({ setActivePage }) {
           </div>
         </div>
 
-        {/* Provider Latency Benchmark (6 cols) */}
+        {/* Provider Speed Benchmark (6 cols) */}
         <div className="lg:col-span-6 bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
           <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-500" />
-            Provider Processing Latency (ms)
+            Payment Provider Speed (Milliseconds)
           </h2>
           <p className="text-xs text-slate-400">
-            Average gateway roundtrip response time (lower is faster).
+            How quickly each provider completes a transaction (lower numbers mean a faster checkout).
           </p>
 
           <div className="h-64 w-full">
@@ -226,7 +253,7 @@ export default function AnalyticsPage({ setActivePage }) {
                 <XAxis dataKey="name" fontSize={11} stroke="#94A3B8" />
                 <YAxis fontSize={11} stroke="#94A3B8" tickFormatter={(val) => `${val}ms`} />
                 <Tooltip
-                  formatter={(val) => [`${val} ms`, 'Avg Latency']}
+                  formatter={(val) => [`${val} ms`, 'Avg Speed']}
                   contentStyle={{ backgroundColor: '#1E293B', borderRadius: '0.5rem', color: '#FFF' }}
                 />
                 <Bar dataKey="latency" fill="#14B8A6" radius={[4, 4, 0, 0]} />
@@ -241,30 +268,29 @@ export default function AnalyticsPage({ setActivePage }) {
       <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
         <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-teal-500" />
-          Autonomous Fee Optimization Impact
+          How Smart Routing Saves You Money
         </h2>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
-            <span className="text-slate-400 font-semibold block uppercase text-[10px]">Unoptimized Baseline (3.5% + $0.50)</span>
+            <span className="text-slate-400 font-semibold block uppercase text-[10px]">Without Smart Routing (Standard 3.5% Fee)</span>
             <span className="text-xl font-bold text-slate-600 dark:text-slate-400">$8,940.00</span>
-            <p className="text-[11px] text-slate-400">Single provider default international rates</p>
+            <p className="text-[11px] text-slate-400">What you would typically pay using a single fixed provider</p>
           </div>
 
           <div className="p-4 rounded-xl bg-teal-50/50 dark:bg-teal-950/30 border border-teal-500/30 space-y-1.5">
-            <span className="text-teal-700 dark:text-teal-400 font-semibold block uppercase text-[10px]">ATLAS.PAY Smart Routed Fee</span>
+            <span className="text-teal-700 dark:text-teal-400 font-semibold block uppercase text-[10px]">With ATLAS.PAY Smart Routing</span>
             <span className="text-xl font-bold text-teal-600 dark:text-teal-400">$4,049.80</span>
-            <p className="text-[11px] text-teal-700/80 dark:text-teal-300/80">Local acquiring routing via Adyen/Razorpay/Stripe</p>
+            <p className="text-[11px] text-teal-700/80 dark:text-teal-300/80">Automatically chooses the lowest-fee provider for each country and card</p>
           </div>
 
           <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-500/30 space-y-1.5">
-            <span className="text-emerald-700 dark:text-emerald-400 font-semibold block uppercase text-[10px]">Net Merchant Profit Retained</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-semibold block uppercase text-[10px]">Total Profit Saved</span>
             <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">+$4,890.20 (+54.7%)</span>
-            <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">Returned directly to merchant bottom line</p>
+            <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">Extra revenue kept directly by your business</p>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

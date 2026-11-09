@@ -9,16 +9,41 @@ router.get('/pending-approvals', optionalAuth, async (req, res) => {
   try {
     const guardianId = req.query.guardian_id || 'guard_priya_sharma_01';
     const pending = await db.table('guardian_approvals').find(a =>
-      a.guardian_id === guardianId && a.status === 'PENDING'
+      (a.guardian_id === guardianId || a.guardian_id.startsWith(guardianId) || guardianId.startsWith(a.guardian_id)) &&
+      a.status?.toUpperCase() === 'PENDING'
     );
     const history = await db.table('guardian_approvals').find(a =>
-      a.guardian_id === guardianId && a.status !== 'PENDING'
+      (a.guardian_id === guardianId || a.guardian_id.startsWith(guardianId) || guardianId.startsWith(a.guardian_id)) &&
+      a.status?.toUpperCase() !== 'PENDING'
     );
 
     res.json({
       pending: pending.reverse(),
       history: history.reverse()
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/guardian/limits
+router.put('/limits', async (req, res) => {
+  try {
+    const { student_id = 'stu_aarav_sharma_01', daily_limit, weekly_limit, monthly_limit, single_tx_limit, auto_approval_threshold } = req.body;
+    const profile = await studentPaymentService.getStudentProfile(student_id);
+    if (!profile) {
+      return res.status(404).json({ error: 'Student profile not found' });
+    }
+
+    const updates = {};
+    if (daily_limit !== undefined) updates.daily_limit = parseFloat(daily_limit);
+    if (weekly_limit !== undefined) updates.weekly_limit = parseFloat(weekly_limit);
+    if (monthly_limit !== undefined) updates.monthly_limit = parseFloat(monthly_limit);
+    if (single_tx_limit !== undefined) updates.single_tx_limit = parseFloat(single_tx_limit);
+    if (auto_approval_threshold !== undefined) updates.auto_approval_threshold = parseFloat(auto_approval_threshold);
+
+    const updated = await db.table('student_profiles').update(profile.id, updates);
+    res.json({ message: 'Spending limits updated', profile: updated });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -56,9 +81,16 @@ router.post('/reject/:id', async (req, res) => {
 router.get('/overview', optionalAuth, async (req, res) => {
   try {
     const guardianId = req.query.guardian_id || 'guard_priya_sharma_01';
-    const students = await db.table('student_profiles').find(s => s.guardian_id === guardianId);
-    const pending = await db.table('guardian_approvals').find(a => a.guardian_id === guardianId && a.status === 'PENDING');
-    const allApprovals = await db.table('guardian_approvals').find(a => a.guardian_id === guardianId);
+    const students = await db.table('student_profiles').find(s =>
+      s.guardian_id === guardianId || s.guardian_id?.startsWith(guardianId) || guardianId?.startsWith(s.guardian_id)
+    );
+    const pending = await db.table('guardian_approvals').find(a =>
+      (a.guardian_id === guardianId || a.guardian_id?.startsWith(guardianId) || guardianId?.startsWith(a.guardian_id)) &&
+      a.status?.toUpperCase() === 'PENDING'
+    );
+    const allApprovals = await db.table('guardian_approvals').find(a =>
+      a.guardian_id === guardianId || a.guardian_id?.startsWith(guardianId) || guardianId?.startsWith(a.guardian_id)
+    );
 
     res.json({
       guardian: {
@@ -70,7 +102,7 @@ router.get('/overview', optionalAuth, async (req, res) => {
       },
       students,
       pending_count: pending.length,
-      total_approved_count: allApprovals.filter(a => a.status === 'APPROVED').length,
+      total_approved_count: allApprovals.filter(a => a.status?.toUpperCase() === 'APPROVED').length,
       recent_requests: allApprovals.slice(-10).reverse()
     });
   } catch (err) {

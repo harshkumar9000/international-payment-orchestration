@@ -7,6 +7,7 @@ const assert = require('node:assert');
 const { app, startServer } = require('../src/server');
 const db = require('../src/db/db');
 const seed = require('../src/db/seed');
+const { calculateAge, parseAndCalculateAge } = require('../src/services/studentPayment.service');
 
 let serverInstance;
 const TEST_PORT = 5099;
@@ -19,10 +20,12 @@ describe('International Payment Orchestration API Suite', () => {
     serverInstance = app.listen(TEST_PORT);
   });
 
-  after(() => {
+  after(async () => {
     if (serverInstance) {
       serverInstance.close();
     }
+    // Restore clean demo state with original pending Coursera approval and cancelled duplicate audit
+    await seed();
   });
 
   test('GET /api/health should return online status', async () => {
@@ -250,22 +253,639 @@ describe('International Payment Orchestration API Suite', () => {
     assert.strictEqual(stuData.profile.student_name, 'Aarav Sharma');
     assert.strictEqual(stuData.profile.is_minor, true);
 
-    // Guardian Pending Approvals
+    // Guardian Pending Approvals (Coursera remains pending in seed)
     const guardRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals`);
     assert.strictEqual(guardRes.status, 200);
     const guardData = await guardRes.json();
     assert.ok(guardData.pending.length > 0);
+    const courseraPending = guardData.pending.find(a => a.merchant_name.includes('Coursera'));
+    assert.ok(courseraPending, 'Coursera should be pending');
+    assert.strictEqual(courseraPending.status, 'PENDING');
+  });
 
-    // Approve the pending request
-    const pendingId = guardData.pending[0].id;
-    const apprRes = await fetch(`${BASE_URL}/api/guardian/approve/${pendingId}`, {
+  test('Student age verification accurately distinguishes minor (<18) vs adult (18+) from DOB', async () => {
+    // 1. Direct unit tests of parseAndCalculateAge and calculateAge helpers
+    const today = new Date();
+    const currentYear = today.getUTCFullYear();
+    const currentMonth = today.getUTCMonth() + 1; // 1-12
+    const currentDay = today.getUTCDate();
+
+    // A. Missing DOB -> UNVERIFIED
+    const missingRes = parseAndCalculateAge(null);
+    assert.strictEqual(missingRes.status, 'UNVERIFIED');
+    assert.strictEqual(missingRes.age, null);
+    assert.strictEqual(calculateAge(null), null);
+    assert.strictEqual(calculateAge(''), null);
+
+    // B. Invalid DOB format -> UNVERIFIED
+    const invalidFormatRes = parseAndCalculateAge('15-05-2009');
+    assert.strictEqual(invalidFormatRes.status, 'UNVERIFIED');
+    assert.strictEqual(calculateAge('not-a-date'), null);
+
+    // C. Invalid calendar date (e.g. Feb 31) -> UNVERIFIED
+    const invalidCalRes = parseAndCalculateAge('2009-02-31');
+    assert.strictEqual(invalidCalRes.status, 'UNVERIFIED');
+    assert.strictEqual(calculateAge('2009-02-31'), null);
+
+    // D. Future DOB -> UNVERIFIED
+    const futureRes = parseAndCalculateAge('2035-12-01');
+    assert.strictEqual(futureRes.status, 'UNVERIFIED');
+    assert.strictEqual(calculateAge('2035-12-01'), null);
+
+    // E. Minor: Exactly 17 years old today
+    const dob17 = `${currentYear - 17}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
+    const age17Info = parseAndCalculateAge(dob17);
+    assert.strictEqual(age17Info.status, 'VERIFIED');
+    assert.strictEqual(age17Info.age, 17);
+    assert.strictEqual(age17Info.is_minor, true);
+    assert.strictEqual(calculateAge(dob17), 17);
+
+    // F. Adult: Exactly 18 years old today
+    const dob18 = `${currentYear - 18}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
+    const age18Info = parseAndCalculateAge(dob18);
+    assert.strictEqual(age18Info.status, 'VERIFIED');
+    assert.strictEqual(age18Info.age, 18);
+    assert.strictEqual(age18Info.is_minor, false);
+    assert.strictEqual(calculateAge(dob18), 18);
+
+    // G. Timezone boundary test (fixed UTC date: reference 2026-06-15)
+    const fixedRef = new Date(Date.UTC(2026, 5, 15)); // 2026-06-15 UTC
+    // Birthday tomorrow (2008-06-16) -> still 17 on June 15
+    const tzDayBefore = parseAndCalculateAge('2008-06-16', fixedRef);
+    assert.strictEqual(tzDayBefore.age, 17);
+    assert.strictEqual(tzDayBefore.is_minor, true);
+    // Birthday today (2008-06-15) -> turns 18 on June 15
+    const tzDayOf = parseAndCalculateAge('2008-06-15', fixedRef);
+    assert.strictEqual(tzDayOf.age, 18);
+    assert.strictEqual(tzDayOf.is_minor, false);
+
+    // 2. Integration test: Missing / invalid DOB blocks intent with AGE_VERIFICATION_REQUIRED
+    const resMissingDob = await fetch(`${BASE_URL}/api/student/verify-intent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason: 'Approved for Stanford course' })
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        payment_data: {
+          date_of_birth: '',
+          amount: 35,
+          merchant_name: 'edX',
+          merchant_category: 'online_courses'
+        }
+      })
     });
-    assert.strictEqual(apprRes.status, 200);
-    const apprData = await apprRes.json();
-    assert.strictEqual(apprData.approval.status, 'APPROVED');
+    assert.strictEqual(resMissingDob.status, 200);
+    const dataMissingDob = await resMissingDob.json();
+    assert.strictEqual(dataMissingDob.verification.status, 'BLOCKED');
+    assert.strictEqual(dataMissingDob.verification.decision, 'AGE_VERIFICATION_REQUIRED');
+    assert.strictEqual(dataMissingDob.verification.age_status, 'UNVERIFIED');
+    assert.strictEqual(dataMissingDob.verification.requires_age_verification, true);
+
+    const resFutureDob = await fetch(`${BASE_URL}/api/student/verify-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        payment_data: {
+          date_of_birth: '2035-05-15',
+          amount: 35,
+          merchant_name: 'edX',
+          merchant_category: 'online_courses'
+        }
+      })
+    });
+    assert.strictEqual(resFutureDob.status, 200);
+    const dataFutureDob = await resFutureDob.json();
+    assert.strictEqual(dataFutureDob.verification.status, 'BLOCKED');
+    assert.strictEqual(dataFutureDob.verification.decision, 'AGE_VERIFICATION_REQUIRED');
+
+    // 3. Integration test: Minor student Aarav Sharma (DOB 2009-05-15, age 17)
+    // Transaction under threshold ($35 < $50) -> Approved without parent approval
+    const resUnder = await fetch(`${BASE_URL}/api/student/verify-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        payment_data: {
+          amount: 35,
+          currency: 'USD',
+          merchant_name: 'edX MicroMasters',
+          merchant_category: 'online_courses'
+        }
+      })
+    });
+    assert.strictEqual(resUnder.status, 200);
+    const dataUnder = await resUnder.json();
+    assert.strictEqual(dataUnder.verification.status, 'APPROVED');
+    assert.strictEqual(dataUnder.verification.requires_parent_approval, false);
+
+    // Minor: Transaction over threshold ($79 > $50) -> Requires parent approval
+    const resOver = await fetch(`${BASE_URL}/api/student/verify-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        payment_data: {
+          amount: 79,
+          currency: 'USD',
+          merchant_name: 'Coursera AI Specialization',
+          merchant_category: 'online_courses'
+        }
+      })
+    });
+    assert.strictEqual(resOver.status, 200);
+    const dataOver = await resOver.json();
+    assert.strictEqual(dataOver.verification.status, 'PENDING_APPROVAL');
+    assert.strictEqual(dataOver.verification.requires_parent_approval, true);
+    assert.strictEqual(dataOver.verification.decision, 'REQUIRES_PARENT_APPROVAL');
+
+    // Minor: Prohibited category -> Blocked
+    const resBlocked = await fetch(`${BASE_URL}/api/student/verify-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        payment_data: {
+          amount: 20,
+          currency: 'USD',
+          merchant_name: 'Vegas Bets',
+          merchant_category: 'gambling_betting'
+        }
+      })
+    });
+    assert.strictEqual(resBlocked.status, 200);
+    const dataBlocked = await resBlocked.json();
+    assert.strictEqual(dataBlocked.verification.status, 'BLOCKED');
+    assert.strictEqual(dataBlocked.verification.decision, 'PROHIBITED_MERCHANT_CATEGORY');
+
+    // 4. Integration test: Adult student Elena Rostova (DOB 2005-09-12, age 20-21)
+    // $79 purchase would trigger approval for a minor, but Elena is 18+ and approved instantly
+    const resAdult = await fetch(`${BASE_URL}/api/student/verify-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_elena_02',
+        payment_data: {
+          amount: 79,
+          currency: 'USD',
+          merchant_name: 'Oxford Courseware',
+          merchant_category: 'online_courses'
+        }
+      })
+    });
+    assert.strictEqual(resAdult.status, 200);
+    const dataAdult = await resAdult.json();
+    assert.strictEqual(dataAdult.verification.status, 'APPROVED');
+    assert.strictEqual(dataAdult.verification.requires_parent_approval, false);
+    assert.strictEqual(dataAdult.verification.decision, 'INSTANT_ALLOWANCE_APPROVED');
+  });
+
+  test('Refund safety audit across captured, duplicate, failed, and pending transactions', async () => {
+    // Scenario 1: CAPTURED & eligible transaction (tx_demo_001 settled charge)
+    const anCaptured = await fetch(`${BASE_URL}/api/agentic-refund/analyze/tx_demo_001`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Customer returns item, eligible for refund.' })
+    });
+    assert.strictEqual(anCaptured.status, 200);
+    const dataCaptured = await anCaptured.json();
+    assert.strictEqual(dataCaptured.evaluation.decision, 'AUTO_REFUND_APPROVED');
+    assert.strictEqual(dataCaptured.evaluation.refund_eligible, true);
+
+    // Execute refund
+    const exRes = await fetch(`${BASE_URL}/api/agentic-refund/execute/tx_demo_001`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Customer returns item, eligible for refund.' })
+    });
+    assert.strictEqual(exRes.status, 200);
+    const exData = await exRes.json();
+    assert.strictEqual(exData.status, 'settled');
+
+    // Scenario 2: Already refunded payment (duplicate prevention check on tx_demo_001)
+    const anDup = await fetch(`${BASE_URL}/api/agentic-refund/analyze/tx_demo_001`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Duplicate attempt' })
+    });
+    assert.strictEqual(anDup.status, 200);
+    const dataDup = await anDup.json();
+    assert.strictEqual(dataDup.evaluation.decision, 'REFUND_REJECTED');
+    assert.strictEqual(dataDup.evaluation.reason_code, 'DUPLICATE_REFUND_PREVENTED');
+    assert.strictEqual(dataDup.evaluation.refund_eligible, false);
+
+    const exDup = await fetch(`${BASE_URL}/api/agentic-refund/execute/tx_demo_001`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Duplicate attempt' })
+    });
+    assert.strictEqual(exDup.status, 200);
+    const exDupData = await exDup.json();
+    assert.strictEqual(exDupData.success, false);
+    assert.strictEqual(exDupData.status, 'rejected');
+
+    // Scenario 3: FAILED payment with no debit (tx_demo_013_failed_nodebit - card declined)
+    const anFailed = await fetch(`${BASE_URL}/api/agentic-refund/analyze/tx_demo_013_failed_nodebit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Failed payment check' })
+    });
+    assert.strictEqual(anFailed.status, 200);
+    const dataFailed = await anFailed.json();
+    assert.strictEqual(dataFailed.evaluation.decision, 'NO_REFUND_NEEDED_HOLD_RELEASED');
+    assert.strictEqual(dataFailed.evaluation.reason_code, 'NO_CAPTURE_OCCURRED');
+    assert.strictEqual(dataFailed.evaluation.refund_eligible, false);
+
+    const exFailed = await fetch(`${BASE_URL}/api/agentic-refund/execute/tx_demo_013_failed_nodebit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Failed payment check' })
+    });
+    assert.strictEqual(exFailed.status, 200);
+    const exFailedData = await exFailed.json();
+    assert.strictEqual(exFailedData.status, 'hold_released');
+
+    // Scenario 4: PENDING transaction awaiting 3DS bank verification (tx_demo_011_pending)
+    const anPending = await fetch(`${BASE_URL}/api/agentic-refund/analyze/tx_demo_011_pending`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Pending payment check' })
+    });
+    assert.strictEqual(anPending.status, 200);
+    const dataPending = await anPending.json();
+    assert.strictEqual(dataPending.evaluation.decision, 'REFUND_REJECTED');
+    assert.strictEqual(dataPending.evaluation.reason_code, 'TRANSACTION_STILL_PENDING');
+    assert.strictEqual(dataPending.evaluation.refund_eligible, false);
+
+    const exPending = await fetch(`${BASE_URL}/api/agentic-refund/execute/tx_demo_011_pending`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Pending payment check' })
+    });
+    assert.strictEqual(exPending.status, 200);
+    const exPendingData = await exPending.json();
+    assert.strictEqual(exPendingData.success, false);
+    assert.strictEqual(exPendingData.status, 'rejected');
+
+    // Scenario 5: High-value CAPTURED transaction ($1250 >= $500 threshold)
+    const anHigh = await fetch(`${BASE_URL}/api/agentic-refund/analyze/tx_demo_012_high_value`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Enterprise dispute' })
+    });
+    assert.strictEqual(anHigh.status, 200);
+    const dataHigh = await anHigh.json();
+    assert.strictEqual(dataHigh.evaluation.decision, 'REQUIRES_HUMAN_APPROVAL');
+    assert.strictEqual(dataHigh.evaluation.requires_human_approval, true);
+    assert.strictEqual(dataHigh.evaluation.reason_code, 'HIGH_VALUE_COMPLIANCE_ESCALATION');
+
+    const exHigh = await fetch(`${BASE_URL}/api/agentic-refund/execute/tx_demo_012_high_value`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Enterprise dispute' })
+    });
+    assert.strictEqual(exHigh.status, 200);
+    const exHighData = await exHigh.json();
+    assert.strictEqual(exHighData.status, 'held_for_approval');
+  });
+
+  test('End-to-end Student Payment Intent, Guardian Approval, and Refund Audit Trail Lifecycle', async () => {
+    // 1. Under-18 student requests payment for $79 course (exceeds $50 auto threshold)
+    const createRes = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'MIT Quantum Computing MicroMasters',
+        merchant_name: 'MIT Quantum Computing MicroMasters',
+        merchant_category: 'online_courses',
+        amount: 79.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(createRes.status, 200);
+    const createData = await createRes.json();
+    assert.strictEqual(createData.success, true);
+    assert.strictEqual(createData.status, 'requires_guardian_approval');
+    assert.strictEqual(createData.decision, 'REQUIRES_PARENT_APPROVAL');
+    assert.ok(createData.approval_id);
+    const newApprovalId = createData.approval_id;
+
+    // 2. Parent checks pending approvals
+    const pendRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=guard_priya_sharma_01`);
+    assert.strictEqual(pendRes.status, 200);
+    const pendData = await pendRes.json();
+    const foundPending = pendData.pending.find(a => a.id === newApprovalId);
+    assert.ok(foundPending, 'Expected newly created approval to appear in pending list');
+    assert.strictEqual(foundPending.amount, 79);
+
+    // 3. Parent approves the request
+    const approveRes = await fetch(`${BASE_URL}/api/guardian/approve/${newApprovalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Approved by Priya Sharma for educational advancement.' })
+    });
+    assert.strictEqual(approveRes.status, 200);
+    const approveData = await approveRes.json();
+    assert.strictEqual(approveData.approval.status, 'APPROVED');
+
+    // 4. Student sees updated approval status
+    const studentApprRes = await fetch(`${BASE_URL}/api/student/approvals?student_id=stu_aarav_sharma_01`);
+    assert.strictEqual(studentApprRes.status, 200);
+    const studentApprData = await studentApprRes.json();
+    const updatedInStudentView = studentApprData.approvals.find(a => a.id === newApprovalId);
+    assert.ok(updatedInStudentView);
+    assert.strictEqual(updatedInStudentView.status, 'APPROVED');
+
+    // 5. Parent rejects a separate $95 request
+    const req2Res = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'Advanced Robotics Workshop',
+        merchant_name: 'Robotics Lab',
+        merchant_category: 'online_courses',
+        amount: 95.00,
+        currency: 'USD'
+      })
+    });
+    const req2Data = await req2Res.json();
+    const req2Id = req2Data.approval_id;
+
+    const rejectRes = await fetch(`${BASE_URL}/api/guardian/reject/${req2Id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Exceeds monthly allowance.' })
+    });
+    assert.strictEqual(rejectRes.status, 200);
+    const rejectData = await rejectRes.json();
+    assert.strictEqual(rejectData.approval.status, 'REJECTED');
+
+    // 6. Student instant allowance clearance for under-threshold purchase ($35 <= $50)
+    const instantRes = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'edX Python Intro',
+        merchant_name: 'edX Python Intro',
+        merchant_category: 'online_courses',
+        amount: 35.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(instantRes.status, 200);
+    const instantData = await instantRes.json();
+    assert.strictEqual(instantData.status, 'approved');
+    assert.strictEqual(instantData.decision, 'INSTANT_ALLOWANCE_APPROVED');
+
+    // 7. Prohibited category is blocked
+    const prohibRes = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'Crypto Casino',
+        merchant_name: 'Crypto Casino',
+        merchant_category: 'gambling_betting',
+        amount: 25.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(prohibRes.status, 200);
+    const prohibData = await prohibRes.json();
+    assert.strictEqual(prohibData.status, 'blocked');
+    assert.strictEqual(prohibData.decision, 'PROHIBITED_MERCHANT_CATEGORY');
+
+    // 8. Missing / invalid DOB is blocked
+    const badDobRes = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'Course',
+        date_of_birth: '2035-01-01',
+        amount: 25.00
+      })
+    });
+    assert.strictEqual(badDobRes.status, 200);
+    const badDobData = await badDobRes.json();
+    assert.strictEqual(badDobData.status, 'blocked');
+    assert.strictEqual(badDobData.decision, 'AGE_VERIFICATION_REQUIRED');
+
+    // 9. Refund history and audit trail endpoint works reliably
+    const histRes = await fetch(`${BASE_URL}/api/agentic-refund/history`);
+    assert.strictEqual(histRes.status, 200);
+    const histData = await histRes.json();
+    assert.ok(Array.isArray(histData.audit_logs));
+
+    // 10. Guardian spending limits update works and reflects in student portal
+    const limitsRes = await fetch(`${BASE_URL}/api/guardian/limits`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma',
+        daily_limit: 350,
+        weekly_limit: 650,
+        monthly_limit: 1200
+      })
+    });
+    assert.strictEqual(limitsRes.status, 200);
+    const limitsData = await limitsRes.json();
+    assert.strictEqual(limitsData.profile.daily_limit, 350);
+    assert.strictEqual(limitsData.profile.weekly_limit, 650);
+    assert.strictEqual(limitsData.profile.monthly_limit, 1200);
+
+    // Verify student portal profile endpoint returns the updated limits
+    const stuProfRes = await fetch(`${BASE_URL}/api/student/profile?student_id=stu_aarav_sharma`);
+    assert.strictEqual(stuProfRes.status, 200);
+    const stuProfData = await stuProfRes.json();
+    assert.strictEqual(stuProfData.profile.spending_limits.daily_limit, 350);
+    assert.strictEqual(stuProfData.profile.spending_limits.weekly_limit, 650);
+    assert.strictEqual(stuProfData.profile.spending_limits.monthly_limit, 1200);
+    assert.strictEqual(stuProfData.student.spending_limits.monthly_limit, 1200);
+  });
+
+  test('POST /api/student/create-intent should prevent duplicate pending approval requests while allowing separate courses', async () => {
+    // 1. First submission: creates initial pending approval
+    const firstReq = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'AWS Certified Cloud Practitioner',
+        merchant_name: 'AWS Certified Cloud Practitioner',
+        merchant_category: 'online_courses',
+        amount: 85.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(firstReq.status, 200);
+    const firstData = await firstReq.json();
+    assert.strictEqual(firstData.status, 'requires_guardian_approval');
+    assert.ok(firstData.approval_id);
+    const originalApprovalId = firstData.approval_id;
+
+    // 2. Duplicate submission with same student, course, and amount
+    const dupReq = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'AWS Certified Cloud Practitioner',
+        merchant_name: 'AWS Certified Cloud Practitioner',
+        merchant_category: 'online_courses',
+        amount: 85.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(dupReq.status, 200);
+    const dupData = await dupReq.json();
+    assert.strictEqual(dupData.status, 'requires_guardian_approval');
+    assert.strictEqual(dupData.approval_id, originalApprovalId);
+    assert.strictEqual(dupData.is_duplicate_prevented, true);
+
+    // 3. Verify in pending approvals that there is ONLY ONE pending request for this course
+    const pendRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=guard_priya_sharma_01`);
+    assert.strictEqual(pendRes.status, 200);
+    const pendData = await pendRes.json();
+    const awsPending = pendData.pending.filter(a => a.merchant_name === 'AWS Certified Cloud Practitioner');
+    assert.strictEqual(awsPending.length, 1);
+    assert.strictEqual(awsPending[0].id, originalApprovalId);
+
+    // 4. Genuinely separate future course payment is NOT blocked
+    const separateReq = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'Harvard CS50 Web Programming',
+        merchant_name: 'Harvard CS50 Web Programming',
+        merchant_category: 'online_courses',
+        amount: 99.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(separateReq.status, 200);
+    const separateData = await separateReq.json();
+    assert.strictEqual(separateData.status, 'requires_guardian_approval');
+    assert.ok(separateData.approval_id);
+    assert.notStrictEqual(separateData.approval_id, originalApprovalId);
+    const separateApprovalId = separateData.approval_id;
+
+    // 5. Individual approval isolation: Approving one does not affect the other
+    const approveRes = await fetch(`${BASE_URL}/api/guardian/approve/${originalApprovalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Approved by Priya Sharma for AWS Certification.' })
+    });
+    assert.strictEqual(approveRes.status, 200);
+    const approveData = await approveRes.json();
+    assert.strictEqual(approveData.approval.status, 'APPROVED');
+
+    // Verify separate request is STILL pending
+    const checkPendRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=guard_priya_sharma_01`);
+    const checkPendData = await checkPendRes.json();
+    const stillPendingSeparate = checkPendData.pending.find(a => a.id === separateApprovalId);
+    assert.ok(stillPendingSeparate);
+    assert.strictEqual(stillPendingSeparate.status, 'PENDING');
+
+    // 6. Individual rejection isolation: Rejecting the separate request updates only it
+    const rejectRes = await fetch(`${BASE_URL}/api/guardian/reject/${separateApprovalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Course deferred to next semester.' })
+    });
+    assert.strictEqual(rejectRes.status, 200);
+    const rejectData = await rejectRes.json();
+    assert.strictEqual(rejectData.approval.status, 'REJECTED');
+
+    // 7. After previous approval/rejection, new request for same course can be made without being blocked
+    const reapplyReq = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'AWS Certified Cloud Practitioner',
+        merchant_name: 'AWS Certified Cloud Practitioner',
+        merchant_category: 'online_courses',
+        amount: 85.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(reapplyReq.status, 200);
+    const reapplyData = await reapplyReq.json();
+    assert.strictEqual(reapplyData.status, 'requires_guardian_approval');
+    assert.notStrictEqual(reapplyData.approval_id, originalApprovalId);
+    assert.strictEqual(reapplyData.is_duplicate_prevented, undefined);
+  });
+
+  test('Approved guardian payment synchronizes transaction record, student history, and spending totals', async () => {
+    // 1. Verify seeded transactions include Duolingo ($59.99), Coursera ($49), and AWS ($79)
+    const initProfRes = await fetch(`${BASE_URL}/api/student/profile?student_id=stu_aarav_sharma_01`);
+    assert.strictEqual(initProfRes.status, 200);
+    const initProfData = await initProfRes.json();
+    const initialSpend = initProfData.profile.spending_limits.current_monthly_spend;
+    assert.ok(typeof initialSpend === 'number');
+    assert.ok(initialSpend >= 187.99);
+
+    // 2. Verify Duolingo is recorded exactly once as settled transaction
+    const txRes = await fetch(`${BASE_URL}/api/student/transactions?student_id=stu_aarav_sharma_01`);
+    assert.strictEqual(txRes.status, 200);
+    const txData = await txRes.json();
+    const duoTxs = txData.transactions.filter(t =>
+      t.amount === 59.99 &&
+      (t.metadata_json && t.metadata_json.includes('Duolingo Super Annual Plan'))
+    );
+    assert.strictEqual(duoTxs.length, 1);
+    assert.strictEqual(duoTxs[0].status, 'settled');
+
+    // 3. Verify Coursera remains pending and not approved automatically
+    const guardPendRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=guard_priya_sharma_01`);
+    const guardPendData = await guardPendRes.json();
+    const courseraItem = guardPendData.pending.find(a => a.merchant_name.includes('Coursera'));
+    assert.ok(courseraItem, 'Coursera should remain in pending approvals');
+    assert.strictEqual(courseraItem.status, 'PENDING');
+
+    // 4. Submit a new course intent and approve it to verify live synchronization
+    const newCourseRes = await fetch(`${BASE_URL}/api/student/create-intent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_id: 'stu_aarav_sharma_01',
+        course_name: 'Language Immersion Certificate',
+        merchant_name: 'Language Immersion Certificate',
+        merchant_category: 'online_courses',
+        amount: 65.00,
+        currency: 'USD'
+      })
+    });
+    assert.strictEqual(newCourseRes.status, 200);
+    const newCourseData = await newCourseRes.json();
+    assert.strictEqual(newCourseData.status, 'requires_guardian_approval');
+    assert.ok(newCourseData.approval_id);
+    const newApprovalId = newCourseData.approval_id;
+
+    // Approve the new payment
+    const approveRes = await fetch(`${BASE_URL}/api/guardian/approve/${newApprovalId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: 'Approved by Priya Sharma for educational advancement.' })
+    });
+    assert.strictEqual(approveRes.status, 200);
+
+    // Verify student monthly spend increased by exactly $65.00
+    const updatedProfRes = await fetch(`${BASE_URL}/api/student/profile?student_id=stu_aarav_sharma_01`);
+    const updatedProfData = await updatedProfRes.json();
+    const updatedSpend = updatedProfData.profile.spending_limits.current_monthly_spend;
+    assert.strictEqual(parseFloat((updatedSpend - initialSpend).toFixed(2)), 65.00);
+
+    // Verify Coursera is STILL pending
+    const finalGuardRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=guard_priya_sharma_01`);
+    const finalGuardData = await finalGuardRes.json();
+    const finalCoursera = finalGuardData.pending.find(a => a.merchant_name.includes('Coursera'));
+    assert.ok(finalCoursera);
+    assert.strictEqual(finalCoursera.status, 'PENDING');
   });
 });
 

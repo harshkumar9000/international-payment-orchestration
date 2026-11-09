@@ -4,6 +4,8 @@ Enforces age verification, parent/guardian consent status, spending limit quotas
 and merchant category whitelisting for educational and minor payments.
 """
 from typing import Dict, List, Any, Optional
+from datetime import date, datetime
+import re
 
 # Merchant Category Code (MCC) Groups
 WHITELISTED_STUDENT_CATEGORIES = {
@@ -23,13 +25,125 @@ PROHIBITED_STUDENT_CATEGORIES = {
     "weapons_defense": "Weapons and hazardous goods merchants are prohibited."
 }
 
+def parse_and_calculate_age(date_of_birth: Any, reference_date: Optional[date] = None) -> Dict[str, Any]:
+    """
+    Accurately parse date of birth and calculate age without timezone shifting errors.
+    Returns:
+        {"status": "VERIFIED", "age": int, "is_minor": bool, "date_of_birth": "YYYY-MM-DD"}
+    or
+        {"status": "UNVERIFIED", "age": None, "is_minor": None, "reason": str}
+    """
+    if not date_of_birth or not isinstance(date_of_birth, str) or not date_of_birth.strip():
+        return {
+            "status": "UNVERIFIED",
+            "age": None,
+            "is_minor": None,
+            "reason": "Date of birth is missing."
+        }
+
+    clean_dob = date_of_birth.strip()
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", clean_dob)
+    if not match:
+        return {
+            "status": "UNVERIFIED",
+            "age": None,
+            "is_minor": None,
+            "reason": "Date of birth format is invalid (expected YYYY-MM-DD)."
+        }
+
+    birth_year = int(match.group(1))
+    birth_month = int(match.group(2))
+    birth_day = int(match.group(3))
+
+    try:
+        birth_date = date(birth_year, birth_month, birth_day)
+    except ValueError as e:
+        return {
+            "status": "UNVERIFIED",
+            "age": None,
+            "is_minor": None,
+            "reason": f"Date of birth specifies invalid calendar values ({str(e)})."
+        }
+
+    ref_date = reference_date or date.today()
+    if birth_date > ref_date:
+        return {
+            "status": "UNVERIFIED",
+            "age": None,
+            "is_minor": None,
+            "reason": "Date of birth cannot be in the future."
+        }
+
+    # Accurate age calculation based on whether birthday has occurred this calendar year
+    age = ref_date.year - birth_date.year - ((ref_date.month, ref_date.day) < (birth_date.month, birth_date.day))
+
+    if age < 0 or age > 130:
+        return {
+            "status": "UNVERIFIED",
+            "age": None,
+            "is_minor": None,
+            "reason": "Calculated age is outside valid range."
+        }
+
+    return {
+        "status": "VERIFIED",
+        "age": age,
+        "is_minor": age < 18,
+        "date_of_birth": clean_dob
+    }
+
 def verify_student_payment_intent(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     Evaluates a proposed payment by a student/minor against limits,
     category whitelists, and guardian consent policies.
+    Requires verified age; unverified ages are blocked from bypassing safety rules.
     """
-    student_age = int(payload.get("age", 17))
-    is_minor = student_age < 18
+    # 0. Age Verification Guard
+    if payload.get("age_status") == "UNVERIFIED":
+        return {
+            "status": "BLOCKED",
+            "decision": "AGE_VERIFICATION_REQUIRED",
+            "reason": "Student age is unverified. Valid age verification is required before student payments can be processed.",
+            "age_status": "UNVERIFIED",
+            "requires_parent_approval": False,
+            "requires_age_verification": True
+        }
+
+    if "date_of_birth" in payload:
+        age_info = parse_and_calculate_age(payload.get("date_of_birth"))
+        if age_info["status"] == "UNVERIFIED":
+            return {
+                "status": "BLOCKED",
+                "decision": "AGE_VERIFICATION_REQUIRED",
+                "reason": f"Student age is unverified ({age_info['reason']}). Valid age verification is required before student payments can be processed.",
+                "age_status": "UNVERIFIED",
+                "requires_parent_approval": False,
+                "requires_age_verification": True
+            }
+        student_age = age_info["age"]
+        is_minor = age_info["is_minor"]
+    elif payload.get("age") is not None:
+        try:
+            student_age = int(payload["age"])
+            is_minor = student_age < 18
+        except (ValueError, TypeError):
+            return {
+                "status": "BLOCKED",
+                "decision": "AGE_VERIFICATION_REQUIRED",
+                "reason": "Student age value is invalid. Valid age verification is required before student payments can be processed.",
+                "age_status": "UNVERIFIED",
+                "requires_parent_approval": False,
+                "requires_age_verification": True
+            }
+    else:
+        return {
+            "status": "BLOCKED",
+            "decision": "AGE_VERIFICATION_REQUIRED",
+            "reason": "Date of birth is missing. Valid age verification is required before student payments can be processed.",
+            "age_status": "UNVERIFIED",
+            "requires_parent_approval": False,
+            "requires_age_verification": True
+        }
     guardian_consent_status = str(payload.get("guardian_consent_status", "ACTIVE")).upper()
     category = str(payload.get("merchant_category", "online_courses")).lower()
     amount = float(payload.get("amount", 45.0))

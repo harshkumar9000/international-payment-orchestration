@@ -279,6 +279,20 @@ function fallbackAgenticRefund(payload) {
     };
   }
 
+  if (status === 'PENDING' || status === 'PROCESSING') {
+    return {
+      decision: 'REFUND_REJECTED',
+      reason_code: 'TRANSACTION_STILL_PENDING',
+      explanation: 'Transaction is currently pending with the payment provider. Wait for settlement or final decline before evaluating refund.',
+      requires_human_approval: false,
+      refund_eligible: false,
+      safe_retry_viable: false,
+      idempotency_key: idemKey,
+      agent_steps: [{ step: 'TRANSACTION_IN_FLIGHT', status: 'PENDING_RESOLUTION', detail: 'Status PENDING verified.' }],
+      source: 'javascript_fallback'
+    };
+  }
+
   if (status === 'FAILED' || status === 'VOIDED') {
     return {
       decision: 'NO_REFUND_NEEDED_HOLD_RELEASED',
@@ -338,7 +352,78 @@ async function verifyStudentPaymentIntent(payload) {
 }
 
 function fallbackStudentPaymentIntent(payload) {
-  const isMinor = Number(payload.age || 17) < 18;
+  if (payload.age_status === 'UNVERIFIED') {
+    return {
+      status: 'BLOCKED',
+      decision: 'AGE_VERIFICATION_REQUIRED',
+      reason: 'Student age is unverified. Valid age verification is required before student payments can be processed.',
+      age_status: 'UNVERIFIED',
+      requires_parent_approval: false,
+      requires_age_verification: true,
+      source: 'javascript_fallback'
+    };
+  }
+
+  let isMinor;
+  if (payload.date_of_birth !== undefined) {
+    if (!payload.date_of_birth || typeof payload.date_of_birth !== 'string') {
+      return {
+        status: 'BLOCKED',
+        decision: 'AGE_VERIFICATION_REQUIRED',
+        reason: 'Student age is unverified (Date of birth is missing). Valid age verification is required before student payments can be processed.',
+        age_status: 'UNVERIFIED',
+        requires_parent_approval: false,
+        requires_age_verification: true,
+        source: 'javascript_fallback'
+      };
+    }
+    const match = payload.date_of_birth.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+      return {
+        status: 'BLOCKED',
+        decision: 'AGE_VERIFICATION_REQUIRED',
+        reason: 'Student age is unverified (Date of birth format is invalid). Valid age verification is required before student payments can be processed.',
+        age_status: 'UNVERIFIED',
+        requires_parent_approval: false,
+        requires_age_verification: true,
+        source: 'javascript_fallback'
+      };
+    }
+    const by = parseInt(match[1], 10);
+    const bm = parseInt(match[2], 10);
+    const bd = parseInt(match[3], 10);
+    const now = new Date();
+    const cy = now.getUTCFullYear();
+    const cm = now.getUTCMonth() + 1;
+    const cd = now.getUTCDate();
+    if (by > cy || (by === cy && bm > cm) || (by === cy && bm === cm && bd > cd)) {
+      return {
+        status: 'BLOCKED',
+        decision: 'AGE_VERIFICATION_REQUIRED',
+        reason: 'Student age is unverified (Date of birth cannot be in the future). Valid age verification is required before student payments can be processed.',
+        age_status: 'UNVERIFIED',
+        requires_parent_approval: false,
+        requires_age_verification: true,
+        source: 'javascript_fallback'
+      };
+    }
+    let calculatedAge = cy - by;
+    if (cm < bm || (cm === bm && cd < bd)) calculatedAge--;
+    isMinor = calculatedAge < 18;
+  } else if (payload.age !== undefined && payload.age !== null) {
+    isMinor = Number(payload.age) < 18;
+  } else {
+    return {
+      status: 'BLOCKED',
+      decision: 'AGE_VERIFICATION_REQUIRED',
+      reason: 'Date of birth is missing. Valid age verification is required before student payments can be processed.',
+      age_status: 'UNVERIFIED',
+      requires_parent_approval: false,
+      requires_age_verification: true,
+      source: 'javascript_fallback'
+    };
+  }
+
   const consent = String(payload.guardian_consent_status || 'ACTIVE').toUpperCase();
   const cat = String(payload.merchant_category || 'online_courses').toLowerCase();
   const amt = Number(payload.amount || 50);
