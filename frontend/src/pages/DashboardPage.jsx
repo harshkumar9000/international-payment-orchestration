@@ -4,25 +4,18 @@ import { useAuth } from '../context/AuthContext';
 import {
   TrendingUp,
   DollarSign,
-  RotateCcw,
-  ShieldCheck,
-  CheckCircle,
-  Activity,
-  ArrowUpRight,
   CreditCard,
-  GitBranch,
-  RefreshCw,
-  Layers,
-  Globe,
-  ArrowDownRight,
-  Sparkles,
+  CheckCircle2,
   AlertTriangle,
-  GraduationCap,
-  Users2,
-  ChevronRight,
+  ArrowRight,
+  Plus,
+  RefreshCw,
   ExternalLink,
-  ShieldAlert,
-  Info
+  ShieldCheck,
+  Globe2,
+  Clock,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
 import {
   AreaChart,
@@ -38,58 +31,34 @@ export default function DashboardPage({ setActivePage }) {
   const { merchant } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [volumeChart, setVolumeChart] = useState(null);
-  const [corridors, setCorridors] = useState(null);
-  const [providersHealth, setProvidersHealth] = useState([]);
   const [recentTxs, setRecentTxs] = useState([]);
-  const [refundStats, setRefundStats] = useState(null);
-  const [studentStats, setStudentStats] = useState(null);
+  const [savedCards, setSavedCards] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState('7d');
 
   async function loadDashboardData() {
     setLoading(true);
     try {
-      const [mRes, vRes, cRes, hRes, tRes, refRes, studRes] = await Promise.all([
+      const [mRes, vRes, tRes, cRes] = await Promise.all([
         api.analytics.getMetrics().catch(() => ({
           total_volume_usd: 148920.50,
           total_transactions: 1248,
           settled_transactions: 1204,
-          recovered_transactions: 38,
-          blocked_transactions: 24,
           failed_transactions: 20,
-          conversion_rate_percent: 96.4,
-          cost_savings_usd: 4890.20,
-          fraud_blocked_rate_percent: 1.9
+          conversion_rate_percent: 96.5
         })),
         api.analytics.getVolumeChart().catch(() => ({
           labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
           volumes: [14200, 18500, 24100, 19800, 31200, 28900, 36400],
           transactions_count: [48, 65, 89, 74, 118, 102, 138]
         })),
-        api.analytics.getCorridors().catch(() => null),
-        api.analytics.getProviderHealth().catch(() => ({ providers: [] })),
         api.transactions.list({ limit: 6 }).catch(() => ({ transactions: [] })),
-        (typeof api.agenticRefund?.getAuditTrail === 'function'
-          ? api.agenticRefund.getAuditTrail()
-          : Promise.resolve({ logs: [] })
-        ).catch(() => ({ logs: [] })),
-        (typeof api.student?.getProfile === 'function'
-          ? api.student.getProfile('stu_aarav_sharma')
-          : Promise.resolve(null)
-        ).catch(() => null)
+        api.cards.list().catch(() => ({ cards: [] }))
       ]);
 
       setMetrics(mRes);
       setVolumeChart(vRes);
-      setCorridors(cRes);
-      setProvidersHealth(hRes?.providers || []);
       setRecentTxs(tRes?.transactions || []);
-      setRefundStats({
-        totalLogs: refRes?.logs ? refRes.logs.length : 0,
-        autoRefunded: 2,
-        pendingEscalated: 1
-      });
-      setStudentStats(studRes);
+      setSavedCards(cRes?.cards || []);
     } catch (err) {
       console.error('[Dashboard Load Error]:', err);
     } finally {
@@ -101,454 +70,350 @@ export default function DashboardPage({ setActivePage }) {
     loadDashboardData();
   }, []);
 
-  // Format chart data for Recharts
-  const chartData = volumeChart && volumeChart.labels ? volumeChart.labels.map((label, idx) => ({
-    name: label,
-    volume: volumeChart.volumes[idx] || 0,
-    count: volumeChart.transactions_count[idx] || 0
-  })) : [
-    { name: 'Mon', volume: 14200, count: 48 },
-    { name: 'Tue', volume: 18500, count: 65 },
-    { name: 'Wed', volume: 24100, count: 89 },
-    { name: 'Thu', volume: 19800, count: 74 },
-    { name: 'Fri', volume: 31200, count: 118 },
-    { name: 'Sat', volume: 28900, count: 102 },
-    { name: 'Sun', volume: 36400, count: 138 }
-  ];
-
-  const totalVolume = metrics?.total_volume_usd?.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) || '$148,920.50';
-  const settledCount = metrics?.settled_transactions || 1204;
-  const failedCount = metrics?.failed_transactions || 20;
-  const conversionRate = metrics?.conversion_rate_percent || 96.4;
-  const costSavings = metrics?.cost_savings_usd?.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) || '$4,890.20';
-  const blockedRate = metrics?.fraud_blocked_rate_percent || 1.9;
+  // Format Recharts chart data
+  const chartData = (volumeChart?.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']).map((day, idx) => ({
+    name: day,
+    volume: volumeChart?.volumes?.[idx] || 0,
+    count: volumeChart?.transactions_count?.[idx] || 0
+  }));
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 p-6 rounded-2xl text-white shadow-xl border border-slate-800">
-        <div className="space-y-1.5">
-          <div className="flex items-center space-x-2">
-            <span className="px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
-              Payment System Online (Demo Mode)
+    <div className="space-y-8 max-w-7xl mx-auto">
+      
+      {/* Top Banner / Welcome & Quick Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded border border-teal-500/20">
+              Overview
             </span>
-            <span className="text-xs text-slate-400">Sample & Sandbox Data</span>
+            <span className="px-2 py-0.5 text-[10px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800/80 rounded border border-slate-200 dark:border-slate-700">
+              Simulated Demo Data
+            </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            Welcome back, {merchant?.business_name || 'Acme Global Digital'}
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            Payments Dashboard
           </h1>
-          <p className="text-sm text-slate-300 max-w-2xl">
-            All systems active: Automatic provider selection, Indian card and UPI support, student payment controls, and automatic refund assistant.
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            Real-time monitoring of your cross-border transactions and domestic payment rails.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Quick Action Buttons */}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => setActivePage('checkout')}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-xs rounded-xl shadow-lg shadow-teal-500/20 transition-all cursor-pointer"
+            onClick={() => setActivePage('cards')}
+            className="px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-xs border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
-            <CreditCard className="w-4 h-4" />
-            Try Payment Checkout
+            <Plus className="w-4 h-4 text-teal-500" />
+            <span>Add Card</span>
           </button>
           <button
-            onClick={loadDashboardData}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2.5 bg-white/10 hover:bg-white/15 text-white font-medium text-xs rounded-xl border border-white/10 transition-all cursor-pointer"
-            title="Refresh Dashboard Data"
+            onClick={() => setActivePage('checkout')}
+            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs shadow-md shadow-teal-600/20 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <CreditCard className="w-4 h-4" />
+            <span>Make Payment</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Payment Volume */}
-        <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Total Payment Volume
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+      {/* 4 Essential Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        
+        {/* Total Payment Volume */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Total Volume</span>
+            <div className="p-2 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{totalVolume}</div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+          <div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+              ${(metrics?.total_volume_usd || 148920.50).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs text-emerald-500 flex items-center gap-1 mt-1 font-semibold">
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>+14.8% this week (Demo Data)</span>
+              <span>+14.8% from last week</span>
             </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex justify-between">
-            <span>Completed Payments:</span>
-            <span className="font-semibold text-slate-700 dark:text-slate-300">{settledCount} payments</span>
           </div>
         </div>
 
-        {/* Card 2: Success Rate */}
-        <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Payment Success Rate
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <CheckCircle className="w-4 h-4" />
+        {/* Total Transactions */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Total Transactions</span>
+            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-500">
+              <RefreshCw className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{conversionRate}%</div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400 font-medium">
-              <GitBranch className="w-3.5 h-3.5" />
-              <span>Automatic backup routing enabled</span>
+          <div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+              {(metrics?.total_transactions || 1248).toLocaleString()}
             </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex justify-between">
-            <span>Declined Payments:</span>
-            <span className="font-semibold text-rose-500">{failedCount} payments</span>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Cross-border & domestic rails
+            </div>
           </div>
         </div>
 
-        {/* Card 3: Automatic Refunds & Recoveries */}
-        <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Automatic Refunds
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-              <RotateCcw className="w-4 h-4" />
+        {/* Successful Payments */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Successful Payments</span>
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-500">
+              <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {metrics?.recovered_transactions || 38} Resolved
+          <div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+              {(metrics?.settled_transactions || 1204).toLocaleString()}
             </div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Duplicate protection active</span>
+            <div className="text-xs text-emerald-500 flex items-center gap-1 mt-1 font-semibold">
+              <span>{metrics?.conversion_rate_percent || 96.5}% success SLA</span>
             </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex justify-between">
-            <span>Waiting for Review:</span>
-            <span className="font-semibold text-amber-500">1 payment over $500</span>
           </div>
         </div>
 
-        {/* Card 4: Fee Savings */}
-        <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-hidden group">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-              Fee Savings
-            </span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
+        {/* Failed Payments */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+          <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Failed Payments</span>
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-500">
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">{costSavings}</div>
-            <div className="mt-1 flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Suspicious payments blocked: {blockedRate}%</span>
+          <div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white font-mono tracking-tight">
+              {(metrics?.failed_transactions || 20).toLocaleString()}
             </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex justify-between">
-            <span>Saved vs flat 3.5% fees</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">-28% fees</span>
+            <div className="text-xs text-amber-500 flex items-center gap-1 mt-1">
+              <span>1.6% decline / retry rate</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Main Charts & Key Feature Spotlights */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Recharts Chart */}
-        <div className="lg:col-span-2 bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      {/* Middle Grid: Activity Chart (8 cols) & Linked Cards Summary (4 cols) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Payment Activity Chart */}
+        <div className="lg:col-span-8 p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Daily Payment Volume & Activity</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Total payments processed daily across international currencies (Demo Data)</p>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Payment Activity (7 Days)
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Daily settled volume across international corridors (USD equivalent)
+              </p>
             </div>
-            <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-lg text-xs">
-              {['24h', '7d', '30d', '90d'].map((tf) => (
-                <button
-                  key={tf}
-                  onClick={() => setTimeframe(tf)}
-                  className={`px-3 py-1 rounded-md font-medium transition-all cursor-pointer ${
-                    timeframe === tf
-                      ? 'bg-white dark:bg-slate-900 text-teal-600 dark:text-teal-400 shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  {tf}
-                </button>
-              ))}
-            </div>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+              USD ($)
+            </span>
           </div>
 
-          <div className="h-64 w-full pt-2">
+          <div className="h-64 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.4} />
+                  <linearGradient id="volumeTeal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#14B8A6" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.15} />
-                <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(val) => `$${val / 1000}k`} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.25} />
+                <XAxis dataKey="name" stroke="#94A3B8" fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1E293B',
+                    backgroundColor: '#0F172A',
                     borderColor: '#334155',
-                    borderRadius: '0.5rem',
-                    color: '#F8FAFC',
-                    fontSize: '12px'
+                    borderRadius: '0.75rem',
+                    fontSize: '12px',
+                    color: '#F8FAFC'
                   }}
-                  formatter={(value, name) => [
-                    name === 'volume' ? `$${Number(value).toLocaleString()}` : value,
-                    name === 'volume' ? 'Total Payment Value' : 'Number of Payments'
-                  ]}
+                  formatter={(val) => [`$${val.toLocaleString()}`, 'Volume']}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="volume"
-                  stroke="#14B8A6"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#volumeGradient)"
-                />
+                <Area type="monotone" dataKey="volume" stroke="#14B8A6" strokeWidth={2.5} fillOpacity={1} fill="url(#volumeTeal)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-center text-xs">
-            <div>
-              <span className="text-slate-400 block text-[11px]">Highest Daily Volume</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">$36,400</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Average Payments / Day</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">98 payments</span>
-            </div>
-            <div>
-              <span className="text-slate-400 block text-[11px]">Average Payment Size</span>
-              <span className="font-bold text-slate-800 dark:text-slate-200">$119.32</span>
-            </div>
-          </div>
         </div>
 
-        {/* Right 1 Col: Key Features */}
-        <div className="space-y-4">
-          {/* Feature 1 */}
-          <div className="bg-gradient-to-br from-teal-900/30 to-slate-900 border border-teal-500/30 rounded-xl p-4 relative overflow-hidden">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-teal-500/20 text-teal-300 border border-teal-500/40">
-                  Feature 1
-                </span>
-                <h3 className="text-sm font-bold text-white mt-1.5">Indian Cards & UPI Payments</h3>
-                <p className="text-xs text-slate-300 mt-1">
-                  Checks whether your RuPay card or UPI account works for international payments, and calculates applicable taxes (TCS).
-                </p>
-              </div>
+        {/* Linked Payment Methods Summary */}
+        <div className="lg:col-span-4 p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Linked Cards
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Indian & global payment instruments
+              </p>
             </div>
             <button
-              onClick={() => setActivePage('compatibility')}
-              className="mt-3 w-full py-1.5 px-3 bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/40 text-teal-300 text-xs font-medium rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer"
+              onClick={() => setActivePage('cards')}
+              className="text-xs text-teal-600 dark:text-teal-400 hover:underline font-semibold cursor-pointer"
             >
-              Check Card & UPI Compatibility <ChevronRight className="w-3.5 h-3.5" />
+              Manage
             </button>
           </div>
 
-          {/* Feature 2 */}
-          <div className="bg-gradient-to-br from-indigo-900/30 to-slate-900 border border-indigo-500/30 rounded-xl p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-                  Feature 2
-                </span>
-                <h3 className="text-sm font-bold text-white mt-1.5">Student & Parent Controls</h3>
-                <p className="text-xs text-slate-300 mt-1">
-                  Helps students pay for international courses safely, with parent approval for payments over $50 and strict limits.
-                </p>
+          <div className="space-y-3">
+            {savedCards.length === 0 ? (
+              <div className="p-6 text-center text-xs text-slate-400 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-800">
+                No cards linked yet.
+                <button
+                  onClick={() => setActivePage('cards')}
+                  className="block mx-auto mt-2 text-teal-500 font-bold hover:underline cursor-pointer"
+                >
+                  Link a Card
+                </button>
               </div>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => setActivePage('student')}
-                className="flex-1 py-1.5 px-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-medium rounded-lg text-center transition-all cursor-pointer"
-              >
-                Student View
-              </button>
-              <button
-                onClick={() => setActivePage('guardian')}
-                className="flex-1 py-1.5 px-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-300 text-xs font-medium rounded-lg text-center transition-all cursor-pointer"
-              >
-                Parent Portal
-              </button>
-            </div>
+            ) : (
+              savedCards.slice(0, 3).map((c) => {
+                const isSupported = c.international_support === 'SUPPORTED';
+                return (
+                  <div
+                    key={c.id}
+                    className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 flex items-center justify-between"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-xs">
+                        {c.network === 'RuPay' ? 'RP' : c.network === 'Visa' ? 'VI' : 'MC'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                          {c.issuing_bank}
+                        </div>
+                        <div className="font-mono text-[11px] text-slate-400">
+                          {c.card_number_masked}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right space-y-1">
+                      <span
+                        className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${
+                          isSupported
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        }`}
+                      >
+                        {isSupported ? 'Global Ready' : 'Domestic'}
+                      </span>
+                      {c.is_default && (
+                        <div className="text-[9px] font-semibold text-teal-400">Default</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
 
-          {/* Feature 3 */}
-          <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-4">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  Feature 3
-                </span>
-                <h3 className="text-sm font-bold text-white mt-1.5">Automatic Refund Assistant</h3>
-                <p className="text-xs text-slate-300 mt-1">
-                  Checks the bank's actual records to verify whether stuck payments were charged, preventing duplicate payouts.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={() => setActivePage('agentic-refund')}
-              className="mt-3 w-full py-1.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-medium rounded-lg flex items-center justify-center gap-1 transition-all cursor-pointer"
-            >
-              Open Refund Assistant <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Provider Health & Live Performance Matrix */}
-      <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">Connected Payment Providers</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Response speed, uptime, and success rates (Simulated Benchmarks)</p>
-          </div>
           <button
-            onClick={() => setActivePage('providers')}
-            className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+            onClick={() => setActivePage('cards')}
+            className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
-            Compare All Providers <ChevronRight className="w-3.5 h-3.5" />
+            <span>View All Cards ({savedCards.length})</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          {providersHealth.map((provider) => (
-            <div
-              key={provider.id}
-              className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-xs text-slate-900 dark:text-white">{provider.name}</span>
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    provider.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
-                  }`}
-                  title={provider.is_active ? 'Provider Online' : 'Provider Offline'}
-                />
-              </div>
-              <div className="flex items-baseline justify-between text-xs">
-                <span className="text-slate-400 text-[11px]">Success Rate:</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">{provider.success_rate_percent}%</span>
-              </div>
-              <div className="flex items-baseline justify-between text-xs">
-                <span className="text-slate-400 text-[11px]">Response Speed:</span>
-                <span className="font-mono text-[11px] text-slate-600 dark:text-slate-300">{provider.avg_latency_ms} ms</span>
-              </div>
-              <div className="flex items-baseline justify-between text-xs pt-1 border-t border-slate-200/60 dark:border-slate-800">
-                <span className="text-slate-400 text-[10px]">Processing Fee:</span>
-                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">{provider.base_fee_display}</span>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Recent Customer Payments Feed */}
-      <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      {/* Recent Transactions Table */}
+      <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">Recent Customer Payments</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Live payment feed with student badges and payment method details</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              Recent Transactions
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Latest cross-border payment charges, settlements, and corridor executions
+            </p>
           </div>
           <button
             onClick={() => setActivePage('transactions')}
-            className="text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-xs text-teal-600 dark:text-teal-400 hover:underline font-semibold cursor-pointer flex items-center gap-1"
           >
-            View Complete Payment History ({recentTxs.length}) <ChevronRight className="w-3.5 h-3.5" />
+            <span>View Full History</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
-              <tr>
-                <th className="py-2.5 px-3 font-semibold">Payment ID</th>
-                <th className="py-2.5 px-3 font-semibold">Customer Email</th>
-                <th className="py-2.5 px-3 font-semibold">Country & Currency</th>
-                <th className="py-2.5 px-3 font-semibold">Amount</th>
-                <th className="py-2.5 px-3 font-semibold">Provider Used</th>
-                <th className="py-2.5 px-3 font-semibold">Status</th>
-                <th className="py-2.5 px-3 font-semibold text-right">Details</th>
+            <thead>
+              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider">
+                <th className="pb-3 font-semibold">Transaction ID</th>
+                <th className="pb-3 font-semibold">Date & Time</th>
+                <th className="pb-3 font-semibold">Corridor</th>
+                <th className="pb-3 font-semibold">Method</th>
+                <th className="pb-3 font-semibold">Amount</th>
+                <th className="pb-3 font-semibold">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
               {recentTxs.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-6 text-center text-slate-400">
-                    No recent payments recorded yet.
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                    No transactions found. Make a payment in checkout to view activity.
                   </td>
                 </tr>
               ) : (
-                recentTxs.slice(0, 5).map((tx) => (
-                  <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3 font-mono font-medium text-slate-700 dark:text-slate-300">
-                      {tx.id.substring(0, 16)}...
-                    </td>
-                    <td className="py-3 px-3">
-                      <div className="font-medium text-slate-900 dark:text-white truncate max-w-[140px]">
-                        {tx.customer_email || 'guest@example.com'}
-                      </div>
-                      {tx.is_student && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-indigo-500 font-semibold">
-                          <GraduationCap className="w-3 h-3" /> Student
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                recentTxs.slice(0, 6).map((tx) => {
+                  const isSettled = tx.status === 'settled';
+                  const isFailed = tx.status === 'failed';
+                  const isPending = tx.status?.includes('pending');
+
+                  return (
+                    <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-3 font-mono font-bold text-teal-600 dark:text-teal-400">
+                        {tx.id.slice(0, 16)}...
+                      </td>
+                      <td className="py-3 text-slate-500 dark:text-slate-400">
+                        {new Date(tx.created_at || Date.now()).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="py-3 text-slate-700 dark:text-slate-300 font-semibold">
                         {tx.customer_country || 'US'} ({tx.currency || 'USD'})
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">
-                      {tx.currency} {parseFloat(tx.amount || 0).toFixed(2)}
-                    </td>
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 capitalize">
-                        {tx.executed_provider || tx.provider || 'stripe'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                          tx.status === 'settled' || tx.status === 'success'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : tx.status === 'recovered' || tx.status === 'refunded'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                            : tx.status === 'blocked'
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                            : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
-                        }`}
-                      >
-                        {tx.status === 'settled' ? 'Completed' : tx.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <button
-                        onClick={() => setActivePage('transactions')}
-                        className="text-teal-600 dark:text-teal-400 hover:text-teal-700 text-xs font-semibold cursor-pointer"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="py-3 text-slate-500 dark:text-slate-400 capitalize">
+                        {(tx.payment_method || 'credit_card').replace('_', ' ')}
+                      </td>
+                      <td className="py-3 font-mono font-bold text-slate-900 dark:text-white">
+                        {tx.amount ? `$${parseFloat(tx.amount).toFixed(2)}` : '$120.00'}
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                            isSettled
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                              : isFailed
+                              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                              : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          }`}
+                        >
+                          {isSettled ? (
+                            <CheckCircle2 className="w-3 h-3" />
+                          ) : isFailed ? (
+                            <AlertTriangle className="w-3 h-3" />
+                          ) : (
+                            <Clock className="w-3 h-3" />
+                          )}
+                          <span className="capitalize">{tx.status || 'Settled'}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

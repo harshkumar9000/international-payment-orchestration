@@ -21,7 +21,17 @@ async function request(endpoint, options = {}) {
     config.body = JSON.stringify(config.body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+  } catch (netErr) {
+    console.error(`[API Network Error] ${options.method || 'GET'} ${endpoint}:`, netErr.message);
+    const friendlyError = new Error('Unable to connect to payment service. Please ensure the backend server is reachable.');
+    friendlyError.status = 0;
+    friendlyError.isNetworkError = true;
+    friendlyError.originalError = netErr;
+    throw friendlyError;
+  }
 
   if (!response.ok) {
     let errorMsg = `HTTP Error ${response.status}`;
@@ -29,7 +39,15 @@ async function request(endpoint, options = {}) {
       const errData = await response.json();
       errorMsg = errData.error || errData.message || errorMsg;
     } catch (e) {
-      // ignore
+      if (response.status === 401) {
+        errorMsg = 'Authentication required. Please sign in to perform this action.';
+      } else if (response.status === 403) {
+        errorMsg = 'Access forbidden. You do not have permission to perform this action.';
+      } else if (response.status === 404) {
+        errorMsg = 'Service endpoint not found.';
+      } else if (response.status >= 500) {
+        errorMsg = 'Payment service is temporarily unavailable. Database operation failed.';
+      }
     }
     const error = new Error(errorMsg);
     error.status = response.status;
@@ -45,7 +63,9 @@ export const api = {
     login: (credentials) => request('/auth/login', { method: 'POST', body: credentials }),
     register: (userData) => request('/auth/register', { method: 'POST', body: userData }),
     demoLogin: () => request('/auth/demo-login', { method: 'POST' }),
-    getMe: () => request('/auth/me')
+    getMe: () => request('/auth/me'),
+    forgotPassword: (data) => request('/auth/forgot-password', { method: 'POST', body: data }),
+    resetPassword: (data) => request('/auth/reset-password', { method: 'POST', body: data })
   },
 
   // Checkout
@@ -92,6 +112,15 @@ export const api = {
     getAnalytics: () => request('/recovery/analytics'),
     getLogs: () => request('/recovery/logs'),
     retry: (id) => request(`/recovery/retry/${id}`, { method: 'POST' })
+  },
+
+  // Cards (Domestic & International)
+  cards: {
+    list: () => request('/cards'),
+    create: (cardData) => request('/cards', { method: 'POST', body: cardData }),
+    delete: (id) => request(`/cards/${id}`, { method: 'DELETE' }),
+    setDefault: (id) => request(`/cards/${id}/default`, { method: 'PUT' }),
+    getById: (id) => request(`/cards/${id}`)
   },
 
   // Domestic Card & UPI International

@@ -7,11 +7,11 @@
     "seed": "npm --prefix backend run seed",
     "dev": "concurrently -n \"intelligence,backend,frontend\" -c \"magenta,cyan,green\" \"npm run dev:python\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "test": "npm run test:python && npm run test:backend",
-    "test:python": "python3 -m unittest intelligence_service/test_intelligence.py",
+    "test:python": "python -m unittest intelligence_service/test_intelligence.py",
     "test:backend": "npm --prefix backend test",
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
-    "dev:python": "python3 -m uvicorn intelligence_service.main:app --port 8000 --reload",
+    "dev:python": "python -m uvicorn intelligence_service.main:app --port 8000 --reload",
     "build": "npm --prefix frontend run build",
     "start": "npm --prefix backend start"
   },

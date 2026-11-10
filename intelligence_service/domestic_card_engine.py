@@ -70,7 +70,8 @@ def evaluate_domestic_instrument(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     payment_method = str(payload.get("payment_method", "credit_card")).lower()
     card_number = str(payload.get("card_number", "")).replace(" ", "").replace("-", "")
-    card_bin = card_number[:4] if len(card_number) >= 4 else str(payload.get("bin", "6521"))
+    raw_bin = str(payload.get("bin") or payload.get("card_bin") or card_number or "6521").replace(" ", "").replace("-", "")
+    card_bin = raw_bin[:4] if len(raw_bin) >= 4 else "6521"
     currency = str(payload.get("currency", "USD")).upper()
     merchant_country = str(payload.get("merchant_country", "US")).upper()
     amount_inr = float(payload.get("amount_inr", 0.0))
@@ -121,16 +122,16 @@ def evaluate_domestic_instrument(payload: Dict[str, Any]) -> Dict[str, Any]:
             ])
 
     # 2. RuPay Card Rails Evaluation
-    elif payment_method in ["credit_card", "debit_card", "rupay_card"]:
+    elif payment_method in ["credit_card", "debit_card", "rupay_card", "card"]:
         # Check BIN
         bin_match = RUPAY_BIN_DATABASE.get(card_bin)
         
         # If card number starts with standard Visa (4) or Mastercard (51-55)
-        if card_number.startswith("4"):
+        if card_number.startswith("4") or raw_bin.startswith("4"):
             eligible = True
             instrument_variant = "Visa International"
             networks = ["Visa Worldwide"]
-        elif card_number.startswith(("51", "52", "53", "54", "55")):
+        elif card_number.startswith(("51", "52", "53", "54", "55")) or raw_bin.startswith(("51", "52", "53", "54", "55")):
             eligible = True
             instrument_variant = "Mastercard International"
             networks = ["Mastercard Worldwide"]
@@ -213,11 +214,13 @@ def evaluate_domestic_instrument(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "eligible": eligible,
+        "status": "APPROVED" if eligible else "BLOCKED",
         "payment_method": payment_method,
         "instrument_variant": instrument_variant,
         "card_bin": card_bin,
         "co_branded_networks": networks,
         "rejection_reason": rejection_reason,
+        "reason": rejection_reason,
         "merchant_country": merchant_country,
         "currency": currency,
         "amount_usd": amount_usd,

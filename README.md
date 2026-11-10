@@ -2,9 +2,9 @@
 
 > **"Smarter Payments. Borderless Possibilities."**
 
-[![Test Suite](https://img.shields.io/badge/Tests-32%2F32%20Passing-brightgreen?style=flat-square)](#testing--verification)
-[![Python Tests](https://img.shields.io/badge/Python%20Intelligence-20%2F20%20Pass-teal?style=flat-square&logo=python)](#testing--verification)
-[![Node Tests](https://img.shields.io/badge/Node%20Backend-12%2F12%20Pass-blue?style=flat-square&logo=node.js)](#testing--verification)
+[![Test Suite](https://img.shields.io/badge/Tests-46%2F46%20Passing-brightgreen?style=flat-square)](#testing--verification)
+[![Python Tests](https://img.shields.io/badge/Python%20Intelligence-28%2F28%20Pass-teal?style=flat-square&logo=python)](#testing--verification)
+[![Node Tests](https://img.shields.io/badge/Node%20Backend-18%2F18%20Pass-blue?style=flat-square&logo=node.js)](#testing--verification)
 [![Frontend](https://img.shields.io/badge/React%2018%20%7C%20Vite%20%7C%20Tailwind-Passing-61DAFB?style=flat-square&logo=react)](#technology-stack)
 [![Design](https://img.shields.io/badge/Design-Atlas%20FinTech%20%2F%20Navy%20%26%20Teal-14B8A6?style=flat-square)](#uiux-redesign--design-system)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2F%20Supabase%20%2B%20Zero--Config%20JSON-336791?style=flat-square&logo=postgresql)](#dual-engine-data-layer)
@@ -247,8 +247,8 @@ npm --prefix frontend run build
 ```
 
 **Results:**
-- Python Intelligence Suite: **20/20 passed** (Fraud, Routing, Recovery, Domestic Card, Agentic Refund, Student Engine)
-- Node.js API Suite: **12/12 passed** (Health, Auth, Currency, Compatibility, Checkout, Recovery Cascade, Domestic Card, Agentic Refund, Student/Guardian)
+- Python Intelligence Suite: **28/28 passed** (Fraud, Routing, Recovery, Domestic Card, Agentic Refund, Student Engine)
+- Node.js API Suite: **18/18 passed** (Health, Auth, Currency, Compatibility, Checkout, Recovery Cascade, Domestic Card, Saved Cards & Tokenization, Agentic Refund, Student/Guardian)
 - Frontend Build: **100% clean production bundle** via Vite.
 
 ---

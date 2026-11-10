@@ -25,7 +25,8 @@ let fallbackStore = {
   student_profiles: [],
   guardian_approvals: [],
   refund_records: [],
-  agentic_audit_logs: []
+  agentic_audit_logs: [],
+  saved_cards: []
 };
 
 // Load existing local store if present
@@ -108,6 +109,9 @@ const db = {
 
   // Table queries
   table: (tableName) => {
+    if (!isPostgresActive) {
+      loadFallbackStore();
+    }
     return {
       find: async (predicate = null) => {
         if (isPostgresActive && pool) {
@@ -241,7 +245,8 @@ const db = {
       student_profiles: [],
       guardian_approvals: [],
       refund_records: [],
-      agentic_audit_logs: []
+      agentic_audit_logs: [],
+      saved_cards: []
     };
     saveFallbackStore();
   }

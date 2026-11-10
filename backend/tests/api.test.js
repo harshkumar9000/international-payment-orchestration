@@ -95,6 +95,92 @@ describe('International Payment Orchestration API Suite', () => {
     assert.strictEqual(data.merchant.email, 'merchant@example.com');
   });
 
+  test('POST /api/auth/register, /login, /me and /forgot-password should authenticate and manage session', async () => {
+    const testEmail = `fintech.user.${Date.now()}@example.com`;
+    const initialPassword = 'SecurePassword123!';
+    const updatedPassword = 'NewSecretPassword456!';
+
+    // 1. Register new user
+    const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: initialPassword,
+        company_name: 'Atlas Test Merchant Corp'
+      })
+    });
+    assert.strictEqual(regRes.status, 201);
+    const regData = await regRes.json();
+    assert.ok(regData.token);
+    assert.strictEqual(regData.merchant.email, testEmail);
+
+    // 2. Login with wrong password
+    const failRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: 'WrongPassword'
+      })
+    });
+    assert.strictEqual(failRes.status, 401);
+
+    // 3. Login with correct password
+    const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: initialPassword
+      })
+    });
+    assert.strictEqual(loginRes.status, 200);
+    const loginData = await loginRes.json();
+    assert.ok(loginData.token);
+
+    // 4. GET /api/auth/me with Bearer token
+    const meRes = await fetch(`${BASE_URL}/api/auth/me`, {
+      headers: { 'Authorization': `Bearer ${loginData.token}` }
+    });
+    assert.strictEqual(meRes.status, 200);
+    const meData = await meRes.json();
+    assert.strictEqual(meData.merchant.email, testEmail);
+
+    // 5. Forgot password request
+    const forgotRes = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testEmail })
+    });
+    assert.strictEqual(forgotRes.status, 200);
+    const forgotData = await forgotRes.json();
+    assert.ok(forgotData.resetToken);
+
+    // 6. Reset password
+    const resetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        token: forgotData.resetToken,
+        new_password: updatedPassword
+      })
+    });
+    assert.strictEqual(resetRes.status, 200);
+
+    // 7. Verify login works with updated password
+    const newLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: updatedPassword
+      })
+    });
+    assert.strictEqual(newLoginRes.status, 200);
+  });
+
   test('POST /api/routing/simulate should route INR to UPI and EUR to Adyen', async () => {
     // INR route simulation
     const inrRes = await fetch(`${BASE_URL}/api/routing/simulate`, {
@@ -886,6 +972,57 @@ describe('International Payment Orchestration API Suite', () => {
     const finalCoursera = finalGuardData.pending.find(a => a.merchant_name.includes('Coursera'));
     assert.ok(finalCoursera);
     assert.strictEqual(finalCoursera.status, 'PENDING');
+  });
+
+  test('GET /api/cards and POST /api/cards should securely link domestic cards with tokenization', async () => {
+    // 1. Fetch initial seeded cards
+    const listRes = await fetch(`${BASE_URL}/api/cards`);
+    assert.strictEqual(listRes.status, 200);
+    const listData = await listRes.json();
+    assert.ok(Array.isArray(listData.cards));
+    assert.ok(listData.cards.length >= 3);
+
+    // Verify raw CVV is not present in stored cards
+    for (const card of listData.cards) {
+      assert.strictEqual(card.cvv, undefined);
+      assert.ok(card.card_number_masked.includes('••••'));
+      assert.ok(card.token);
+    }
+
+    // 2. Add a new RuPay Global card
+    const addRes = await fetch(`${BASE_URL}/api/cards`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardholder_name: 'Priya Sharma',
+        card_number: '6521998877665544',
+        expiry: '10/28',
+        cvv: '789',
+        network: 'RuPay',
+        issuing_bank: 'Axis Bank'
+      })
+    });
+    assert.strictEqual(addRes.status, 201);
+    const addData = await addRes.json();
+    assert.strictEqual(addData.success, true);
+    assert.strictEqual(addData.card.international_support, 'SUPPORTED');
+    assert.strictEqual(addData.card.last_four, '5544');
+    assert.strictEqual(addData.card.cvv, undefined);
+    assert.ok(addData.card.token.startsWith('tok_sim_'));
+
+    // 3. Set as default
+    const defRes = await fetch(`${BASE_URL}/api/cards/${addData.card.id}/default`, {
+      method: 'PUT'
+    });
+    assert.strictEqual(defRes.status, 200);
+    const defData = await defRes.json();
+    assert.strictEqual(defData.card.is_default, true);
+
+    // 4. Delete the card
+    const delRes = await fetch(`${BASE_URL}/api/cards/${addData.card.id}`, {
+      method: 'DELETE'
+    });
+    assert.strictEqual(delRes.status, 200);
   });
 });
 

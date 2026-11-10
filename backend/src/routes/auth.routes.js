@@ -180,5 +180,63 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 });
 
+// POST /forgot-password
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+
+    const merchant = await db.table('merchants').findOne(m => m.email.toLowerCase() === email.toLowerCase().trim());
+    if (!merchant) {
+      return res.status(404).json({ error: 'No account registered with this email address.' });
+    }
+
+    const resetToken = `rst_${uuidv4().replace(/-/g, '')}`;
+
+    res.json({
+      success: true,
+      message: 'Password recovery verification instructions have been generated.',
+      resetToken,
+      email: merchant.email,
+      simulated: true
+    });
+  } catch (err) {
+    console.error('[Forgot Password Error]:', err);
+    res.status(500).json({ error: 'Failed to process password recovery.' });
+  }
+});
+
+// POST /reset-password
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, token, new_password } = req.body;
+    if (!email || !new_password) {
+      return res.status(400).json({ error: 'Email and new password are required.' });
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    const merchant = await db.table('merchants').findOne(m => m.email.toLowerCase() === email.toLowerCase().trim());
+    if (!merchant) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+
+    const passwordHash = await bcrypt.hash(new_password, 10);
+    await db.table('merchants').update(merchant.id, { password_hash: passwordHash });
+
+    res.json({
+      success: true,
+      message: 'Password has been successfully updated. You may now log in.'
+    });
+  } catch (err) {
+    console.error('[Reset Password Error]:', err);
+    res.status(500).json({ error: 'Failed to reset password.' });
+  }
+});
+
 module.exports = router;
 

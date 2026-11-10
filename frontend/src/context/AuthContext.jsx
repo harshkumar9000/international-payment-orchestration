@@ -4,10 +4,23 @@ import { api } from '../services/api';
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem('atlas_auth_token'));
+  const [token, setToken] = useState(() => {
+    try {
+      const savedToken = localStorage.getItem('atlas_auth_token');
+      return savedToken && savedToken !== 'null' && savedToken !== 'undefined' ? savedToken : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
   const [merchant, setMerchant] = useState(() => {
-    const saved = localStorage.getItem('atlas_merchant');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('atlas_merchant');
+      return saved && saved !== 'undefined' && saved !== 'null' ? JSON.parse(saved) : null;
+    } catch (e) {
+      localStorage.removeItem('atlas_merchant');
+      return null;
+    }
   });
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +73,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('atlas_merchant');
   };
 
+  const forgotPassword = async (email) => {
+    return await api.auth.forgotPassword({ email });
+  };
+
+  const resetPassword = async (email, token, new_password) => {
+    return await api.auth.resetPassword({ email, token, new_password });
+  };
+
   return (
     <AuthContext.Provider value={{
       token,
@@ -69,7 +90,9 @@ export function AuthProvider({ children }) {
       login,
       register,
       demoLogin,
-      logout
+      logout,
+      forgotPassword,
+      resetPassword
     }}>
       {children}
     </AuthContext.Provider>

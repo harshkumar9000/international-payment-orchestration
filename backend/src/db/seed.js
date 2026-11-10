@@ -837,6 +837,73 @@ async function seed() {
   });
 
   console.log(`  -> Inserted stuck transactions and agentic refund seed records.`);
+
+  // 7. Seed Saved Domestic & Global Cards
+  const savedCards = [
+    {
+      id: 'card_rupay_global_01',
+      merchant_id: demoMerchant.id,
+      cardholder_name: 'Swapnil Sharma',
+      card_number_masked: '•••• •••• •••• 8821',
+      last_four: '8821',
+      bin: '652150',
+      network: 'RuPay',
+      card_type: 'RuPay Global (Discover/Diners Co-badged)',
+      issuing_bank: 'HDFC Bank',
+      expiry: '09/28',
+      international_support: 'SUPPORTED',
+      international_support_label: 'International Enabled',
+      international_support_notes: 'Eligible for global merchant ecommerce via Discover/Diners Club bilateral network.',
+      is_default: true,
+      token: 'tok_rupay_glob_8821_mock',
+      created_at: new Date(now - 14 * 24 * 3600 * 1000).toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'card_visa_plat_02',
+      merchant_id: demoMerchant.id,
+      cardholder_name: 'Swapnil Sharma',
+      card_number_masked: '•••• •••• •••• 4118',
+      last_four: '4118',
+      bin: '453201',
+      network: 'Visa',
+      card_type: 'Visa Platinum International',
+      issuing_bank: 'ICICI Bank',
+      expiry: '11/29',
+      international_support: 'SUPPORTED',
+      international_support_label: 'International Enabled',
+      international_support_notes: 'Full cross-border ecommerce with 3D Secure 2.2 authentication.',
+      is_default: false,
+      token: 'tok_visa_plat_4118_mock',
+      created_at: new Date(now - 8 * 24 * 3600 * 1000).toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'card_rupay_domestic_03',
+      merchant_id: demoMerchant.id,
+      cardholder_name: 'Swapnil Sharma',
+      card_number_masked: '•••• •••• •••• 3412',
+      last_four: '3412',
+      bin: '607012',
+      network: 'RuPay',
+      card_type: 'RuPay Classic (PMJDY Domestic)',
+      issuing_bank: 'State Bank of India',
+      expiry: '04/27',
+      international_support: 'DOMESTIC_ONLY',
+      international_support_label: 'Domestic Only (India)',
+      international_support_notes: 'Domestic debit card. Not enabled for foreign merchant billing. Use RuPay Global or Visa/Mastercard instead.',
+      is_default: false,
+      token: 'tok_rupay_dom_3412_mock',
+      created_at: new Date(now - 3 * 24 * 3600 * 1000).toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ];
+
+  for (const card of savedCards) {
+    await db.table('saved_cards').insert(card);
+  }
+  console.log(`  -> Inserted ${savedCards.length} saved domestic and international payment cards.`);
+
   console.log(`  -> Inserted ${sampleTransactions.length} sample transactions and audit records.`);
   console.log('✅ Database seed completed successfully!');
 }
