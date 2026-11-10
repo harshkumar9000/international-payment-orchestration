@@ -168,20 +168,24 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0A0E17] text-slate-900 dark:text-slate-100 transition-colors duration-200">
+    <div className="min-h-screen bg-[#F7F7F7] dark:bg-[#080808] text-[#111111] dark:text-[#FFFFFF] transition-colors duration-200">
       {isPublicView ? (
-        // Public & Authentication Views (Navbar + Form/Landing + Footer)
-        <div className="flex flex-col min-h-screen">
-          <Navbar activePage={activePage} setActivePage={setActivePage} />
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8">
-            {activePage === 'landing' && <LandingPage setActivePage={setActivePage} />}
-            {activePage === 'login' && <LoginPage setActivePage={setActivePage} />}
-            {activePage === 'signup' && <SignupPage setActivePage={setActivePage} />}
-            {activePage === 'forgot-password' && <ForgotPasswordPage setActivePage={setActivePage} />}
-            {activePage === 'auth-callback' && <AuthCallbackPage setActivePage={setActivePage} />}
-          </main>
-          <Footer setActivePage={setActivePage} />
-        </div>
+        activePage === 'landing' ? (
+          <div className="min-h-screen bg-black">
+            <LandingPage setActivePage={setActivePage} />
+          </div>
+        ) : (
+          <div className="flex flex-col min-h-screen bg-[#F7F7F7] text-[#111111]">
+            <Navbar activePage={activePage} setActivePage={setActivePage} />
+            <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {activePage === 'login' && <LoginPage setActivePage={setActivePage} />}
+              {activePage === 'signup' && <SignupPage setActivePage={setActivePage} />}
+              {activePage === 'forgot-password' && <ForgotPasswordPage setActivePage={setActivePage} />}
+              {activePage === 'auth-callback' && <AuthCallbackPage setActivePage={setActivePage} />}
+            </main>
+            <Footer setActivePage={setActivePage} />
+          </div>
+        )
       ) : (
         // Authenticated FinTech Dashboard Layout
         <div className="flex min-h-screen">

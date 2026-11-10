@@ -36,14 +36,14 @@ export default function DashboardHeader({
   const current = pageTitles[activePage] || { group: 'ATLAS.PAY', title: 'Dashboard' };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/90 dark:bg-[#111827]/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between transition-colors">
+    <header className="sticky top-0 z-30 h-16 bg-white/95 dark:bg-[#080808]/95 backdrop-blur-md border-b border-[#DEDEDE] dark:border-[#222222] px-4 sm:px-6 flex items-center justify-between transition-colors">
       
       {/* Left: Mobile Toggle / Desktop Collapse + Breadcrumb */}
       <div className="flex items-center space-x-3">
         {/* Mobile Hamburger */}
         <button
           onClick={() => setMobileOpen ? setMobileOpen(!mobileOpen) : setIsCollapsed(!isCollapsed)}
-          className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          className="lg:hidden p-2 rounded-lg text-[#666666] hover:text-[#111111] dark:text-[#999999] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] transition-colors cursor-pointer"
           title="Toggle Navigation Menu"
         >
           <Menu className="w-5 h-5" />
@@ -51,18 +51,18 @@ export default function DashboardHeader({
 
         {/* Breadcrumb Header */}
         <div>
-          <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 font-medium">
+          <div className="flex items-center space-x-1.5 text-[11px] text-[#999999] font-medium">
             <span
               onClick={() => setActivePage('dashboard')}
-              className="cursor-pointer hover:text-teal-500 transition-colors"
+              className="cursor-pointer hover:text-[#111111] dark:hover:text-white transition-colors"
               title="Go to Dashboard"
             >
               ATLAS.PAY
             </span>
             <span>/</span>
-            <span className="uppercase text-teal-600 dark:text-teal-400 font-semibold">{current.group}</span>
+            <span className="uppercase text-[#111111] dark:text-white font-semibold">{current.group}</span>
           </div>
-          <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+          <h2 className="text-[15px] font-semibold text-[#111111] dark:text-white leading-tight">
             {current.title}
           </h2>
         </div>
@@ -74,7 +74,7 @@ export default function DashboardHeader({
         {activePage !== 'checkout' && (
           <button
             onClick={() => setActivePage('checkout')}
-            className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95"
+            className="hidden sm:flex items-center space-x-1.5 px-3.5 py-1.5 rounded-xl bg-black text-white dark:bg-white dark:text-black font-bold text-xs shadow-sm transition-all cursor-pointer active:scale-95 hover:bg-[#222222] dark:hover:bg-[#EEEEEE]"
           >
             <CreditCard className="w-3.5 h-3.5" />
             <span>Pay Merchant</span>
@@ -84,20 +84,20 @@ export default function DashboardHeader({
         {/* Theme Toggle Button */}
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+          className="p-2 rounded-xl text-[#666666] hover:text-[#111111] dark:text-[#999999] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] transition-colors cursor-pointer"
           title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-500" />}
+          {theme === 'dark' ? <Sun className="w-4 h-4 text-white" /> : <Moon className="w-4 h-4 text-black" />}
         </button>
 
         {/* User Profile & Logout */}
-        <div className="flex items-center space-x-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+        <div className="flex items-center space-x-2 pl-2 border-l border-[#DEDEDE] dark:border-[#222222]">
           <div className="hidden sm:block text-right">
-            <span className="block text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate max-w-[140px]">
+            <span className="block text-[11px] font-bold text-[#111111] dark:text-white truncate max-w-[140px]">
               {merchant?.company_name || merchant?.email || 'Demo Merchant'}
             </span>
-            <span className="block text-[9px] text-teal-500 font-mono">
-              Live Sandbox
+            <span className="block text-[9px] text-[#666666] dark:text-[#999999] font-mono">
+              Sandbox Active
             </span>
           </div>
 
@@ -106,7 +106,7 @@ export default function DashboardHeader({
               logout();
               setActivePage('login');
             }}
-            className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+            className="p-2 rounded-xl text-[#666666] hover:text-[#111111] dark:text-[#999999] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] transition-colors cursor-pointer"
             title="Sign Out"
           >
             <LogOut className="w-4 h-4" />

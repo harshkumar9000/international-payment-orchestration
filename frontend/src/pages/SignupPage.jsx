@@ -93,26 +93,30 @@ export default function SignupPage({ setActivePage }) {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 py-10">
-      <div className="max-w-md w-full space-y-6 p-8 sm:p-10 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-xl transition-colors">
+      <div className="max-w-md w-full space-y-6 p-8 sm:p-10 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-xl transition-colors">
         
         {/* Brand Header */}
         <div className="text-center space-y-2">
           <div
             onClick={() => setActivePage('landing')}
-            className="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-teal-600/25 cursor-pointer font-black text-xl"
+            className="inline-block cursor-pointer group"
           >
-            A
+            <img
+              src="/atlas_pay_favicon.png"
+              alt="ATLAS.PAY"
+              className="w-14 h-14 rounded-2xl object-contain mx-auto shadow-lg shadow-blue-500/20 transition-transform group-hover:scale-105"
+            />
           </div>
           <div>
             <div className="flex items-center justify-center space-x-1.5 mt-2">
-              <span className="font-extrabold text-2xl tracking-tight text-slate-900 dark:text-white">
-                ATLAS<span className="text-teal-500">.PAY</span>
+              <span className="font-bold text-2xl tracking-tight text-slate-900 dark:text-white">
+                ATLAS<span className="text-[#666666] dark:text-[#999999]">.PAY</span>
               </span>
             </div>
-            <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200 mt-1">
+            <h2 className="text-[20px] font-semibold text-slate-800 dark:text-slate-200 mt-1 tracking-tight">
               Create an Account
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-[14px] text-slate-500 dark:text-slate-400 mt-1 font-normal leading-[1.5]">
               Get started with cross-border payments and domestic card linking.
             </p>
           </div>
@@ -148,7 +152,7 @@ export default function SignupPage({ setActivePage }) {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Swapnil Sharma"
-                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
               />
             </div>
           </div>
@@ -166,7 +170,7 @@ export default function SignupPage({ setActivePage }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
               />
             </div>
           </div>
@@ -185,7 +189,7 @@ export default function SignupPage({ setActivePage }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Minimum 6 characters"
-                className="w-full pl-9 pr-10 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                className="w-full pl-9 pr-10 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
               />
               <button
                 type="button"
@@ -227,7 +231,7 @@ export default function SignupPage({ setActivePage }) {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repeat password"
-                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
               />
             </div>
             {confirmPassword && password !== confirmPassword && (
@@ -245,10 +249,10 @@ export default function SignupPage({ setActivePage }) {
                 required
                 checked={agreeTerms}
                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                className="rounded border-slate-700 text-teal-600 focus:ring-teal-500 w-4 h-4 mt-0.5"
+                className="rounded border-slate-700 text-teal-600 focus:ring-black dark:focus:ring-white w-4 h-4 mt-0.5"
               />
               <span>
-                I agree to the <span className="text-teal-600 dark:text-teal-400 font-semibold">Terms of Service</span> and <span className="text-teal-600 dark:text-teal-400 font-semibold">Privacy Policy</span>.
+                I agree to the <span className="text-[#111111] dark:text-white font-semibold">Terms of Service</span> and <span className="text-[#111111] dark:text-white font-semibold">Privacy Policy</span>.
               </span>
             </label>
           </div>
@@ -257,7 +261,7 @@ export default function SignupPage({ setActivePage }) {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md shadow-teal-600/20 hover:shadow-teal-600/35 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer active:scale-95"
+            className="w-full py-2.5 px-4 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-md shadow-sm hover:shadow-teal-600/35 transition-all flex items-center justify-center space-x-2 disabled:opacity-50 cursor-pointer active:scale-95"
           >
             <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
             <ArrowRight className="w-4 h-4" />
@@ -270,7 +274,7 @@ export default function SignupPage({ setActivePage }) {
           <button
             type="button"
             onClick={() => setActivePage('login')}
-            className="font-bold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
+            className="font-bold text-[#111111] dark:text-white hover:underline cursor-pointer"
           >
             Sign In here
           </button>

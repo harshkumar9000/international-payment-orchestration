@@ -311,27 +311,27 @@ export default function CheckoutPage({ setActivePage }) {
     <div className="space-y-8 max-w-6xl mx-auto">
       
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#DEDEDE] dark:border-[#222222]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded border border-teal-500/20">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#EEEEEE] dark:bg-[#1A1A1A] text-[#111111] dark:text-white rounded border border-[#DEDEDE] dark:border-[#333333]">
               Multi-Rail Checkout
             </span>
             <span className="text-xs text-slate-400">• Demo Mode</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+          <h1 className="page-heading text-[28px] sm:text-[32px] font-semibold text-slate-900 dark:text-white tracking-[-0.025em] leading-tight">
             International Payment Checkout
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[15px] text-slate-500 dark:text-slate-400 mt-1 font-normal leading-[1.5]">
             Pay international merchants seamlessly using your linked Indian payment cards or global rails.
           </p>
         </div>
 
         <button
           onClick={() => setActivePage('cards')}
-          className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-xs border border-slate-200 dark:border-slate-700 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-auto"
+          className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-[14px] border border-slate-200 dark:border-slate-700 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-auto"
         >
-          <CreditCard className="w-4 h-4 text-teal-500" />
+          <CreditCard className="w-4 h-4 text-[#111111] dark:text-white" />
           <span>Manage Saved Cards</span>
         </button>
       </div>
@@ -339,7 +339,7 @@ export default function CheckoutPage({ setActivePage }) {
       {/* Main Checkout View: Left Form + Right Summary OR Receipt View */}
       {transactionReceipt ? (
         // Transaction Success Receipt Card
-        <div className="max-w-2xl mx-auto p-8 rounded-2xl bg-white dark:bg-[#111827] border border-emerald-500/30 shadow-2xl space-y-6">
+        <div className="max-w-2xl mx-auto p-8 rounded-2xl bg-white dark:bg-[#080808] border border-emerald-500/30 shadow-2xl space-y-6">
           <div className="text-center space-y-2">
             <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
               <CheckCircle2 className="w-8 h-8" />
@@ -355,10 +355,10 @@ export default function CheckoutPage({ setActivePage }) {
             </p>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 divide-y divide-slate-200 dark:divide-slate-800 text-xs">
+          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-[#DEDEDE] dark:border-[#222222] divide-y divide-slate-200 dark:divide-slate-800 text-xs">
             <div className="flex justify-between py-2">
               <span className="text-slate-400">Transaction ID:</span>
-              <span className="font-mono text-teal-400 font-semibold">{transactionReceipt.id}</span>
+              <span className="font-mono text-[#111111] dark:text-white font-semibold">{transactionReceipt.id}</span>
             </div>
             <div className="flex justify-between py-2">
               <span className="text-slate-400">Merchant:</span>
@@ -380,7 +380,7 @@ export default function CheckoutPage({ setActivePage }) {
                 setTransactionReceipt(null);
                 setOtpRequired(false);
               }}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md cursor-pointer transition-all"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-md cursor-pointer transition-all"
             >
               Make Another Payment
             </button>
@@ -394,9 +394,9 @@ export default function CheckoutPage({ setActivePage }) {
         </div>
       ) : otpRequired ? (
         // 3D Secure / OTP Simulation Screen
-        <div className="max-w-md mx-auto p-6 rounded-2xl bg-white dark:bg-[#111827] border border-teal-500/30 shadow-2xl space-y-6">
+        <div className="max-w-md mx-auto p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#333333] shadow-2xl space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-12 h-12 mx-auto rounded-full bg-teal-500/10 text-teal-500 flex items-center justify-center">
+            <div className="w-12 h-12 mx-auto rounded-full bg-[#EEEEEE] dark:bg-[#1A1A1A] text-[#111111] dark:text-white flex items-center justify-center">
               <Lock className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -417,9 +417,9 @@ export default function CheckoutPage({ setActivePage }) {
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value)}
                 maxLength={6}
-                className="w-full text-center tracking-widest text-lg font-mono px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-teal-500"
+                className="w-full text-center tracking-widest text-lg font-mono px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-black dark:border-white"
               />
-              <span className="block text-[11px] text-teal-400 mt-1 text-center font-mono">
+              <span className="block text-[11px] text-[#111111] dark:text-white mt-1 text-center font-mono">
                 Demo Code: 123456
               </span>
             </div>
@@ -427,7 +427,7 @@ export default function CheckoutPage({ setActivePage }) {
             <button
               onClick={handleVerifyOtp}
               disabled={processing}
-              className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+              className="w-full py-3 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-md transition-all cursor-pointer"
             >
               {processing ? 'Authorizing Payment...' : 'Confirm & Authorize Charge'}
             </button>
@@ -441,9 +441,9 @@ export default function CheckoutPage({ setActivePage }) {
           <div className="lg:col-span-7 space-y-6">
             
             {/* Step 1: Merchant & Payment Details */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-4">
               <div className="flex items-center space-x-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <span className="w-6 h-6 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center">
+                <span className="w-6 h-6 rounded-full bg-black dark:bg-white dark:text-black text-white font-bold text-xs flex items-center justify-center">
                   1
                 </span>
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">
@@ -460,7 +460,7 @@ export default function CheckoutPage({ setActivePage }) {
                     type="text"
                     value={merchantName}
                     onChange={(e) => setMerchantName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
 
@@ -472,16 +472,16 @@ export default function CheckoutPage({ setActivePage }) {
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
               </div>
             </div>
 
             {/* Step 2: Destination Country & Currency */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-4">
               <div className="flex items-center space-x-2 pb-3 border-b border-slate-100 dark:border-slate-800">
-                <span className="w-6 h-6 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center">
+                <span className="w-6 h-6 rounded-full bg-black dark:bg-white dark:text-black text-white font-bold text-xs flex items-center justify-center">
                   2
                 </span>
                 <h3 className="font-bold text-slate-900 dark:text-white text-sm">
@@ -497,7 +497,7 @@ export default function CheckoutPage({ setActivePage }) {
                   <select
                     value={selectedCountry}
                     onChange={(e) => handleCountryChange(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   >
                     {COUNTRIES.map((c) => (
                       <option key={c.code} value={c.code}>
@@ -518,7 +518,7 @@ export default function CheckoutPage({ setActivePage }) {
                       min="1"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                     />
                     <span className="absolute right-3.5 top-2.5 text-xs font-mono text-slate-400">
                       {selectedCurrency}
@@ -529,10 +529,10 @@ export default function CheckoutPage({ setActivePage }) {
             </div>
 
             {/* Step 3: Payment Method Selection */}
-            <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center space-x-2">
-                  <span className="w-6 h-6 rounded-full bg-teal-600 text-white font-bold text-xs flex items-center justify-center">
+                  <span className="w-6 h-6 rounded-full bg-black dark:bg-white dark:text-black text-white font-bold text-xs flex items-center justify-center">
                     3
                   </span>
                   <h3 className="font-bold text-slate-900 dark:text-white text-sm">
@@ -542,7 +542,7 @@ export default function CheckoutPage({ setActivePage }) {
                 <button
                   type="button"
                   onClick={() => setActivePage('cards')}
-                  className="text-xs text-teal-600 dark:text-teal-400 hover:underline font-semibold cursor-pointer"
+                  className="text-xs text-[#111111] dark:text-white hover:underline font-semibold cursor-pointer"
                 >
                   + Add Card
                 </button>
@@ -555,7 +555,7 @@ export default function CheckoutPage({ setActivePage }) {
                   onClick={() => setSelectedMethodType('linked_card')}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     selectedMethodType === 'linked_card'
-                      ? 'bg-teal-600 text-white shadow-sm'
+                      ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}
                 >
@@ -567,7 +567,7 @@ export default function CheckoutPage({ setActivePage }) {
                   onClick={() => setSelectedMethodType('upi')}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     selectedMethodType === 'upi'
-                      ? 'bg-teal-600 text-white shadow-sm'
+                      ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}
                 >
@@ -579,7 +579,7 @@ export default function CheckoutPage({ setActivePage }) {
                   onClick={() => setSelectedMethodType('paypal')}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     selectedMethodType === 'paypal'
-                      ? 'bg-teal-600 text-white shadow-sm'
+                      ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}
                 >
@@ -591,9 +591,9 @@ export default function CheckoutPage({ setActivePage }) {
               {selectedMethodType === 'linked_card' && (
                 <div className="space-y-3 pt-2">
                   {savedCards.length === 0 ? (
-                    <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-400">
+                    <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-xs text-slate-400">
                       No cards linked yet.{' '}
-                      <button onClick={() => setActivePage('cards')} className="text-teal-400 font-bold hover:underline">
+                      <button onClick={() => setActivePage('cards')} className="text-[#111111] dark:text-white font-bold hover:underline">
                         Link a Card here
                       </button>
                     </div>
@@ -609,8 +609,8 @@ export default function CheckoutPage({ setActivePage }) {
                           onClick={() => setSelectedCardId(card.id)}
                           className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                             isSelected
-                              ? 'border-teal-500 bg-teal-500/5 dark:bg-teal-500/10'
-                              : 'border-slate-200 dark:border-slate-800 hover:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40'
+                              ? 'border-black dark:border-white bg-teal-500/5 dark:bg-[#EEEEEE] dark:bg-[#1A1A1A]'
+                              : 'border-[#DEDEDE] dark:border-[#222222] hover:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40'
                           }`}
                         >
                           <div className="flex items-center space-x-3">
@@ -619,7 +619,7 @@ export default function CheckoutPage({ setActivePage }) {
                               name="selected_card"
                               checked={isSelected}
                               onChange={() => setSelectedCardId(card.id)}
-                              className="text-teal-600 focus:ring-teal-500"
+                              className="text-teal-600 focus:ring-black dark:focus:ring-white"
                             />
                             <div>
                               <div className="font-bold text-xs text-slate-800 dark:text-slate-200">
@@ -661,10 +661,10 @@ export default function CheckoutPage({ setActivePage }) {
                       value={upiVpa}
                       onChange={(e) => setUpiVpa(e.target.value)}
                       placeholder="username@okaxis"
-                      className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                     />
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-400">
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-[11px] text-slate-400">
                     Bilateral linkage active with {activeCountry.upiSupported ? `${activeCountry.name} (${activeCountry.upiRail})` : 'selected country'}.
                   </div>
                 </div>
@@ -672,7 +672,7 @@ export default function CheckoutPage({ setActivePage }) {
 
               {/* PayPal Option */}
               {selectedMethodType === 'paypal' && (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] space-y-2 text-xs">
                   <div className="font-bold text-slate-800 dark:text-slate-200">
                     PayPal Sandbox Integration
                   </div>
@@ -699,7 +699,7 @@ export default function CheckoutPage({ setActivePage }) {
 
           {/* Right Column: Payment Summary & Confirmation */}
           <div className="lg:col-span-5 sticky top-24 space-y-4">
-            <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-xl space-y-5">
+            <div className="p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-xl space-y-5">
               <h3 className="font-bold text-slate-900 dark:text-white text-base pb-3 border-b border-slate-100 dark:border-slate-800">
                 Payment Summary
               </h3>
@@ -734,13 +734,13 @@ export default function CheckoutPage({ setActivePage }) {
                   </span>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-baseline">
+                <div className="pt-3 border-t border-[#DEDEDE] dark:border-[#222222] flex justify-between items-baseline">
                   <div>
                     <span className="text-sm font-bold text-slate-900 dark:text-white">Total Payable</span>
                     <span className="block text-[10px] text-slate-400">Billed in Indian Rupees (INR)</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-xl font-black font-mono text-teal-600 dark:text-teal-400">
+                    <span className="text-xl font-black font-mono text-[#111111] dark:text-white">
                       ₹{(conversion?.converted_amount || 12589).toLocaleString()}
                     </span>
                   </div>
@@ -764,7 +764,7 @@ export default function CheckoutPage({ setActivePage }) {
                   setShowPaymentModal(true);
                 }}
                 disabled={Boolean(methodIneligibleReason)}
-                className="w-full py-3.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg shadow-teal-600/25 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
+                className="w-full py-3.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 <Lock className="w-4 h-4" />
                 <span>Pay Now — ₹{(conversion?.converted_amount || 12589).toLocaleString()}</span>

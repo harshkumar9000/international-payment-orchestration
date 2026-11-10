@@ -1,77 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Workbench&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --mono-main: #080808;
+    --mono-pure: #000000;
+    --mono-white: #FFFFFF;
+    --mono-offwhite: #F7F7F7;
+    --mono-light: #EEEEEE;
+    --mono-border: #DEDEDE;
+    --mono-secondary: #999999;
+    --mono-muted: #666666;
+  }
+
+  html, body, button, input, select, textarea {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
   body {
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-color: #000000;
+    color: #111111;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  .dark body {
+    background-color: #080808;
+    color: #FFFFFF;
+  }
+
+  /* Default Typography Hierarchy */
+  h1 {
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.04em;
+  }
+
+  h2 {
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.035em;
+  }
+
+  h3 {
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.015em;
   }
 }
 
-/* ATLAS.PAY Brand Gradient & Styling */
-.atlas-gradient {
-  background: linear-gradient(135deg, #111827 0%, #0F766E 50%, #14B8A6 100%);
+@layer utilities {
+  /* 1. Hero Headlines: 600-700, 58-64px, 1.02-1.10 line height, -0.045em tracking */
+  .hero-headline {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    font-size: clamp(38px, 5.2vw, 64px);
+    line-height: 1.05;
+    letter-spacing: -0.045em;
+  }
+
+  /* 2. Section Headings: 600, 38-46px, 1.1 line height, -0.035em tracking */
+  .section-heading {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: clamp(28px, 3.8vw, 44px);
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+  }
+
+  /* 3. Dashboard and Page Headings: 600, 28-34px, -0.025em tracking */
+  .page-heading {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: clamp(24px, 2.6vw, 32px);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+  }
+
+  /* 4. Card Headings: 500-600, 18-22px */
+  .card-heading {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: clamp(18px, 1.8vw, 22px);
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+  }
+
+  /* 5. Body Text: 400, 15-17px, 1.45-1.6 line height */
+  .body-text {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.55;
+    letter-spacing: -0.01em;
+  }
+
+  /* 6. Navigation: 400-500, 14-15px */
+  .nav-typography {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    font-size: 14.5px;
+    letter-spacing: -0.01em;
+  }
+
+  /* 7. Buttons: 500-600, 14-15px */
+  .btn-typography {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    font-size: 14.5px;
+    letter-spacing: -0.01em;
+  }
 }
 
-.atlas-teal-gradient {
-  background: linear-gradient(135deg, #0F766E 0%, #14B8A6 100%);
+/* Horizontal Marquee Animation */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
 }
 
-.fintech-gradient {
-  background: linear-gradient(135deg, #0F766E 0%, #14B8A6 100%);
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 25s linear infinite;
 }
 
-.glow-teal {
-  box-shadow: 0 4px 20px -2px rgba(20, 184, 166, 0.25);
+.animate-marquee:hover {
+  animation-play-state: paused;
 }
 
-.subtle-shadow {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-}
-
-.card-shadow {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-}
-
-.glass-panel {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-/* 3D Payment Animation & Currency Stacking */
+/* 3D Payment Animation & Perspective */
 .perspective-1000 {
   perspective: 1000px;
 }
 
 .preserve-3d {
   transform-style: preserve-3d;
-}
-
-@keyframes coinStackDrop {
-  0% {
-    opacity: 0;
-    transform: translateY(-90px) rotateX(60deg) rotateZ(-25deg) scale(0.7);
-  }
-  60% {
-    opacity: 1;
-    transform: translateY(6px) rotateX(60deg) rotateZ(-25deg) scale(1.04);
-  }
-  80% {
-    transform: translateY(-3px) rotateX(60deg) rotateZ(-25deg) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0px) rotateX(60deg) rotateZ(-25deg) scale(1);
-  }
-}
-
-@keyframes coinStackFloat {
-  0%, 100% {
-    transform: translateY(0px) rotateX(60deg) rotateZ(-25deg);
-  }
-  50% {
-    transform: translateY(-8px) rotateX(57deg) rotateZ(-23deg);
-  }
 }
 
 @keyframes springPop {
@@ -84,6 +158,7 @@
     transform: scale(1.18) rotate(3deg);
   }
   80% {
+    opacity: 1;
     transform: scale(0.95) rotate(-1deg);
   }
   100% {
@@ -92,63 +167,63 @@
   }
 }
 
-@keyframes ringPulseGlow {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.35;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 0.75;
-  }
-}
-
-@keyframes particleFlow {
-  0% {
-    opacity: 0;
-    transform: translate(var(--tx, 30px), var(--ty, -50px)) scale(0.2);
-  }
-  40% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.2);
-  }
-}
-
-@keyframes confettiBurst {
-  0% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1) rotate(0deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--cx, 40px), var(--cy, -60px)) scale(0.3) rotate(var(--crot, 180deg));
-  }
-}
-
-@keyframes shimmerGlow {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(200%);
-  }
-}
-
 .animate-spring-pop {
   animation: springPop 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
-.animate-coin-float {
-  animation: coinStackFloat 3.5s ease-in-out infinite;
+/* Minimal subtle monochrome card shadows */
+.mono-card-shadow {
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08), 0 2px 6px 0 rgba(0, 0, 0, 0.02);
 }
 
-.animate-ring-pulse {
-  animation: ringPulseGlow 2.5s ease-in-out infinite;
+.mono-hero-shadow {
+  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.35);
 }
 
-.animate-shimmer {
-  animation: shimmerGlow 2.5s linear infinite;
+.mono-floating-shadow {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Comic Pop-Up Buttons with Hard Drop Shadows */
+.btn-comic-white {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s ease;
+  box-shadow: 0px 0px 0px 0px rgba(255, 255, 255, 0);
+}
+.btn-comic-white:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 5px 5px 0px 0px #FFFFFF;
+}
+.btn-comic-white:active {
+  transform: translate(0px, 0px);
+  box-shadow: 0px 0px 0px 0px #FFFFFF;
+}
+
+.btn-comic-outline {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.15s ease;
+  box-shadow: 0px 0px 0px 0px rgba(255, 255, 255, 0);
+}
+.btn-comic-outline:hover {
+  transform: translate(-3px, -3px);
+  border-color: #FFFFFF;
+  box-shadow: 5px 5px 0px 0px #FFFFFF;
+}
+.btn-comic-outline:active {
+  transform: translate(0px, 0px);
+  box-shadow: 0px 0px 0px 0px #FFFFFF;
+}
+
+.btn-comic-black {
+  position: relative;
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0px 0px 0px 0px rgba(0, 0, 0, 0);
+}
+.btn-comic-black:hover {
+  transform: translate(-3px, -3px);
+  box-shadow: 5px 5px 0px 0px #000000;
+}
+.btn-comic-black:active {
+  transform: translate(0px, 0px);
+  box-shadow: 0px 0px 0px 0px #000000;
 }

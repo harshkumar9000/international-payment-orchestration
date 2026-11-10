@@ -8,35 +8,49 @@ export default {
   theme: {
     extend: {
       colors: {
-        atlas: {
-          navy: '#111827',
-          teal: '#14B8A6',
-          mint: '#D1FAE5',
-          amber: '#F59E0B',
-          bg: '#F8FAFC',
+        mono: {
+          main: '#080808',
+          pure: '#000000',
           white: '#FFFFFF',
-          cardDark: '#1E293B',
+          offwhite: '#F7F7F7',
+          light: '#EEEEEE',
+          border: '#DEDEDE',
+          secondary: '#999999',
+          muted: '#666666',
+          textWhite: '#FFFFFF',
+          textDark: '#111111',
+        },
+        atlas: {
+          navy: '#080808',
+          teal: '#000000',
+          mint: '#EEEEEE',
+          amber: '#666666',
+          bg: '#F7F7F7',
+          white: '#FFFFFF',
+          cardDark: '#080808',
           cardLight: '#FFFFFF',
-          borderDark: '#334155',
-          borderLight: '#E2E8F0'
+          borderDark: '#262626',
+          borderLight: '#DEDEDE'
         },
         fintech: {
-          blue: '#14B8A6', // Accent teal
-          dark: '#111827',
-          cardDark: '#1E293B',
+          blue: '#080808',
+          dark: '#080808',
+          cardDark: '#080808',
           cardLight: '#FFFFFF',
-          borderDark: '#334155',
-          borderLight: '#E2E8F0',
-          accent: '#14B8A6',
-          gold: '#F59E0B',
-          purple: '#6366F1'
+          borderDark: '#262626',
+          borderLight: '#DEDEDE',
+          accent: '#000000',
+          gold: '#666666',
+          purple: '#080808'
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['Poppins', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
+        workbench: ['Workbench', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
       }
     },
   },
   plugins: [],
 }
-

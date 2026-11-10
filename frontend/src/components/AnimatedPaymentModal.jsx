@@ -219,13 +219,13 @@ export default function AnimatedPaymentModal({
 
       {/* Main Modal Dialog Box */}
       <div
-        className="relative w-full max-w-lg bg-[#0E1522] border border-teal-500/25 rounded-3xl shadow-2xl shadow-teal-950/50 overflow-hidden text-slate-100 z-10 transition-all duration-300 transform scale-100"
+        className="relative w-full max-w-lg bg-[#0E1522] border border-white/25 rounded-3xl shadow-2xl shadow-black/50 overflow-hidden text-slate-100 z-10 transition-all duration-300 transform scale-100"
         style={{
           boxShadow: '0 20px 60px -15px rgba(0, 0, 0, 0.8), 0 0 35px 2px rgba(20, 184, 166, 0.15)'
         }}
       >
         {/* Top Decorative Ambient Glow Bar */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-teal-500 via-teal-300 to-cyan-500" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-white via-neutral-300 to-cyan-500" />
 
         {/* =========================================================================
             STAGE 1: REVIEW PAYMENT
@@ -236,14 +236,14 @@ export default function AnimatedPaymentModal({
             {/* Header: Title + Security Pill + Close */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
               <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/20 text-white flex items-center justify-center">
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white tracking-tight">
+                  <h3 className="card-heading text-[18px] sm:text-[20px] font-semibold text-white tracking-[-0.015em]">
                     Review Payment
                   </h3>
-                  <span className="text-[10px] text-teal-400/90 font-mono flex items-center gap-1">
+                  <span className="text-[10px] text-white/90 font-mono flex items-center gap-1">
                     <Lock className="w-2.5 h-2.5" />
                     <span>256-Bit SSL Encrypted Vault</span>
                   </span>
@@ -262,7 +262,7 @@ export default function AnimatedPaymentModal({
             {/* Merchant Identity & Destination Card */}
             <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-xl bg-teal-600/20 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                <div className="w-10 h-10 rounded-xl bg-black/20 border border-white/30 flex items-center justify-center text-white">
                   <Building2 className="w-5 h-5" />
                 </div>
                 <div>
@@ -284,9 +284,9 @@ export default function AnimatedPaymentModal({
             </div>
 
             {/* Primary Total Payable Banner */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-teal-950/40 via-slate-900/90 to-slate-900 border border-teal-500/30 text-center space-y-1 relative overflow-hidden">
-              <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
-              <span className="text-[11px] font-semibold text-teal-400 uppercase tracking-wider">
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-black/40 via-slate-900/90 to-slate-900 border border-white/30 text-center space-y-1 relative overflow-hidden">
+              <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+              <span className="text-[11px] font-semibold text-white uppercase tracking-wider">
                 Total Payable Amount
               </span>
               <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
@@ -313,14 +313,14 @@ export default function AnimatedPaymentModal({
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">RBI Compliance / TCS:</span>
-                <span className="font-mono text-emerald-400 font-medium">
+                <span className="font-mono text-white font-medium">
                   ₹0.00 (Exempt under ₹7L)
                 </span>
               </div>
               <div className="flex justify-between py-2 items-center">
                 <span className="text-slate-400">Payment Instrument:</span>
                 <span className="font-semibold text-white flex items-center gap-1.5">
-                  <CreditCard className="w-3.5 h-3.5 text-teal-400" />
+                  <CreditCard className="w-3.5 h-3.5 text-white" />
                   <span>
                     {selectedMethod.type === 'linked_card'
                       ? `${selectedMethod.card?.issuing_bank || 'HDFC Bank'} •••• ${selectedMethod.card?.last_four || '1234'}`
@@ -338,7 +338,7 @@ export default function AnimatedPaymentModal({
               <button
                 type="button"
                 onClick={triggerPaymentExecution}
-                className="w-full relative group overflow-hidden py-3.5 px-6 rounded-2xl bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-500 hover:from-teal-500 hover:to-emerald-400 text-white font-extrabold text-sm shadow-lg shadow-teal-900/40 cursor-pointer transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
+                className="w-full relative group overflow-hidden py-3.5 px-6 rounded-2xl bg-gradient-to-r from-black via-white to-white hover:from-white hover:to-white text-white font-extrabold text-sm shadow-lg shadow-teal-900/40 cursor-pointer transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-2"
               >
                 {/* Shimmer light bar */}
                 <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 animate-shimmer pointer-events-none" />
@@ -353,14 +353,14 @@ export default function AnimatedPaymentModal({
                   ref={sliderRef}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={handleTouchEnd}
-                  className="relative h-12 rounded-2xl bg-slate-900 border border-teal-500/30 overflow-hidden flex items-center px-2 select-none"
+                  className="relative h-12 rounded-2xl bg-slate-900 border border-white/30 overflow-hidden flex items-center px-2 select-none"
                 >
                   <div
-                    className="absolute left-0 top-0 bottom-0 bg-teal-500/20 transition-all"
+                    className="absolute left-0 top-0 bottom-0 bg-white/20 transition-all"
                     style={{ width: `${swipeProgress}%` }}
                   />
                   <div
-                    className="absolute h-9 w-9 rounded-xl bg-teal-500 text-white flex items-center justify-center shadow-md transition-all cursor-grab active:cursor-grabbing"
+                    className="absolute h-9 w-9 rounded-xl bg-white text-white flex items-center justify-center shadow-md transition-all cursor-grab active:cursor-grabbing"
                     style={{ left: `calc(${swipeProgress * 0.8}% + 4px)` }}
                   >
                     <ArrowRight className="w-4 h-4" />
@@ -397,7 +397,7 @@ export default function AnimatedPaymentModal({
             <div className="relative w-48 h-48 mx-auto flex items-center justify-center perspective-1000">
               
               {/* Outer Pulsing Glow Aura */}
-              <div className="absolute inset-2 rounded-full bg-teal-500/15 blur-2xl animate-ring-pulse pointer-events-none" />
+              <div className="absolute inset-2 rounded-full bg-white/15 blur-2xl animate-ring-pulse pointer-events-none" />
 
               {/* Circling SVG Progress Ring */}
               <svg className="absolute w-44 h-44 animate-spin" style={{ animationDuration: '3.5s' }} viewBox="0 0 100 100">
@@ -439,7 +439,7 @@ export default function AnimatedPaymentModal({
                   ].map((p, i) => (
                     <div
                       key={i}
-                      className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full bg-teal-300 shadow-md shadow-teal-400"
+                      className="absolute left-1/2 top-1/2 w-2 h-2 rounded-full bg-neutral-300 shadow-md shadow-white"
                       style={{
                         '--tx': p.tx,
                         '--ty': p.ty,
@@ -459,7 +459,7 @@ export default function AnimatedPaymentModal({
               >
                 {/* Coin 1 (Base) */}
                 <div
-                  className="absolute w-24 h-24 rounded-full border border-teal-300/60 flex items-center justify-center"
+                  className="absolute w-24 h-24 rounded-full border border-neutral-300/60 flex items-center justify-center"
                   style={{
                     background: 'radial-gradient(circle at 35% 30%, #f8fafc 0%, #cbd5e1 55%, #64748b 100%)',
                     boxShadow: '0 2px 0 #475569, 0 4px 0 #334155, 0 6px 0 #1e293b, 0 14px 25px rgba(0,0,0,0.6)',
@@ -474,7 +474,7 @@ export default function AnimatedPaymentModal({
 
                 {/* Coin 2 */}
                 <div
-                  className="absolute w-24 h-24 rounded-full border border-teal-200/60 flex items-center justify-center"
+                  className="absolute w-24 h-24 rounded-full border border-neutral-200/60 flex items-center justify-center"
                   style={{
                     background: 'radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 55%, #94a3b8 100%)',
                     boxShadow: '0 2px 0 #475569, 0 4px 0 #334155, 0 6px 0 #1e293b, 0 12px 20px rgba(0,0,0,0.5)',
@@ -497,14 +497,14 @@ export default function AnimatedPaymentModal({
                     animation: !prefersReducedMotion ? 'coinStackDrop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards 0.38s' : 'none'
                   }}
                 >
-                  <div className="w-18 h-18 rounded-full border border-teal-500/40 flex items-center justify-center font-black font-mono text-teal-800 text-lg">
+                  <div className="w-18 h-18 rounded-full border border-white/40 flex items-center justify-center font-black font-mono text-teal-800 text-lg">
                     A
                   </div>
                 </div>
 
                 {/* Coin 4 (Top Token with Teal Shimmer) */}
                 <div
-                  className="absolute w-24 h-24 rounded-full border border-teal-200 flex items-center justify-center"
+                  className="absolute w-24 h-24 rounded-full border border-neutral-200 flex items-center justify-center"
                   style={{
                     background: 'radial-gradient(circle at 35% 30%, #ffffff 0%, #f1f5f9 55%, #cbd5e1 100%)',
                     boxShadow: '0 2px 0 #64748b, 0 4px 0 #475569, 0 6px 0 #334155, 0 16px 28px rgba(20, 184, 166, 0.3)',
@@ -512,7 +512,7 @@ export default function AnimatedPaymentModal({
                     animation: !prefersReducedMotion ? 'coinStackDrop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards 0.54s' : 'none'
                   }}
                 >
-                  <div className="w-18 h-18 rounded-full border border-teal-500/50 flex items-center justify-center">
+                  <div className="w-18 h-18 rounded-full border border-white/50 flex items-center justify-center">
                     <span className="font-black font-mono text-teal-700 text-xl tracking-tighter">
                       ATLAS
                     </span>
@@ -523,10 +523,10 @@ export default function AnimatedPaymentModal({
 
             {/* Processing Text & Status */}
             <div className="space-y-1.5">
-              <h3 className="text-xl font-black text-white tracking-tight animate-pulse">
+              <h3 className="text-xl sm:text-[22px] font-semibold text-white tracking-[-0.02em] animate-pulse">
                 Processing your payment...
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-[14px] text-slate-400 font-normal">
                 Securely communicating with the payment provider.
               </p>
             </div>
@@ -545,15 +545,15 @@ export default function AnimatedPaymentModal({
                   <div key={s.step} className="flex items-center space-x-2.5 text-xs">
                     <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
                       isCompleted
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-white text-white'
                         : isCurrent
-                        ? 'bg-teal-500 text-white animate-spin'
+                        ? 'bg-white text-white animate-spin'
                         : 'bg-slate-800 text-slate-500'
                     }`}>
                       {isCompleted ? <Check className="w-3 h-3" /> : s.step}
                     </div>
                     <span className={`text-[11px] font-medium ${
-                      isCompleted ? 'text-slate-300' : isCurrent ? 'text-teal-400 font-bold' : 'text-slate-500'
+                      isCompleted ? 'text-slate-300' : isCurrent ? 'text-white font-bold' : 'text-slate-500'
                     }`}>
                       {s.label}
                     </span>
@@ -574,7 +574,7 @@ export default function AnimatedPaymentModal({
         {stage === 'otp' && (
           <div className="p-6 sm:p-8 space-y-6">
             <div className="text-center space-y-2">
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-white/10 border border-white/30 text-white flex items-center justify-center">
                 <Lock className="w-7 h-7" />
               </div>
               <h3 className="text-lg font-bold text-white">
@@ -592,16 +592,16 @@ export default function AnimatedPaymentModal({
                   maxLength={6}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value)}
-                  className="w-full text-center text-xl font-mono tracking-widest py-3 px-4 rounded-xl bg-slate-900 border border-teal-500/40 text-white focus:outline-none focus:border-teal-400 shadow-inner"
+                  className="w-full text-center text-xl font-mono tracking-widest py-3 px-4 rounded-xl bg-slate-900 border border-white/40 text-white focus:outline-none focus:border-white shadow-inner"
                 />
-                <span className="block text-[10px] font-mono text-teal-400 mt-1 text-center">
+                <span className="block text-[10px] font-mono text-white mt-1 text-center">
                   Sandbox Demo Code: 123456
                 </span>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                className="w-full py-3 rounded-xl bg-black hover:bg-white text-white font-bold text-xs shadow-md transition-all cursor-pointer"
               >
                 Confirm & Authorize Charge
               </button>
@@ -643,21 +643,21 @@ export default function AnimatedPaymentModal({
 
             {/* Satisfying Spring Checkmark */}
             <div className="relative w-20 h-20 mx-auto">
-              <div className="absolute inset-0 rounded-full bg-emerald-500/20 blur-xl animate-pulse" />
-              <div className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-400 text-white flex items-center justify-center shadow-lg shadow-emerald-900/40 animate-spring-pop">
+              <div className="absolute inset-0 rounded-full bg-white/20 blur-xl animate-pulse" />
+              <div className="relative w-20 h-20 rounded-full bg-gradient-to-tr from-emerald-600 to-white text-white flex items-center justify-center shadow-lg shadow-emerald-900/40 animate-spring-pop">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
             </div>
 
             {/* Headline & Amount */}
             <div className="space-y-1">
-              <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white border border-white/30">
                 Payment Settled
               </span>
-              <h2 className="text-2xl font-black text-white tracking-tight pt-1">
+              <h2 className="text-2xl sm:text-[28px] font-semibold text-white tracking-[-0.025em] pt-1">
                 Payment Successful!
               </h2>
-              <p className="text-2xl sm:text-3xl font-extrabold font-mono text-teal-400 pt-1">
+              <p className="text-2xl sm:text-3xl font-extrabold font-mono text-white pt-1">
                 ₹{totalInr.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-slate-400">
@@ -672,11 +672,11 @@ export default function AnimatedPaymentModal({
                 <button
                   type="button"
                   onClick={() => handleCopyTxId(transactionResult?.id || 'tx_demo')}
-                  className="font-mono text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1.5 cursor-pointer"
+                  className="font-mono text-white hover:text-neutral-300 font-semibold flex items-center gap-1.5 cursor-pointer"
                   title="Copy Reference ID"
                 >
                   <span>{transactionResult?.id || 'tx_atlas_demo_01'}</span>
-                  {copiedTxId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
+                  {copiedTxId ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                 </button>
               </div>
 
@@ -715,7 +715,7 @@ export default function AnimatedPaymentModal({
               <button
                 type="button"
                 onClick={handleModalClose}
-                className="py-3 px-4 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-lg shadow-teal-900/30 transition-all cursor-pointer"
+                className="py-3 px-4 rounded-2xl bg-black hover:bg-white text-white font-bold text-xs shadow-lg shadow-teal-900/30 transition-all cursor-pointer"
               >
                 Done
               </button>
@@ -746,7 +746,7 @@ export default function AnimatedPaymentModal({
               <button
                 type="button"
                 onClick={() => setStage('review')}
-                className="py-3 px-4 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs transition-colors cursor-pointer"
+                className="py-3 px-4 rounded-2xl bg-black hover:bg-white text-white font-bold text-xs transition-colors cursor-pointer"
               >
                 Try Again
               </button>

@@ -246,18 +246,18 @@ export default function MyCardsPage({ setActivePage }) {
     <div className="space-y-8 max-w-6xl mx-auto">
       
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#DEDEDE] dark:border-[#222222]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded border border-teal-500/20">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#EEEEEE] dark:bg-[#1A1A1A] text-[#111111] dark:text-white rounded border border-[#DEDEDE] dark:border-[#333333]">
               Domestic Rails
             </span>
             <span className="text-xs text-slate-400">• Tokenized Storage</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+          <h1 className="page-heading text-[28px] sm:text-[32px] font-semibold text-slate-900 dark:text-white tracking-[-0.025em] leading-tight">
             My Payment Cards
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[15px] text-slate-500 dark:text-slate-400 mt-1 font-normal leading-[1.5]">
             Manage your domestic Indian payment cards and verify cross-border e-commerce eligibility.
           </p>
         </div>
@@ -265,30 +265,30 @@ export default function MyCardsPage({ setActivePage }) {
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs shadow-md shadow-teal-600/20 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+            className="px-4 py-2.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-semibold text-[14px] shadow-md shadow-sm flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
             <Plus className="w-4 h-4" />
             <span>Add New Card</span>
           </button>
           <button
             onClick={() => setActivePage('checkout')}
-            className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-slate-100 font-semibold text-xs border border-slate-700/60 flex items-center gap-2 cursor-pointer transition-all"
+            className="px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-slate-100 font-semibold text-[14px] border border-slate-700/60 flex items-center gap-2 cursor-pointer transition-all"
           >
-            <CreditCard className="w-4 h-4 text-teal-400" />
+            <CreditCard className="w-4 h-4 text-[#111111] dark:text-white" />
             <span>Go to Checkout</span>
           </button>
         </div>
       </div>
 
       {/* Security & Tokenization Notice */}
-      <div className="p-4 rounded-xl bg-teal-500/5 border border-teal-500/20 flex items-start gap-3 text-xs text-slate-600 dark:text-slate-300">
-        <ShieldCheck className="w-5 h-5 text-teal-500 shrink-0 mt-0.5" />
+      <div className="p-4 rounded-xl bg-teal-500/5 border border-[#DEDEDE] dark:border-[#333333] flex items-start gap-3 text-xs text-slate-600 dark:text-slate-300">
+        <ShieldCheck className="w-5 h-5 text-[#111111] dark:text-white shrink-0 mt-0.5" />
         <div className="space-y-1">
           <p className="font-bold text-slate-900 dark:text-white">
             Bank-Grade Simulated Tokenization
           </p>
           <p className="leading-relaxed text-slate-500 dark:text-slate-400">
-            For security compliance, full card numbers and CVVs are <strong>never stored</strong> in our application database. In this demo sandbox, cards are replaced with secure mock vault tokens (<code className="font-mono text-teal-600 dark:text-teal-400">tok_sim_...</code>).
+            For security compliance, full card numbers and CVVs are <strong>never stored</strong> in our application database. In this demo sandbox, cards are replaced with secure mock vault tokens (<code className="font-mono text-[#111111] dark:text-white">tok_sim_...</code>).
           </p>
         </div>
       </div>
@@ -308,7 +308,7 @@ export default function MyCardsPage({ setActivePage }) {
         </div>
       ) : cards.length === 0 ? (
         <div className="p-12 text-center rounded-2xl border border-dashed border-slate-300 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4">
-          <div className="w-12 h-12 mx-auto rounded-full bg-teal-500/10 flex items-center justify-center text-teal-500">
+          <div className="w-12 h-12 mx-auto rounded-full bg-[#EEEEEE] dark:bg-[#1A1A1A] flex items-center justify-center text-[#111111] dark:text-white">
             <CreditCard className="w-6 h-6" />
           </div>
           <div>
@@ -319,7 +319,7 @@ export default function MyCardsPage({ setActivePage }) {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-500 transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-black dark:bg-white dark:text-black text-white text-xs font-bold hover:bg-[#222222] dark:hover:bg-[#EEEEEE] transition-all cursor-pointer"
           >
             Add Your First Card
           </button>
@@ -335,8 +335,8 @@ export default function MyCardsPage({ setActivePage }) {
                 key={card.id}
                 className={`relative flex flex-col justify-between rounded-2xl p-6 border transition-all duration-200 overflow-hidden ${
                   card.is_default
-                    ? 'border-teal-500/50 shadow-lg shadow-teal-500/10 bg-gradient-to-br from-slate-900 via-[#0d1624] to-[#0a2327]'
-                    : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-[#111827] hover:border-slate-700'
+                    ? 'border-black dark:border-white/50 shadow-lg shadow-teal-500/10 bg-gradient-to-br from-slate-900 via-[#0d1624] to-[#0a2327]'
+                    : 'border-[#DEDEDE] dark:border-[#222222] bg-white dark:bg-[#080808] hover:border-slate-700'
                 }`}
               >
                 {/* Visual Card Elements */}
@@ -411,7 +411,7 @@ export default function MyCardsPage({ setActivePage }) {
 
                   {/* Badges / Notes */}
                   {card.is_default && (
-                    <div className="text-[11px] font-semibold text-teal-400 flex items-center gap-1.5">
+                    <div className="text-[11px] font-semibold text-[#111111] dark:text-white flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />
                       <span>Default Payment Method</span>
                     </div>
@@ -431,7 +431,7 @@ export default function MyCardsPage({ setActivePage }) {
                       {!card.is_default && (
                         <button
                           onClick={() => handleSetDefault(card.id)}
-                          className="px-2 py-1 text-[11px] font-semibold text-teal-500 hover:text-teal-400 hover:bg-teal-500/10 rounded cursor-pointer transition-all"
+                          className="px-2 py-1 text-[11px] font-semibold text-[#111111] dark:text-white hover:text-[#111111] dark:text-white hover:bg-[#222222] dark:hover:bg-[#EEEEEE]/10 rounded cursor-pointer transition-all"
                         >
                           Make Default
                         </button>
@@ -455,12 +455,12 @@ export default function MyCardsPage({ setActivePage }) {
       {/* Add New Card Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-6">
+          <div className="relative w-full max-w-lg bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] rounded-2xl shadow-2xl overflow-hidden p-6 space-y-6">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-4 border-b border-[#DEDEDE] dark:border-[#222222]">
               <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-xl bg-teal-500/10 text-teal-500">
+                <div className="p-2 rounded-xl bg-[#EEEEEE] dark:bg-[#1A1A1A] text-[#111111] dark:text-white">
                   <CreditCard className="w-5 h-5" />
                 </div>
                 <div>
@@ -498,7 +498,7 @@ export default function MyCardsPage({ setActivePage }) {
                   placeholder="e.g. Swapnil Sharma"
                   value={cardholderName}
                   onChange={(e) => setCardholderName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                 />
               </div>
 
@@ -508,7 +508,7 @@ export default function MyCardsPage({ setActivePage }) {
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                     Card Number
                   </label>
-                  <span className="text-[10px] font-mono text-teal-400 font-bold uppercase">
+                  <span className="text-[10px] font-mono text-[#111111] dark:text-white font-bold uppercase">
                     Detected: {selectedNetwork}
                   </span>
                 </div>
@@ -518,7 +518,7 @@ export default function MyCardsPage({ setActivePage }) {
                   placeholder="6521 0000 0000 0000"
                   value={cardNumber}
                   onChange={(e) => setCardNumber(formatCardNumberInput(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono tracking-wider bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono tracking-wider bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                 />
               </div>
 
@@ -544,7 +544,7 @@ export default function MyCardsPage({ setActivePage }) {
                   <select
                     value={selectedNetwork}
                     onChange={(e) => setSelectedNetwork(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   >
                     <option value="RuPay">RuPay</option>
                     <option value="Visa">Visa</option>
@@ -559,7 +559,7 @@ export default function MyCardsPage({ setActivePage }) {
                   <select
                     value={selectedBank}
                     onChange={(e) => setSelectedBank(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   >
                     {INDIAN_BANKS.map((b) => (
                       <option key={b} value={b}>{b}</option>
@@ -580,7 +580,7 @@ export default function MyCardsPage({ setActivePage }) {
                     placeholder="MM/YY"
                     value={expiry}
                     onChange={(e) => setExpiry(formatExpiryInput(e.target.value))}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
 
@@ -598,7 +598,7 @@ export default function MyCardsPage({ setActivePage }) {
                     placeholder="•••"
                     value={cvv}
                     onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
               </div>
@@ -609,7 +609,7 @@ export default function MyCardsPage({ setActivePage }) {
                   type="checkbox"
                   checked={isDefault}
                   onChange={(e) => setIsDefault(e.target.checked)}
-                  className="rounded border-slate-700 text-teal-600 focus:ring-teal-500 w-4 h-4"
+                  className="rounded border-slate-700 text-teal-600 focus:ring-black dark:focus:ring-white w-4 h-4"
                 />
                 <span className="text-xs text-slate-600 dark:text-slate-300">
                   Set as default payment card for checkout
@@ -617,7 +617,7 @@ export default function MyCardsPage({ setActivePage }) {
               </label>
 
               {/* Action Buttons */}
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-[#DEDEDE] dark:border-[#222222]">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
@@ -628,7 +628,7 @@ export default function MyCardsPage({ setActivePage }) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md shadow-teal-600/20 disabled:opacity-50 cursor-pointer transition-all"
+                  className="px-5 py-2.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-md shadow-sm disabled:opacity-50 cursor-pointer transition-all"
                 >
                   {submitting ? 'Tokenizing Card...' : 'Link Card Securely'}
                 </button>
@@ -641,7 +641,7 @@ export default function MyCardsPage({ setActivePage }) {
       {/* Card Details Modal */}
       {selectedCardDetails && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-2xl space-y-5">
+          <div className="w-full max-w-md bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] rounded-2xl p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="font-bold text-slate-900 dark:text-white text-base">
                 Card Information & Compliance
@@ -665,7 +665,7 @@ export default function MyCardsPage({ setActivePage }) {
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                 <span className="text-slate-400">BIN Identifier:</span>
-                <span className="font-mono text-teal-400">{selectedCardDetails.bin || 'N/A'}</span>
+                <span className="font-mono text-[#111111] dark:text-white">{selectedCardDetails.bin || 'N/A'}</span>
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                 <span className="text-slate-400">Card Classification:</span>
@@ -677,7 +677,7 @@ export default function MyCardsPage({ setActivePage }) {
               </div>
               <div className="flex justify-between py-1.5 border-b border-slate-800/60">
                 <span className="text-slate-400">Vault Token:</span>
-                <span className="font-mono text-[10px] text-teal-400">{selectedCardDetails.token}</span>
+                <span className="font-mono text-[10px] text-[#111111] dark:text-white">{selectedCardDetails.token}</span>
               </div>
               <div className="pt-2">
                 <span className="text-slate-400 block mb-1">Cross-Border Eligibility Note:</span>

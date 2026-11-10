@@ -230,10 +230,10 @@ export default function StudentPaymentsPage({ setActivePage }) {
               Parent Linked: {profile?.guardian_email || 'priya.sharma@guardian.com'}
             </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">
+          <h1 className="page-heading text-[26px] sm:text-[30px] font-semibold tracking-[-0.025em] text-white leading-tight">
             {profile?.student_name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Aarav Sharma'} ({profile?.age || 17} Years Old)
           </h1>
-          <p className="text-xs text-slate-300 max-w-2xl">
+          <p className="text-[14.5px] text-slate-300 max-w-2xl font-normal leading-[1.5]">
             Pay safely for international university courses, tech certifications, and learning tools with spending limits and parent guidance.
           </p>
         </div>
@@ -241,7 +241,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
         <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => setActivePage('guardian')}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[14px] rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
           >
             <UserCheck className="w-4 h-4" />
             Open Parent Approval Portal

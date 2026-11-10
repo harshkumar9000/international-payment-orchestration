@@ -81,10 +81,10 @@ export default function TransactionsPage() {
             <ListOrdered className="w-4 h-4" />
             <span>Payment Records</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mt-1">
+          <h1 className="page-heading text-[28px] sm:text-[32px] font-semibold text-slate-900 dark:text-white tracking-[-0.025em] leading-tight mt-1">
             Payment History & Details
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[15px] text-slate-500 dark:text-slate-400 mt-1 font-normal leading-[1.5]">
             Search, filter, and inspect step-by-step history and routing decisions for all international payments.
           </p>
         </div>
@@ -94,7 +94,7 @@ export default function TransactionsPage() {
           <a
             href={api.transactions.getCsvExportUrl()}
             download
-            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-[14px] shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition flex items-center space-x-1.5 cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-blue-500" />
             <span>Download CSV</span>

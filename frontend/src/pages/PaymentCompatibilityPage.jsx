@@ -196,25 +196,25 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
     <div className="space-y-8 max-w-5xl mx-auto">
       
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#DEDEDE] dark:border-[#222222]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded border border-teal-500/20">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[#EEEEEE] dark:bg-[#1A1A1A] text-[#111111] dark:text-white rounded border border-[#DEDEDE] dark:border-[#333333]">
               Corridor Checker
             </span>
             <span className="text-xs text-slate-400">• Instant Dynamic Feedback</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+          <h1 className="page-heading text-[28px] sm:text-[32px] font-semibold text-slate-900 dark:text-white tracking-[-0.025em] leading-tight">
             RuPay & UPI International Compatibility
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[15px] text-slate-500 dark:text-slate-400 mt-1 font-normal leading-[1.5]">
             Real-time verification of domestic Indian cards and bilateral UPI payment corridors.
           </p>
         </div>
 
         <button
           onClick={() => setActivePage('checkout')}
-          className="px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs shadow-md shadow-teal-600/20 flex items-center gap-2 cursor-pointer transition-all active:scale-95 self-start sm:self-auto"
+          className="px-4 py-2.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-semibold text-[14px] shadow-md shadow-sm flex items-center gap-2 cursor-pointer transition-all active:scale-95 self-start sm:self-auto"
         >
           <CreditCard className="w-4 h-4" />
           <span>Test in Checkout</span>
@@ -226,7 +226,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
         <span className="text-slate-400 font-semibold text-[11px] shrink-0">Quick Presets:</span>
         <button
           onClick={() => applyPreset('rupay_global')}
-          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-teal-500/10 hover:text-teal-400 text-slate-700 dark:text-slate-300 font-medium shrink-0 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-[#222222] dark:hover:bg-[#EEEEEE]/10 hover:text-[#111111] dark:text-white text-slate-700 dark:text-slate-300 font-medium shrink-0 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
         >
           RuPay Global (US)
         </button>
@@ -238,7 +238,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
         </button>
         <button
           onClick={() => applyPreset('upi_singapore')}
-          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-teal-500/10 hover:text-teal-400 text-slate-700 dark:text-slate-300 font-medium shrink-0 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-[#222222] dark:hover:bg-[#EEEEEE]/10 hover:text-[#111111] dark:text-white text-slate-700 dark:text-slate-300 font-medium shrink-0 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
         >
           UPI Singapore (PayNow)
         </button>
@@ -250,7 +250,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
         </button>
         <button
           onClick={() => applyPreset('visa_intl')}
-          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-teal-500/10 hover:text-teal-400 text-slate-700 dark:text-slate-300 font-medium shrink-0 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 hover:bg-[#222222] dark:hover:bg-[#EEEEEE]/10 hover:text-[#111111] dark:text-white text-slate-700 dark:text-slate-300 font-medium shrink-0 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
         >
           Visa International (DE)
         </button>
@@ -260,13 +260,13 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         
         {/* Left: Reactive Parameters Form */}
-        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <h3 className="font-bold text-slate-900 dark:text-white text-sm">
               Payment Instrument & Destination
             </h3>
             {evaluating && (
-              <span className="text-[10px] text-teal-400 flex items-center gap-1 font-mono">
+              <span className="text-[10px] text-[#111111] dark:text-white flex items-center gap-1 font-mono">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 Checking...
               </span>
@@ -284,7 +284,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 onClick={() => setMethod('card')}
                 className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   method === 'card'
-                    ? 'bg-teal-600 text-white shadow-sm'
+                    ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
@@ -296,7 +296,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                 onClick={() => setMethod('upi')}
                 className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                   method === 'upi'
-                    ? 'bg-teal-600 text-white shadow-sm'
+                    ? 'bg-black dark:bg-white dark:text-black text-white shadow-sm'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-white'
                 }`}
               >
@@ -326,7 +326,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                         setCardBin('524100');
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   >
                     <option value="RuPay">RuPay (India)</option>
                     <option value="Visa">Visa</option>
@@ -344,20 +344,20 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
                     value={cardBin}
                     onChange={(e) => setCardBin(e.target.value.replace(/\D/g, ''))}
                     placeholder="e.g. 652150"
-                    className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+                    className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
               </div>
 
               <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                <Info className="w-3.5 h-3.5 text-[#111111] dark:text-white shrink-0" />
                 <span>
-                  RuPay Global BINs: <code className="text-teal-400 font-mono">6521xx</code>, <code className="text-teal-400 font-mono">6522xx</code> • Domestic PMJDY: <code className="text-amber-400 font-mono">6070xx</code>
+                  RuPay Global BINs: <code className="text-[#111111] dark:text-white font-mono">6521xx</code>, <code className="text-[#111111] dark:text-white font-mono">6522xx</code> • Domestic PMJDY: <code className="text-amber-400 font-mono">6070xx</code>
                 </span>
               </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-[#DEDEDE] dark:border-[#222222] text-xs space-y-1.5">
               <span className="font-semibold text-slate-800 dark:text-slate-200">
                 NIPL Bilateral Fast-Payment Linkage
               </span>
@@ -375,7 +375,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
             <select
               value={destCountry}
               onChange={(e) => handleCountryChange(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full px-3 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
             >
               {DESTINATIONS.map((d) => (
                 <option key={d.code} value={d.code}>
@@ -395,13 +395,13 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
               value={amountInr}
               onChange={(e) => setAmountInr(e.target.value)}
               placeholder="25000"
-              className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-teal-500"
+              className="w-full px-3 py-2 rounded-xl text-xs font-mono bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
             />
           </div>
         </div>
 
         {/* Right: Instant Results Card */}
-        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+        <div className="lg:col-span-6 p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-5">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Instant Verification Result
@@ -471,7 +471,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
 
             <div className="flex justify-between py-1">
               <span className="text-slate-400">FX Settlement:</span>
-              <span className="font-mono text-teal-400 font-semibold">
+              <span className="font-mono text-[#111111] dark:text-white font-semibold">
                 Mid-market + 1.25% markup
               </span>
             </div>
@@ -488,7 +488,7 @@ export default function PaymentCompatibilityPage({ setActivePage }) {
           <div className="pt-2">
             <button
               onClick={() => setActivePage('checkout')}
-              className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs shadow-md shadow-teal-600/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+              className="w-full py-2.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-md shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
             >
               <span>Proceed to Checkout with this Corridor</span>
               <ArrowRight className="w-3.5 h-3.5" />

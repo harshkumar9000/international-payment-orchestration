@@ -44,26 +44,28 @@ export default function Sidebar({
     <div className="h-full flex flex-col justify-between">
       {/* Brand & Top Header */}
       <div>
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="h-16 flex items-center justify-between px-4 border-b border-[#DEDEDE] dark:border-[#222222]">
           <div
             onClick={() => handleNavigate(isAuthenticated ? 'dashboard' : 'landing')}
-            className="flex items-center space-x-3 cursor-pointer select-none"
+            className="flex items-center space-x-3 cursor-pointer select-none group"
             title={isAuthenticated ? 'Go to Dashboard' : 'Go to Home'}
           >
-            <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center font-black shadow-md shadow-teal-600/20 shrink-0">
-              <span className="text-lg tracking-tighter">A</span>
-            </div>
+            <img
+              src="/atlas_pay_favicon.png"
+              alt="ATLAS.PAY"
+              className="w-9 h-9 rounded-xl object-contain shadow-sm shrink-0 transition-transform group-hover:scale-105"
+            />
             {!isCollapsed && (
               <div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">
-                    ATLAS<span className="text-teal-500">.PAY</span>
+                  <span className="font-bold text-base tracking-tight text-[#111111] dark:text-white">
+                    ATLAS<span className="text-[#666666] dark:text-[#999999]">.PAY</span>
                   </span>
-                  <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider bg-teal-50 text-teal-700 dark:bg-teal-950/80 dark:text-teal-300 rounded border border-teal-200 dark:border-teal-800">
-                    Demo
+                  <span className="px-1.5 py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider bg-[#EEEEEE] text-[#111111] dark:bg-[#1E1E1E] dark:text-white rounded border border-[#DEDEDE] dark:border-[#333333]">
+                    B2B
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[140px]">
+                <p className="text-[10.5px] text-[#666666] dark:text-[#999999] truncate max-w-[140px] font-normal">
                   Payments. Without Borders.
                 </p>
               </div>
@@ -73,7 +75,7 @@ export default function Sidebar({
           {/* Desktop Collapse Toggle */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex p-1 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="hidden lg:flex p-1 rounded-lg text-[#666666] hover:text-[#111111] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] transition-colors cursor-pointer"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -91,26 +93,16 @@ export default function Sidebar({
                 key={item.id}
                 onClick={() => handleNavigate(item.id)}
                 title={isCollapsed ? item.label : undefined}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400 font-bold border border-teal-500/20 shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                    ? 'bg-black text-white dark:bg-white dark:text-black font-semibold shadow-sm'
+                    : 'text-[#666666] dark:text-[#999999] hover:text-[#111111] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E]'
                 }`}
               >
                 <div className="flex items-center space-x-3 truncate">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-teal-500' : 'text-slate-400 dark:text-slate-400'}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white dark:text-black' : 'text-[#666666] dark:text-[#999999]'}`} />
                   {!isCollapsed && <span className="truncate">{item.label}</span>}
                 </div>
-
-                {!isCollapsed && item.badge && (
-                  <span className={`px-1.5 py-0.5 text-[9px] rounded font-mono font-bold ${
-                    isActive
-                      ? 'bg-teal-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                  }`}>
-                    {item.badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -118,17 +110,17 @@ export default function Sidebar({
       </div>
 
       {/* Footer Strip */}
-      <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+      <div className="p-3 border-t border-[#DEDEDE] dark:border-[#222222] space-y-2">
         {!isCollapsed ? (
           <>
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="p-2.5 rounded-xl bg-[#F7F7F7] dark:bg-[#111111] border border-[#DEDEDE] dark:border-[#262626] flex items-center justify-between text-[11px] text-[#666666] dark:text-[#999999]">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Sandbox Online</span>
+                <span className="w-2 h-2 rounded-full bg-black dark:bg-white animate-pulse" />
+                <span>Sandbox Active</span>
               </div>
               <button
                 onClick={() => handleNavigate('landing')}
-                className="text-teal-500 hover:underline font-semibold cursor-pointer"
+                className="text-[#111111] dark:text-white hover:underline font-semibold cursor-pointer"
               >
                 Public View
               </button>
@@ -139,7 +131,7 @@ export default function Sidebar({
                 logout();
                 handleNavigate('login');
               }}
-              className="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs font-semibold text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center space-x-2 py-2 px-3 rounded-xl text-xs font-semibold text-[#666666] hover:text-[#111111] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] transition-colors cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
               <span>Sign Out</span>
@@ -147,13 +139,13 @@ export default function Sidebar({
           </>
         ) : (
           <div className="text-center py-2 space-y-2">
-            <span className="w-2 h-2 mx-auto rounded-full bg-emerald-500 block" title="Sandbox Online" />
+            <span className="w-2 h-2 mx-auto rounded-full bg-black dark:bg-white block" title="Sandbox Active" />
             <button
               onClick={() => {
                 logout();
                 handleNavigate('login');
               }}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 block mx-auto cursor-pointer"
+              className="p-1.5 rounded-lg text-[#666666] hover:text-[#111111] dark:hover:text-white hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] block mx-auto cursor-pointer"
               title="Sign Out"
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -168,7 +160,7 @@ export default function Sidebar({
     <>
       {/* Desktop Fixed Sidebar */}
       <aside
-        className={`hidden lg:flex fixed top-0 left-0 z-40 h-screen transition-all duration-300 bg-white dark:bg-[#111827] border-r border-slate-200 dark:border-slate-800 flex-col justify-between ${
+        className={`hidden lg:flex fixed top-0 left-0 z-40 h-screen transition-all duration-300 bg-white dark:bg-[#080808] border-r border-[#DEDEDE] dark:border-[#222222] flex-col justify-between ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -185,7 +177,7 @@ export default function Sidebar({
           />
 
           {/* Off-canvas sidebar */}
-          <div className="relative w-64 bg-white dark:bg-[#111827] border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between z-10">
+          <div className="relative w-64 bg-white dark:bg-[#080808] border-r border-[#DEDEDE] dark:border-[#222222] flex-col justify-between z-10 flex">
             {sidebarContent}
           </div>
         </div>
