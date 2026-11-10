@@ -615,11 +615,12 @@
       "guardian_consent_status": "ACTIVE",
       "daily_limit": 500,
       "weekly_limit": 1000,
-      "monthly_limit": 1500,
+      "monthly_limit": 2000,
       "single_tx_limit": 250,
       "auto_approval_threshold": 50,
       "whitelisted_mccs": "[\"education_higher_ed\",\"online_courses\",\"books_study_materials\",\"software_tools\",\"standardized_testing\"]",
-      "created_at": "2026-09-10T17:13:56.680Z"
+      "created_at": "2026-09-10T17:13:56.680Z",
+      "updated_at": "2026-11-10T07:14:06.444Z"
     },
     {
       "id": "stu_elena_02",
