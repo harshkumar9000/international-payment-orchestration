@@ -1485,5 +1485,40 @@ describe('International Payment Orchestration API Suite', () => {
       assert.strictEqual(db.getStatus(), 'postgresql_connected');
     });
   });
+
+  describe('Vercel Entrypoint & Express Module Export Compatibility Suite', () => {
+    test('1. require("./src/server") returns a function', () => {
+      const serverModule = require('../src/server');
+      assert.strictEqual(typeof serverModule, 'function');
+    });
+
+    test('2. The returned function is the Express app', () => {
+      const serverModule = require('../src/server');
+      assert.strictEqual(typeof serverModule.use, 'function');
+      assert.strictEqual(typeof serverModule.get, 'function');
+      assert.strictEqual(typeof serverModule.listen, 'function');
+    });
+
+    test('3. The .app property points to the same Express app', () => {
+      const serverModule = require('../src/server');
+      assert.strictEqual(typeof serverModule.app, 'function');
+      assert.strictEqual(serverModule, serverModule.app);
+    });
+
+    test('4. Named startServer and ensureDbInitialized exports remain available', () => {
+      const { startServer: startFn, ensureDbInitialized: initFn, _resetServerlessInitPromiseForTesting: resetFn } = require('../src/server');
+      assert.strictEqual(typeof startFn, 'function');
+      assert.strictEqual(typeof initFn, 'function');
+      assert.strictEqual(typeof resetFn, 'function');
+    });
+
+    test('5. backend/api/index.js exports a function (the Express app)', () => {
+      const apiModule = require('../api/index');
+      const serverModule = require('../src/server');
+      assert.strictEqual(typeof apiModule, 'function');
+      assert.strictEqual(apiModule, serverModule);
+      assert.strictEqual(typeof apiModule.listen, 'function');
+    });
+  });
 });
 
