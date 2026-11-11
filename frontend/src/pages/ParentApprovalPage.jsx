@@ -1,29 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
+import {
+  filterValidPendingApprovals,
+  formatApprovalTimestamp,
+  getPortalDisplayState
+} from '../utils/approvalUtils';
 import {
   Users2,
   ShieldCheck,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Clock,
   Settings,
-  DollarSign,
   GraduationCap,
   RefreshCw,
   Save,
   Check,
-  X,
-  Sparkles,
-  ArrowRight
+  X
 } from 'lucide-react';
 
 export default function ParentApprovalPage({ setActivePage }) {
-  const [guardianId] = useState('guard_priya_sharma');
-  const [studentId] = useState('stu_aarav_sharma');
+  // Use exact production IDs for student and guardian
+  const [guardianId] = useState('guard_priya_sharma_01');
+  const [studentId] = useState('stu_aarav_sharma_01');
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
@@ -44,32 +47,51 @@ export default function ParentApprovalPage({ setActivePage }) {
     { id: 'crypto', label: 'Cryptocurrency & Virtual Assets', enabled: false }
   ]);
 
-  async function loadData() {
-    setLoading(true);
+  const isFetchingRef = useRef(false);
+
+  const loadData = useCallback(async (isSilent = false) => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    if (!isSilent) {
+      setLoading(true);
+    }
+    setError(null);
+
+    const pendingEndpoint = `/api/guardian/pending-approvals?guardian_id=${guardianId}`;
+    const profileEndpoint = `/api/student/profile?student_id=${studentId}`;
+
     try {
-      const [pendRes, profRes] = await Promise.all([
-        (typeof api.guardian?.getPending === 'function'
+      // 1. Fetch pending approvals - do NOT silently swallow errors with .catch(() => ({ pending: [] }))
+      const pendResPromise = (
+        typeof api.guardian?.getPending === 'function'
           ? api.guardian.getPending(guardianId)
           : typeof api.guardian?.getPendingApprovals === 'function'
           ? api.guardian.getPendingApprovals(guardianId)
-          : Promise.resolve({ pending: [] })
-        ).catch(() => ({ pending: [] })),
-        (typeof api.student?.getProfile === 'function'
+          : Promise.reject(new Error(`Guardian API client is not configured for ${pendingEndpoint}`))
+      );
+
+      // 2. Fetch student profile for limits and verified student details
+      const profResPromise = (
+        typeof api.student?.getProfile === 'function'
           ? api.student.getProfile(studentId)
           : Promise.resolve(null)
-        ).catch(() => null)
-      ]);
+      ).catch(err => {
+        console.warn(`[ParentApprovalPortal] Student profile fetch failed on ${profileEndpoint}:`, err.message);
+        return null;
+      });
 
-      const rawPending = pendRes?.pending || [];
-      const uniquePending = [];
-      const seenIds = new Set();
-      for (const item of rawPending) {
-        if (item && item.id && !seenIds.has(item.id) && item.status?.toUpperCase() === 'PENDING') {
-          seenIds.add(item.id);
-          uniquePending.push(item);
-        }
+      const [pendRes, profRes] = await Promise.all([pendResPromise, profResPromise]);
+
+      if (!pendRes || typeof pendRes !== 'object') {
+        throw new Error(`Invalid response received from ${pendingEndpoint}`);
       }
-      setPendingApprovals(uniquePending);
+
+      // Filter and deduplicate valid pending approvals
+      const rawPending = Array.isArray(pendRes.pending) ? pendRes.pending : [];
+      const validPending = filterValidPendingApprovals(rawPending, guardianId, studentId);
+
+      setPendingApprovals(validPending);
+
       const stuProfile = profRes?.student || profRes?.profile || profRes;
       if (stuProfile) {
         setProfile(stuProfile);
@@ -78,49 +100,67 @@ export default function ParentApprovalPage({ setActivePage }) {
         setMonthlyLimit(stuProfile.spending_limits?.monthly_limit || stuProfile.monthly_limit || 500);
       }
     } catch (err) {
-      console.error('Error loading guardian data:', err);
+      console.error(`[ParentApprovalPortal] Failed to fetch from endpoint ${pendingEndpoint}:`, err);
+      setError(err.message || `Failed to fetch pending approval requests from ${pendingEndpoint}.`);
+      setPendingApprovals([]);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
-  }
+  }, [guardianId, studentId]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(false);
+
+    // Auto-refresh when tab regains focus or when guardian approval event is fired
+    const handleSync = () => {
+      loadData(true);
+    };
+
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('guardian_approval_updated', handleSync);
+
+    return () => {
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('guardian_approval_updated', handleSync);
+    };
+  }, [loadData]);
 
   async function handleApprove(approvalId) {
+    if (!approvalId) return;
     setActionLoading(approvalId);
     setFeedback(null);
     try {
       const res = await api.guardian.approve(approvalId, 'Approved by Priya Sharma for educational advancement.');
-      setFeedback({ type: 'success', message: res.message || 'Payment approved! Authorized by parent in portal.' });
+      setFeedback({ type: 'success', message: res?.message || 'Payment approved! Authorized by parent in portal.' });
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('guardian_approval_updated'));
       }
-      loadData();
+      await loadData(false);
     } catch (err) {
-      console.error('Approve error:', err);
-      setFeedback({ type: 'error', message: err.message || 'Failed to approve payment.' });
+      console.error(`[ParentApprovalPortal] Failed to approve request ${approvalId}:`, err);
+      setFeedback({ type: 'error', message: err.message || 'Failed to approve payment request.' });
     } finally {
       setActionLoading(null);
     }
   }
 
   async function handleReject(approvalId) {
+    if (!approvalId) return;
     const reason = prompt('Please provide a reason for rejecting this request:', 'This course exceeds the current monthly educational budget.');
     if (!reason) return;
 
     setActionLoading(approvalId);
     setFeedback(null);
     try {
-      await api.guardian.reject(approvalId, reason);
-      setFeedback({ type: 'success', message: 'Payment request rejected. Student has been notified.' });
+      const res = await api.guardian.reject(approvalId, reason);
+      setFeedback({ type: 'success', message: res?.message || 'Payment request rejected. Student has been notified.' });
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('guardian_approval_updated'));
       }
-      loadData();
+      await loadData(false);
     } catch (err) {
-      console.error('Reject error:', err);
+      console.error(`[ParentApprovalPortal] Failed to reject request ${approvalId}:`, err);
       setFeedback({ type: 'error', message: err.message || 'Failed to reject transaction.' });
     } finally {
       setActionLoading(null);
@@ -130,6 +170,7 @@ export default function ParentApprovalPage({ setActivePage }) {
   async function handleSaveLimits(e) {
     e.preventDefault();
     setSavingLimits(true);
+    setFeedback(null);
     try {
       const res = await api.guardian.updateLimits(studentId, {
         daily_limit: parseFloat(dailyLimit),
@@ -137,12 +178,14 @@ export default function ParentApprovalPage({ setActivePage }) {
         monthly_limit: parseFloat(monthlyLimit)
       });
       setLimitsSaved(true);
+      setFeedback({ type: 'success', message: 'Spending limits updated successfully.' });
       if (res?.profile) {
         setProfile(res.profile);
       }
       setTimeout(() => setLimitsSaved(false), 3000);
     } catch (err) {
-      console.error('Error saving limits:', err);
+      console.error(`[ParentApprovalPortal] Failed to save limits for student ${studentId}:`, err);
+      setFeedback({ type: 'error', message: err.message || 'Failed to update spending limits.' });
     } finally {
       setSavingLimits(false);
     }
@@ -154,6 +197,8 @@ export default function ParentApprovalPage({ setActivePage }) {
     );
   }
 
+  const displayState = getPortalDisplayState({ loading, error, pendingApprovals });
+
   return (
     <div className="space-y-6 pb-12">
       {/* Guardian Header */}
@@ -164,7 +209,9 @@ export default function ParentApprovalPage({ setActivePage }) {
               <Users2 className="w-3.5 h-3.5" />
               Parent & Legal Guardian Portal
             </span>
-            <span className="text-xs text-slate-300">Logged in as: Priya Sharma (priya.sharma@guardian.com)</span>
+            <span className="text-xs text-slate-300">
+              Logged in as: {profile?.guardian_name || 'Priya Sharma (Parent/Guardian)'} ({profile?.guardian_email || 'priya.sharma@parent.in'})
+            </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
             Supervising Student: {profile?.student_name || 'Aarav Sharma'} ({profile?.age !== null && profile?.age !== undefined ? `Age ${profile.age}` : 'Age Unverified'})
@@ -176,6 +223,7 @@ export default function ParentApprovalPage({ setActivePage }) {
 
         <div className="flex items-center gap-2 shrink-0">
           <button
+            type="button"
             onClick={() => setActivePage('student')}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/15 text-white font-semibold text-xs rounded-xl border border-white/10 transition-all cursor-pointer"
           >
@@ -183,7 +231,8 @@ export default function ParentApprovalPage({ setActivePage }) {
             Switch to Student View
           </button>
           <button
-            onClick={loadData}
+            type="button"
+            onClick={() => loadData(false)}
             disabled={loading}
             className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all cursor-pointer"
             title="Refresh Requests"
@@ -203,7 +252,7 @@ export default function ParentApprovalPage({ setActivePage }) {
           }`}
         >
           <span>{feedback.message}</span>
-          <button onClick={() => setFeedback(null)} className="text-slate-400 hover:text-slate-600">
+          <button type="button" onClick={() => setFeedback(null)} className="text-slate-400 hover:text-slate-600">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -211,7 +260,7 @@ export default function ParentApprovalPage({ setActivePage }) {
 
       {/* Main Grid: Pending Approvals (7 cols) + Spending Controls (5 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
+
         {/* Left: Pending Approval Requests */}
         <div className="lg:col-span-7 bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -223,7 +272,31 @@ export default function ParentApprovalPage({ setActivePage }) {
           </div>
 
           <div className="space-y-3">
-            {pendingApprovals.length === 0 ? (
+            {displayState === 'ERROR' && (
+              <div className="p-6 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-center space-y-2">
+                <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+                <h3 className="text-xs font-bold text-rose-900 dark:text-rose-100">Unable to Load Approval Requests</h3>
+                <p className="text-xs text-rose-700 dark:text-rose-300 max-w-sm mx-auto">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => loadData(false)}
+                  className="mt-2 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Retry Loading
+                </button>
+              </div>
+            )}
+
+            {displayState === 'LOADING' && (
+              <div className="p-8 rounded-xl bg-slate-50 dark:bg-slate-900 text-center space-y-3 border border-slate-200 dark:border-slate-800">
+                <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mx-auto" />
+                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">Checking for Pending Payment Requests...</h3>
+                <p className="text-xs text-slate-400">Communicating with the ATLAS.PAY compliance rail.</p>
+              </div>
+            )}
+
+            {displayState === 'EMPTY' && (
               <div className="p-8 rounded-xl bg-slate-50 dark:bg-slate-900 text-center space-y-2 border border-dashed border-slate-200 dark:border-slate-800">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
                 <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">No Pending Requests</h3>
@@ -231,83 +304,89 @@ export default function ParentApprovalPage({ setActivePage }) {
                   All current payment requests from your student have been resolved.
                 </p>
               </div>
-            ) : (
-              pendingApprovals.map((appr) => (
-                <div
-                  key={appr.id}
-                  className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/40 dark:bg-amber-950/20 space-y-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 dark:text-white text-sm">
-                          {appr.merchant_name || 'International Online Course'}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
-                          {appr.merchant_category || 'Education'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Course: {appr.course_name || appr.notes || 'Online Learning Program'}
-                      </p>
-                    </div>
-
-                    <div className="text-right">
-                      <div className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
-                        {appr.currency} {parseFloat(appr.amount).toFixed(2)}
-                      </div>
-                      <span className="text-[10px] text-slate-400">
-                        Requested: {new Date(appr.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Why approval is needed */}
-                  <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
-                    <strong className="text-teal-600 dark:text-teal-400">Why approval is needed:</strong>{' '}
-                    {appr.amount > 50
-                      ? 'The amount exceeds your student\'s $50 auto-approval limit.'
-                      : 'International educational purchase requires parent confirmation.'}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
-                      onClick={() => handleReject(appr.id)}
-                      disabled={actionLoading === appr.id}
-                      className="px-3.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Reject Request
-                    </button>
-                    <button
-                      onClick={() => handleApprove(appr.id)}
-                      disabled={actionLoading === appr.id}
-                      className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-teal-600/20 transition-all cursor-pointer"
-                    >
-                      {actionLoading === appr.id ? (
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Check className="w-3.5 h-3.5" />
-                      )}
-                      Approve & Pay Course
-                    </button>
-                  </div>
-                </div>
-              ))
             )}
+
+            {displayState === 'LIST' &&
+              pendingApprovals.map((appr) => {
+                const approvalId = appr.id || appr.approval_id;
+                return (
+                  <div
+                    key={approvalId}
+                    className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/40 dark:bg-amber-950/20 space-y-3"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-white text-sm">
+                            {appr.merchant_name || 'International Online Course'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">
+                            {appr.merchant_category || 'Education'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                          Purpose: {appr.purpose_description || appr.course_name || appr.notes || 'Online Learning Program'}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-base font-extrabold text-slate-900 dark:text-white font-mono">
+                          {appr.currency || 'USD'} {parseFloat(appr.amount || 0).toFixed(2)}
+                        </div>
+                        <span className="text-[10px] text-slate-400">
+                          Requested: {formatApprovalTimestamp(appr.requested_at, appr.created_at)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Why approval is needed */}
+                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400">
+                      <strong className="text-teal-600 dark:text-teal-400">Why approval is needed:</strong>{' '}
+                      {appr.purpose_description || (parseFloat(appr.amount || 0) > 50
+                        ? "The amount exceeds your student's $50 auto-approval limit."
+                        : "International educational purchase requires parent confirmation.")}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleReject(approvalId)}
+                        disabled={actionLoading === approvalId}
+                        className="px-3.5 py-1.5 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Reject Request
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(approvalId)}
+                        disabled={actionLoading === approvalId}
+                        className="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-teal-600/20 transition-all cursor-pointer"
+                      >
+                        {actionLoading === approvalId ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        Approve & Pay Course
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
         </div>
 
         {/* Right: Spending Limit Sliders & Category Whitelisting (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          
+
           {/* Spending Limit Sliders */}
           <div className="bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Settings className="w-4 h-4 text-teal-500" />
-                Configure Spending Limits for Aarav
+                Configure Spending Limits for {profile?.student_name ? profile.student_name.split(' ')[0] : 'Aarav'}
               </h2>
               {limitsSaved && (
                 <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">

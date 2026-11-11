@@ -114,9 +114,9 @@ export default function StudentPaymentsPage({ setActivePage }) {
       if (typeof api.student?.createPaymentIntent !== 'function') {
         throw new Error('Student payment service is currently not connected.');
       }
-      const idempotencyKey = `idem_${profile?.id || 'stu_aarav_sharma'}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const idempotencyKey = `idem_${profile?.id || 'stu_aarav_sharma_01'}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
       const res = await api.student.createPaymentIntent({
-        student_id: profile?.id || 'stu_aarav_sharma',
+        student_id: profile?.id || 'stu_aarav_sharma_01',
         merchant_name: courseName,
         merchant_category: merchantCategory,
         amount: parseFloat(amount),

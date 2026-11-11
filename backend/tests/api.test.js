@@ -1665,5 +1665,218 @@ describe('International Payment Orchestration API Suite', () => {
       assert.strictEqual(profData.profile.age_verification_status, 'VERIFIED');
     });
   });
+
+  describe('Parent Approval Portal & Pending Requests Display Regression Suite', () => {
+    let filterValidPendingApprovals, formatApprovalTimestamp, getPortalDisplayState;
+
+    before(async () => {
+      const utils = await import('../../frontend/src/utils/approvalUtils.js');
+      filterValidPendingApprovals = utils.filterValidPendingApprovals;
+      formatApprovalTimestamp = utils.formatApprovalTimestamp;
+      getPortalDisplayState = utils.getPortalDisplayState;
+    });
+
+    test('1. API response containing appr_pending_coursera_01 appears for guardian guard_priya_sharma_01', async () => {
+      const guardianId = 'guard_priya_sharma_01';
+      const res = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=${guardianId}`);
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.ok(Array.isArray(data.pending));
+
+      const courseraAppr = data.pending.find(a => a.id === 'appr_pending_coursera_01');
+      assert.ok(courseraAppr, 'appr_pending_coursera_01 must be present in pending approvals list');
+      assert.strictEqual(courseraAppr.student_id, 'stu_aarav_sharma_01');
+      assert.strictEqual(courseraAppr.guardian_id, 'guard_priya_sharma_01');
+      assert.strictEqual(courseraAppr.merchant_name, 'Coursera Deep Learning Specialization');
+      assert.strictEqual(courseraAppr.merchant_category, 'online_courses');
+      assert.strictEqual(Number(courseraAppr.amount), 79.00);
+      assert.strictEqual(courseraAppr.currency, 'USD');
+      assert.strictEqual(courseraAppr.status, 'PENDING');
+      assert.ok(courseraAppr.requested_at, 'requested_at timestamp must be present');
+      assert.ok(courseraAppr.purpose_description, 'purpose_description must be present');
+    });
+
+    test('2. A valid pending item is not filtered out by portal filtering logic', () => {
+      const guardianId = 'guard_priya_sharma_01';
+      const studentId = 'stu_aarav_sharma_01';
+      const samplePending = [
+        {
+          id: 'appr_pending_coursera_01',
+          transaction_id: 'tx_student_pending_01',
+          student_id: studentId,
+          guardian_id: guardianId,
+          amount: 79.00,
+          currency: 'USD',
+          merchant_name: 'Coursera Deep Learning Specialization',
+          merchant_category: 'online_courses',
+          purpose_description: 'Stanford AI & Machine Learning Specialization Certificate',
+          status: 'PENDING',
+          requested_at: '2026-11-11T12:00:00.000Z'
+        }
+      ];
+
+      const filtered = filterValidPendingApprovals(samplePending, guardianId, studentId);
+      assert.strictEqual(filtered.length, 1);
+      assert.strictEqual(filtered[0].id, 'appr_pending_coursera_01');
+      assert.strictEqual(filtered[0].status, 'PENDING');
+      assert.strictEqual(filtered[0].merchant_name, 'Coursera Deep Learning Specialization');
+      assert.strictEqual(filtered[0].amount, 79.00);
+
+      // Verify timestamp formatting prioritizes requested_at
+      const formattedTime = formatApprovalTimestamp(samplePending[0].requested_at, null);
+      assert.ok(formattedTime !== 'Pending' && formattedTime !== 'Just now');
+    });
+
+    test('3. An API failure displays an error state instead of "No Pending Requests"', () => {
+      // Scenario A: API failed with an error
+      const errorState = getPortalDisplayState({
+        loading: false,
+        error: 'Failed to fetch from endpoint /api/guardian/pending-approvals?guardian_id=guard_priya_sharma_01: Network Error',
+        pendingApprovals: []
+      });
+      assert.strictEqual(errorState, 'ERROR', 'Display state must be ERROR when API fails, never EMPTY');
+
+      // Scenario B: Loading in progress
+      const loadingState = getPortalDisplayState({
+        loading: true,
+        error: null,
+        pendingApprovals: []
+      });
+      assert.strictEqual(loadingState, 'LOADING', 'Display state must be LOADING, never EMPTY');
+
+      // Scenario C: Successful response with empty list
+      const emptyState = getPortalDisplayState({
+        loading: false,
+        error: null,
+        pendingApprovals: []
+      });
+      assert.strictEqual(emptyState, 'EMPTY', 'Display state is EMPTY only after successful empty response');
+
+      // Scenario D: Successful response with items
+      const listState = getPortalDisplayState({
+        loading: false,
+        error: null,
+        pendingApprovals: [{ id: 'appr_pending_coursera_01' }]
+      });
+      assert.strictEqual(listState, 'LIST', 'Display state must be LIST when approvals exist');
+    });
+
+    test('4. Approved and rejected records are not displayed as pending', async () => {
+      const guardianId = 'guard_priya_sharma_01';
+      const studentId = 'stu_aarav_sharma_01';
+
+      // 4A. Test database response: /api/guardian/pending-approvals separates pending from history
+      const res = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=${guardianId}`);
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+
+      // All items in data.pending must have status PENDING
+      for (const item of data.pending) {
+        assert.strictEqual(item.status.toUpperCase(), 'PENDING');
+        assert.notStrictEqual(item.status.toUpperCase(), 'APPROVED');
+        assert.notStrictEqual(item.status.toUpperCase(), 'REJECTED');
+        assert.notStrictEqual(item.status.toUpperCase(), 'CANCELLED_DUPLICATE');
+      }
+
+      // 4B. Test filterValidPendingApprovals strictly rejects non-PENDING items
+      const mixedList = [
+        { id: 'appr_1', status: 'PENDING', guardian_id: guardianId, student_id: studentId },
+        { id: 'appr_2', status: 'APPROVED', guardian_id: guardianId, student_id: studentId },
+        { id: 'appr_3', status: 'REJECTED', guardian_id: guardianId, student_id: studentId },
+        { id: 'appr_4', status: 'CANCELLED_DUPLICATE', guardian_id: guardianId, student_id: studentId },
+        { id: 'appr_5', status: 'pending', guardian_id: guardianId, student_id: studentId } // Case-insensitive
+      ];
+
+      const filtered = filterValidPendingApprovals(mixedList, guardianId, studentId);
+      assert.strictEqual(filtered.length, 2);
+      assert.deepStrictEqual(filtered.map(x => x.id), ['appr_1', 'appr_5']);
+    });
+
+    test('5. Refresh updates the pending list when a request is approved or rejected', async () => {
+      const guardianId = 'guard_priya_sharma_01';
+      const studentId = 'stu_aarav_sharma_01';
+      const tempApprId = `appr_temp_refresh_test_${Date.now()}`;
+
+      // Insert a dedicated temporary pending approval
+      await db.table('guardian_approvals').insert({
+        id: tempApprId,
+        transaction_id: `tx_temp_refresh_${Date.now()}`,
+        student_id: studentId,
+        guardian_id: guardianId,
+        amount: 45.00,
+        currency: 'USD',
+        merchant_name: 'Udemy React Mastery',
+        merchant_category: 'online_courses',
+        purpose_description: 'React course for student curriculum',
+        status: 'PENDING',
+        requested_at: new Date().toISOString()
+      });
+
+      // 5A. Pending list before approval must include temp request
+      const resBefore = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=${guardianId}`);
+      const dataBefore = await resBefore.json();
+      const foundBefore = dataBefore.pending.find(a => a.id === tempApprId);
+      assert.ok(foundBefore, 'Temporary pending request must appear in pending list before decision');
+
+      // 5B. Approve the temporary request
+      const approveRes = await fetch(`${BASE_URL}/api/guardian/approve/${tempApprId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Approved in test refresh flow' })
+      });
+      assert.strictEqual(approveRes.status, 200);
+
+      // 5C. Refresh pending list - temporary request must no longer be in pending
+      const resAfter = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=${guardianId}`);
+      const dataAfter = await resAfter.json();
+      const foundAfter = dataAfter.pending.find(a => a.id === tempApprId);
+      assert.strictEqual(foundAfter, undefined, 'Approved request must not appear in pending list after refresh');
+
+      const foundInHistory = dataAfter.history.find(a => a.id === tempApprId);
+      assert.ok(foundInHistory, 'Approved request must move to history');
+      assert.strictEqual(foundInHistory.status, 'APPROVED');
+
+      // Clean up temporary approval record from test store
+      await db.table('guardian_approvals').delete(tempApprId);
+    });
+
+    test('6. The student and guardian exact IDs (stu_aarav_sharma_01 and guard_priya_sharma_01) are used', async () => {
+      const guardianId = 'guard_priya_sharma_01';
+      const studentId = 'stu_aarav_sharma_01';
+
+      // 6A. Student profile endpoint returns exact student ID and guardian link
+      const profRes = await fetch(`${BASE_URL}/api/student/profile?student_id=${studentId}`);
+      assert.strictEqual(profRes.status, 200);
+      const profData = await profRes.json();
+      assert.strictEqual(profData.profile.id, 'stu_aarav_sharma_01');
+      assert.strictEqual(profData.profile.guardian_id, 'guard_priya_sharma_01');
+      assert.strictEqual(profData.profile.guardian_email, 'priya.sharma@parent.in');
+
+      // 6B. Guardian pending approvals matches exact guardian ID
+      const pendRes = await fetch(`${BASE_URL}/api/guardian/pending-approvals?guardian_id=${guardianId}`);
+      assert.strictEqual(pendRes.status, 200);
+      const pendData = await pendRes.json();
+      const coursera = pendData.pending.find(a => a.id === 'appr_pending_coursera_01');
+      assert.ok(coursera);
+      assert.strictEqual(coursera.guardian_id, guardianId);
+      assert.strictEqual(coursera.student_id, studentId);
+
+      // 6C. Updating limits with exact studentId succeeds
+      const limitsRes = await fetch(`${BASE_URL}/api/guardian/limits`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: studentId,
+          daily_limit: 150,
+          weekly_limit: 350,
+          monthly_limit: 700
+        })
+      });
+      assert.strictEqual(limitsRes.status, 200);
+      const limitsData = await limitsRes.json();
+      assert.strictEqual(limitsData.profile.id, studentId);
+      assert.strictEqual(Number(limitsData.profile.daily_limit), 150);
+    });
+  });
 });
 
