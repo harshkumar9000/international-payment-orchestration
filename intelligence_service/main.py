@@ -30,14 +30,55 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS setup for local development and backend bridge
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Environment-based CORS Configuration
+# Restrict production CORS strictly to configured FRONTEND_URL or ALLOWED_ORIGINS
+raw_origins = [
+    os.getenv("FRONTEND_URL", ""),
+    os.getenv("ALLOWED_ORIGINS", "")
+]
+configured_origins = []
+for raw in raw_origins:
+    if raw:
+        configured_origins.extend([u.strip().rstrip("/") for u in raw.split(",") if u.strip()])
+
+is_production = os.getenv("NODE_ENV") == "production"
+
+if is_production and configured_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=configured_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+elif is_production:
+    # If in production without configured FRONTEND_URL, disallow cross-origin browser calls
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Local development
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+@app.get("/")
+def root():
+    return {
+        "service": "ATLAS.PAY Intelligence Microservice",
+        "status": "online",
+        "version": "1.0.0",
+        "health": "/health",
+        "docs": "/docs"
+    }
 
 # -----------------
 # Request Models

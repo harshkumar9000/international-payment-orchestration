@@ -2,16 +2,48 @@
  * Database Seed Script
  * Pre-populates realistic FinTech records for merchants, payment providers,
  * intelligent routing rules, and past transactions with audit logs.
+ * 
+ * Supports both Local JSON and Supabase PostgreSQL environments safely:
+ * - Local JSON mode: Resets local_store.json and populates fresh demo state.
+ * - Cloud PostgreSQL mode: Requires explicit --cloud flag (npm run db:seed:cloud).
+ *   Uses non-destructive inserts with stable IDs. Never truncates user data or creates duplicates.
  */
 const bcrypt = require('bcryptjs');
 const db = require('./db');
+const path = require('path');
+const dotenv = require('dotenv');
 
-async function seed() {
-  await db.init();
-  console.log('🌱 Starting database seed...');
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
 
-  // Reset local store to ensure clean demo state
-  db.resetStore();
+async function seed(options = {}) {
+  const isCloudFlag = options.cloud || process.argv.includes('--cloud') || process.env.ALLOW_CLOUD_SEED === 'true';
+
+  await db.init({ throwOnError: false });
+
+  const isPostgresMode = db.getProvider() === 'postgres';
+
+  if (isPostgresMode && !isCloudFlag) {
+    console.log('⚠️ [DB Seed] PostgreSQL mode is active (DB_PROVIDER=postgres).');
+    console.log('   To prevent accidental demo resets in your Supabase cloud database, demo seeding requires:');
+    console.log('   👉 npm run db:seed:cloud');
+    console.log('   Alternatively, switch to local development mode in .env (DB_PROVIDER=json) and run: npm run seed');
+    return false;
+  }
+
+  if (isPostgresMode) {
+    if (!db.isPostgres()) {
+      console.error(`❌ [DB Seed] Cannot seed cloud database because PostgreSQL is unavailable: ${db.getLastError() ? db.getLastError().message : 'Connection failed'}.`);
+      console.error('   Please verify your DATABASE_URL in the root .env file.');
+      process.exit(1);
+    }
+    console.log('🌱 [DB Seed] Starting safe demo seeding for Supabase PostgreSQL (non-destructive)...');
+  } else {
+    console.log('🌱 [DB Seed] Starting clean demo seeding for Local JSON store...');
+    // Reset local store only in local JSON mode
+    db.resetStore();
+  }
 
   // 1. Create Default Demo Merchant
   const passwordHash = await bcrypt.hash('Password123!', 10);
@@ -41,9 +73,9 @@ async function seed() {
       avg_latency_ms: 320,
       success_rate: 0.9620,
       uptime: 0.9998,
-      supported_currencies: '["USD","EUR","GBP","CAD","AUD","JPY","SGD","NZD","CHF"]',
-      supported_methods: '["credit_card","debit_card","apple_pay","google_pay"]',
-      supported_countries: '["US","CA","GB","AU","DE","FR","JP","SG","NL","IE","ES","IT"]',
+      supported_currencies: JSON.stringify(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'SGD', 'NZD', 'CHF']),
+      supported_methods: JSON.stringify(['credit_card', 'debit_card', 'apple_pay', 'google_pay']),
+      supported_countries: JSON.stringify(['US', 'CA', 'GB', 'AU', 'DE', 'FR', 'JP', 'SG', 'NL', 'IE', 'ES', 'IT']),
       created_at: new Date().toISOString()
     },
     {
@@ -55,9 +87,9 @@ async function seed() {
       avg_latency_ms: 285,
       success_rate: 0.9780,
       uptime: 0.9999,
-      supported_currencies: '["EUR","GBP","USD","CHF","SEK","NOK","DKK","PLN"]',
-      supported_methods: '["credit_card","debit_card","sepa_debit","ideal","sofort","giropay"]',
-      supported_countries: '["DE","FR","NL","GB","ES","IT","SE","CH","BE","AT","PL"]',
+      supported_currencies: JSON.stringify(['EUR', 'GBP', 'USD', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN']),
+      supported_methods: JSON.stringify(['credit_card', 'debit_card', 'sepa_debit', 'ideal', 'sofort', 'giropay']),
+      supported_countries: JSON.stringify(['DE', 'FR', 'NL', 'GB', 'ES', 'IT', 'SE', 'CH', 'BE', 'AT', 'PL']),
       created_at: new Date().toISOString()
     },
     {
@@ -69,9 +101,9 @@ async function seed() {
       avg_latency_ms: 520,
       success_rate: 0.9450,
       uptime: 0.9995,
-      supported_currencies: '["USD","EUR","GBP","CAD","AUD","JPY"]',
-      supported_methods: '["paypal_wallet","paypal_credit","credit_card","debit_card"]',
-      supported_countries: '["US","GB","DE","FR","CA","AU","JP"]',
+      supported_currencies: JSON.stringify(['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY']),
+      supported_methods: JSON.stringify(['paypal_wallet', 'paypal_credit', 'credit_card', 'debit_card']),
+      supported_countries: JSON.stringify(['US', 'GB', 'DE', 'FR', 'CA', 'AU', 'JP']),
       created_at: new Date().toISOString()
     },
     {
@@ -83,9 +115,9 @@ async function seed() {
       avg_latency_ms: 190,
       success_rate: 0.9850,
       uptime: 0.9997,
-      supported_currencies: '["INR"]',
-      supported_methods: '["upi","upi_qr","upi_intent","netbanking","rupay_card"]',
-      supported_countries: '["IN"]',
+      supported_currencies: JSON.stringify(['INR']),
+      supported_methods: JSON.stringify(['upi', 'upi_qr', 'upi_intent', 'netbanking', 'rupay_card']),
+      supported_countries: JSON.stringify(['IN']),
       created_at: new Date().toISOString()
     },
     {
@@ -97,9 +129,9 @@ async function seed() {
       avg_latency_ms: 410,
       success_rate: 0.9510,
       uptime: 0.9992,
-      supported_currencies: '["BRL","MXN","COP","CLP","PEN","ZAR","NGN","KES","INR","USD"]',
-      supported_methods: '["pix","oxxo","pse","boleto","credit_card","debit_card"]',
-      supported_countries: '["BR","MX","CO","CL","PE","ZA","NG","KE","IN"]',
+      supported_currencies: JSON.stringify(['BRL', 'MXN', 'COP', 'CLP', 'PEN', 'ZAR', 'NGN', 'KES', 'INR', 'USD']),
+      supported_methods: JSON.stringify(['pix', 'oxxo', 'pse', 'boleto', 'credit_card', 'debit_card']),
+      supported_countries: JSON.stringify(['BR', 'MX', 'CO', 'CL', 'PE', 'ZA', 'NG', 'KE', 'IN']),
       created_at: new Date().toISOString()
     }
   ];
@@ -107,7 +139,7 @@ async function seed() {
   for (const prov of providers) {
     await db.table('providers').insert(prov);
   }
-  console.log(`  -> Inserted ${providers.length} payment provider profiles.`);
+  console.log(`  -> Seeded ${providers.length} payment provider profiles.`);
 
   // 3. Routing Rules
   const routingRules = [
@@ -156,7 +188,7 @@ async function seed() {
   for (const rule of routingRules) {
     await db.table('routing_rules').insert(rule);
   }
-  console.log(`  -> Inserted ${routingRules.length} intelligent routing rules.`);
+  console.log(`  -> Seeded ${routingRules.length} intelligent routing rules.`);
 
   // 4. Past Transactions & Audit Trails
   const now = Date.now();
@@ -583,7 +615,6 @@ async function seed() {
   for (const tx of sampleTransactions) {
     await db.table('transactions').insert(tx);
 
-    // Audit logs for recovered transactions
     if (tx.status === 'recovered') {
       await db.table('recovery_logs').insert({
         id: `rec_${tx.id}`,
@@ -597,7 +628,6 @@ async function seed() {
       });
     }
 
-    // Fraud log for blocked
     if (tx.status === 'blocked') {
       await db.table('fraud_assessments').insert({
         id: `fraud_${tx.id}`,
@@ -661,7 +691,7 @@ async function seed() {
   for (const stu of studentProfiles) {
     await db.table('student_profiles').insert(stu);
   }
-  console.log(`  -> Inserted ${studentProfiles.length} student profiles.`);
+  console.log(`  -> Seeded ${studentProfiles.length} student profiles.`);
 
   // 6. Guardian Approval Requests
   const guardianApprovals = [
@@ -676,9 +706,11 @@ async function seed() {
       merchant_category: 'online_courses',
       purpose_description: 'Stanford Machine Learning Certificate Course',
       status: 'APPROVED',
+      idempotency_key: 'idem_appr_coursera_andrew_ng',
       decision_reason: 'Approved by Priya Sharma via Parent Mobile Portal.',
       requested_at: new Date(now - 14 * 24 * 3600 * 1000).toISOString(),
-      decided_at: new Date(now - 14 * 24 * 3600 * 1000 + 300000).toISOString()
+      decided_at: new Date(now - 14 * 24 * 3600 * 1000 + 300000).toISOString(),
+      updated_at: new Date(now - 14 * 24 * 3600 * 1000 + 300000).toISOString()
     },
     {
       id: 'appr_aws_cloud_practitioner',
@@ -691,9 +723,11 @@ async function seed() {
       merchant_category: 'certification_fees',
       purpose_description: 'AWS Cloud Certification Exam Fee',
       status: 'APPROVED',
+      idempotency_key: 'idem_appr_aws_cloud_practitioner',
       decision_reason: 'Approved by Priya Sharma via Parent Mobile Portal.',
       requested_at: new Date(now - 7 * 24 * 3600 * 1000).toISOString(),
-      decided_at: new Date(now - 7 * 24 * 3600 * 1000 + 400000).toISOString()
+      decided_at: new Date(now - 7 * 24 * 3600 * 1000 + 400000).toISOString(),
+      updated_at: new Date(now - 7 * 24 * 3600 * 1000 + 400000).toISOString()
     },
     {
       id: 'appr_pending_coursera_01',
@@ -706,8 +740,10 @@ async function seed() {
       merchant_category: 'online_courses',
       purpose_description: 'Stanford AI & Machine Learning Specialization Certificate (Exceeds $50 auto-allowance)',
       status: 'PENDING',
+      idempotency_key: 'idem_appr_pending_coursera_01',
       decision_reason: null,
-      requested_at: new Date(now - 25 * 60 * 1000).toISOString()
+      requested_at: new Date(now - 25 * 60 * 1000).toISOString(),
+      updated_at: new Date(now - 25 * 60 * 1000).toISOString()
     },
     {
       id: 'appr_dup_coursera_02',
@@ -720,6 +756,7 @@ async function seed() {
       merchant_category: 'online_courses',
       purpose_description: 'Stanford AI & Machine Learning Specialization Certificate (Exceeds $50 auto-allowance)',
       status: 'CANCELLED_DUPLICATE',
+      idempotency_key: 'idem_appr_dup_coursera_02',
       decision_reason: 'Duplicate submission cancelled: superseded by original pending request appr_pending_coursera_01',
       requested_at: new Date(now - 24 * 60 * 1000).toISOString(),
       decided_at: new Date(now - 24 * 60 * 1000).toISOString(),
@@ -736,9 +773,11 @@ async function seed() {
       merchant_category: 'standardized_testing',
       purpose_description: 'GRE General Test Registration Fee',
       status: 'APPROVED',
+      idempotency_key: 'idem_appr_approved_gre_02',
       decision_reason: 'Approved by Priya Sharma via Parent Mobile Portal.',
       requested_at: new Date(now - 3 * 24 * 3600 * 1000).toISOString(),
-      decided_at: new Date(now - 3 * 24 * 3600 * 1000 + 400000).toISOString()
+      decided_at: new Date(now - 3 * 24 * 3600 * 1000 + 400000).toISOString(),
+      updated_at: new Date(now - 3 * 24 * 3600 * 1000 + 400000).toISOString()
     },
     {
       id: 'appr_approved_duolingo_01',
@@ -751,6 +790,7 @@ async function seed() {
       merchant_category: 'education',
       purpose_description: 'Duolingo Super Annual Plan',
       status: 'APPROVED',
+      idempotency_key: 'idem_appr_approved_duolingo_01',
       decision_reason: 'Approved by Priya Sharma for educational advancement.',
       requested_at: new Date(now - 12 * 60 * 1000).toISOString(),
       decided_at: new Date(now - 10 * 60 * 1000).toISOString(),
@@ -761,7 +801,7 @@ async function seed() {
   for (const appr of guardianApprovals) {
     await db.table('guardian_approvals').insert(appr);
   }
-  console.log(`  -> Inserted ${guardianApprovals.length} guardian approvals.`);
+  console.log(`  -> Seeded ${guardianApprovals.length} guardian approvals.`);
 
   // 7. Stuck Transactions & Seeded Refunds for Agentic Engine
   const stuckTxs = [
@@ -832,13 +872,13 @@ async function seed() {
     agent_evaluated: true,
     agent_confidence_score: 0.99,
     customer_notified: true,
+    is_simulated: true,
+    simulation_notice: 'Simulated sandbox transaction. No actual currency was debited or returned.',
     initiated_by: 'AI_AGENT_AUTONOMOUS',
     created_at: new Date(now - 120 * 60 * 1000).toISOString()
   });
 
-  console.log(`  -> Inserted stuck transactions and agentic refund seed records.`);
-
-  // 7. Seed Saved Domestic & Global Cards
+  // 8. Seed Saved Domestic & Global Cards
   const savedCards = [
     {
       id: 'card_rupay_global_01',
@@ -902,15 +942,14 @@ async function seed() {
   for (const card of savedCards) {
     await db.table('saved_cards').insert(card);
   }
-  console.log(`  -> Inserted ${savedCards.length} saved domestic and international payment cards.`);
-
-  console.log(`  -> Inserted ${sampleTransactions.length} sample transactions and audit records.`);
-  console.log('✅ Database seed completed successfully!');
+  console.log(`  -> Seeded ${savedCards.length} saved domestic and international payment cards.`);
+  console.log('✅ [DB Seed] Database seed completed successfully!');
+  return true;
 }
 
 if (require.main === module) {
   seed().then(() => process.exit(0)).catch(err => {
-    console.error('❌ Seed error:', err);
+    console.error('❌ Seed error:', err.message);
     process.exit(1);
   });
 }

@@ -40,13 +40,59 @@ const PORT = process.env.PORT || 5001;
 app.use(helmet({
   crossOriginResourcePolicy: false
 }));
+
+// Environment-Based CORS Configuration
+// Restrict production CORS strictly to configured FRONTEND_URL (supports comma-separated list for preview origins)
+const rawFrontendUrls = [
+  process.env.FRONTEND_URL,
+  process.env.ALLOWED_ORIGINS
+].filter(Boolean).join(',');
+
+const allowedOrigins = rawFrontendUrls
+  ? rawFrontendUrls.split(',').map(u => u.trim().replace(/\/+$/, '')).filter(Boolean)
+  : ['http://localhost:5173'];
+
 app.use(cors({
-  origin: '*',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. cURL, health monitors, internal calls)
+    if (!origin) return callback(null, true);
+
+    // In non-production environments, allow localhost and testing origins
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+
+    // In production, strictly validate against the configured allowed origins list
+    const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+    const isAllowed = allowedOrigins.includes(normalizedOrigin);
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`[CORS] Origin '${origin}' is not authorized by ATLAS.PAY security policy.`));
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-demo-merchant']
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Lazy Serverless Database Initialization (Cold-Start Safe)
+let serverlessInitPromise = null;
+app.use(async (req, res, next) => {
+  if (!db.isReady()) {
+    if (!serverlessInitPromise) {
+      serverlessInitPromise = db.init({ throwOnError: false }).catch(err => {
+        console.error('❌ [Serverless DB Init Error]:', err.message);
+      });
+    }
+    await serverlessInitPromise;
+  }
+  next();
+});
 
 // Request Logger (Development)
 app.use((req, res, next) => {
@@ -54,6 +100,17 @@ app.use((req, res, next) => {
     console.log(`[HTTP] ${req.method} ${req.originalUrl}`);
   }
   next();
+});
+
+// Root Service Information
+app.get('/', (req, res) => {
+  res.json({
+    service: 'ATLAS.PAY International Payment Orchestration API',
+    status: 'online',
+    version: '1.0.0',
+    health: '/api/health',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Mount API Routes
@@ -77,12 +134,13 @@ app.use('/api/cards', cardsRoutes);
 // Health Check Endpoint
 app.get('/api/health', async (req, res) => {
   const pyHealth = await pythonBridge.getHealth();
+  const dbStatus = db.getStatus();
   res.json({
-    status: 'online',
+    status: dbStatus === 'database_unavailable' ? 'degraded' : 'online',
     timestamp: new Date().toISOString(),
     services: {
       backend: 'healthy',
-      database: db.isPostgres() ? 'postgresql_connected' : 'embedded_storage_active',
+      database: dbStatus,
       python_intelligence: pyHealth.online ? 'connected' : 'offline_fallback_active'
     }
   });
@@ -103,12 +161,29 @@ app.use((err, req, res, next) => {
 
 // Start Server function
 async function startServer() {
-  await db.init();
+  const dbOk = await db.init();
+  if (db.getProvider() === 'postgres' && !dbOk) {
+    console.warn('⚠️ [Backend] Started in PostgreSQL mode, but database is unavailable. Database endpoints will report failure until a valid DATABASE_URL is provided.');
+  }
 
   const server = app.listen(PORT, () => {
     console.log(`🚀 [Backend] International Payment Orchestration Server running on port ${PORT}`);
     console.log(`🔗 [Backend] API URL: http://localhost:${PORT}/api/health`);
+    console.log(`💾 [Backend] Database Mode: ${db.getProvider().toUpperCase()} (${db.getStatus()})`);
   });
+
+  // Clean shutdown hook
+  const shutdown = async () => {
+    console.log('\n🛑 [Backend] Gracefully shutting down...');
+    server.close(async () => {
+      await db.close();
+      console.log('✅ [Backend] Closed database pool and HTTP server.');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 
   return { app, server };
 }

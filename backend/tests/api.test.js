@@ -2,6 +2,13 @@
  * Backend API Integration and Unit Tests
  * Tests routing, currency conversion, fraud, checkout, recovery, and providers.
  */
+const path = require('path');
+const fs = require('fs');
+
+// Strictly enforce isolated test store for automated testing (never touch real Supabase or local_store.json)
+process.env.DB_PROVIDER = 'json';
+process.env.TEST_STORE_FILE = path.join(__dirname, 'local_store.test.json');
+
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert');
 const { app, startServer } = require('../src/server');
@@ -15,7 +22,7 @@ const BASE_URL = `http://localhost:${TEST_PORT}`;
 
 describe('International Payment Orchestration API Suite', () => {
   before(async () => {
-    // Seed test data and run on dedicated port
+    // Seed test data and run on dedicated port in isolated test store
     await seed();
     serverInstance = app.listen(TEST_PORT);
   });
@@ -24,8 +31,12 @@ describe('International Payment Orchestration API Suite', () => {
     if (serverInstance) {
       serverInstance.close();
     }
-    // Restore clean demo state with original pending Coursera approval and cancelled duplicate audit
-    await seed();
+    // Clean up isolated test store file
+    if (fs.existsSync(process.env.TEST_STORE_FILE)) {
+      try {
+        fs.unlinkSync(process.env.TEST_STORE_FILE);
+      } catch (_) {}
+    }
   });
 
   test('GET /api/health should return online status', async () => {
@@ -1023,6 +1034,201 @@ describe('International Payment Orchestration API Suite', () => {
       method: 'DELETE'
     });
     assert.strictEqual(delRes.status, 200);
+  });
+
+  describe('Database Layer & PostgreSQL Isolation Tests', () => {
+    test('db.getStatus() and GET /api/health report embedded_storage_active in local JSON mode', async () => {
+      assert.strictEqual(db.getStatus(), 'embedded_storage_active');
+      assert.strictEqual(db.getProvider(), 'json');
+
+      const res = await fetch(`${BASE_URL}/api/health`);
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.services.database, 'embedded_storage_active');
+    });
+
+    test('Table name allowlist protects against unauthorized dynamic tables', async () => {
+      assert.throws(() => {
+        db.table('malicious_table_injection');
+      }, /not in the allowlist/);
+    });
+
+    test('Identifier validator rejects unsafe column names', async () => {
+      const origProvider = db.getProvider();
+      const origStatus = db.getStatus();
+
+      // Mock pool to test validation in postgres mode
+      const mockPool = {
+        query: async () => ({ rows: [] })
+      };
+      db._setMockPoolForTesting(mockPool, 'postgres', 'postgresql_connected');
+
+      await assert.rejects(async () => {
+        await db.table('merchants').insert({ 'invalid-col; DROP TABLE--': 'val' });
+      }, /Invalid SQL identifier/);
+
+      // Restore
+      db._setMockPoolForTesting(null, origProvider, origStatus);
+    });
+
+    test('PostgreSQL mode with missing or placeholder DATABASE_URL marks database_unavailable and does not fall back to JSON', async () => {
+      const origProvider = process.env.DB_PROVIDER;
+      const origUrl = process.env.DATABASE_URL;
+
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.xxx:[YOUR-PASSWORD]@aws-1.pooler.supabase.com:5432/postgres';
+
+      const ok = await db.init({ throwOnError: false });
+      assert.strictEqual(ok, false);
+      assert.strictEqual(db.getStatus(), 'database_unavailable');
+      assert.strictEqual(db.isPostgres(), false);
+
+      // Attempting database table operation in postgres mode with unavailable database must throw, never silently read JSON
+      await assert.rejects(async () => {
+        await db.table('transactions').find();
+      }, /Database unavailable: PostgreSQL is configured but/);
+
+      // Restore
+      process.env.DB_PROVIDER = origProvider;
+      process.env.DATABASE_URL = origUrl;
+      await db.init();
+    });
+
+    test('PostgreSQL mode with mock pool executes parameterized queries and returns actual DB records', async () => {
+      const origProvider = db.getProvider();
+      const origStatus = db.getStatus();
+
+      const executedQueries = [];
+      const mockPool = {
+        query: async (sql, params = []) => {
+          executedQueries.push({ sql, params });
+          if (sql.includes('SELECT COUNT(*)')) {
+            return { rows: [{ count: '42' }] };
+          }
+          if (sql.includes('INSERT INTO saved_cards')) {
+            return { rows: [{ id: params[0], cardholder_name: params[1], is_persisted: true }] };
+          }
+          if (sql.includes('UPDATE saved_cards')) {
+            return { rows: [{ id: params[params.length - 1], cardholder_name: 'Updated Name' }] };
+          }
+          if (sql.includes('SELECT * FROM saved_cards WHERE id = $1')) {
+            return { rows: [{ id: params[0], cardholder_name: 'Fetched Name' }] };
+          }
+          if (sql.includes('SELECT * FROM saved_cards')) {
+            return { rows: [{ id: 'card_1', cardholder_name: 'Mock Card 1' }, { id: 'card_2', cardholder_name: 'Mock Card 2' }] };
+          }
+          if (sql.includes('DELETE FROM saved_cards')) {
+            return { rows: [] };
+          }
+          return { rows: [] };
+        }
+      };
+
+      db._setMockPoolForTesting(mockPool, 'postgres', 'postgresql_connected');
+
+      // Test COUNT
+      const count = await db.table('saved_cards').count();
+      assert.strictEqual(count, 42);
+      assert.ok(executedQueries[executedQueries.length - 1].sql.includes('SELECT COUNT(*)::int AS count FROM saved_cards'));
+
+      // Test INSERT
+      const inserted = await db.table('saved_cards').insert({
+        id: 'card_test_mock_01',
+        cardholder_name: 'Mock User'
+      });
+      assert.strictEqual(inserted.id, 'card_test_mock_01');
+      assert.strictEqual(inserted.is_persisted, true);
+      assert.ok(executedQueries[executedQueries.length - 1].sql.includes('RETURNING *'));
+
+      // Test UPDATE
+      const updated = await db.table('saved_cards').update('card_test_mock_01', {
+        cardholder_name: 'Updated Name'
+      });
+      assert.strictEqual(updated.cardholder_name, 'Updated Name');
+      assert.ok(executedQueries[executedQueries.length - 1].sql.includes('RETURNING *'));
+
+      // Test FIND
+      const cards = await db.table('saved_cards').find();
+      assert.strictEqual(cards.length, 2);
+
+      // Test FINDBYID
+      const found = await db.table('saved_cards').findById('card_test_mock_01');
+      assert.strictEqual(found.cardholder_name, 'Fetched Name');
+
+      // Test DELETE
+      const deleted = await db.table('saved_cards').delete('card_test_mock_01');
+      assert.strictEqual(deleted, true);
+
+      // Restore
+      db._setMockPoolForTesting(null, origProvider, origStatus);
+    });
+
+    test('Guardian spending limits and student approval records persist accurately', async () => {
+      // 1. Update limits
+      const updateRes = await fetch(`${BASE_URL}/api/guardian/limits`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: 'stu_aarav_sharma_01',
+          daily_limit: 5000.00,
+          monthly_limit: 15000.00,
+          single_tx_limit: 500.00
+        })
+      });
+      assert.strictEqual(updateRes.status, 200);
+      const updateData = await updateRes.json();
+      assert.strictEqual(updateData.profile.daily_limit, 5000.00);
+      assert.strictEqual(updateData.profile.monthly_limit, 15000.00);
+
+      // 2. Verify student profile endpoint reflects updated limits
+      const profileRes = await fetch(`${BASE_URL}/api/student/profile?student_id=stu_aarav_sharma_01`);
+      assert.strictEqual(profileRes.status, 200);
+      const profileData = await profileRes.json();
+      assert.strictEqual(profileData.profile.spending_limits.daily_limit, 5000.00);
+      assert.strictEqual(profileData.profile.spending_limits.monthly_limit, 15000.00);
+
+      // 3. Verify duplicate prevention mechanism on pending approval
+      const firstReq = await fetch(`${BASE_URL}/api/student/create-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: 'stu_aarav_sharma_01',
+          merchant_name: 'MIT Quantum Computing',
+          course_name: 'MIT Quantum Computing',
+          merchant_category: 'online_courses',
+          amount: 120.00,
+          currency: 'USD'
+        })
+      });
+      assert.strictEqual(firstReq.status, 200);
+      const firstData = await firstReq.json();
+      assert.strictEqual(firstData.status, 'requires_guardian_approval');
+
+      const dupRes = await fetch(`${BASE_URL}/api/student/create-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: 'stu_aarav_sharma_01',
+          merchant_name: 'MIT Quantum Computing',
+          course_name: 'MIT Quantum Computing',
+          merchant_category: 'online_courses',
+          amount: 120.00,
+          currency: 'USD'
+        })
+      });
+      assert.strictEqual(dupRes.status, 200);
+      const dupData = await dupRes.json();
+      assert.strictEqual(dupData.is_duplicate_prevented, true);
+    });
+
+    test('Refund records persist simulation safeguards (is_simulated and simulation_notice)', async () => {
+      const refunds = await db.table('refund_records').find();
+      assert.ok(refunds.length > 0);
+      const demoRefund = refunds.find(r => r.id === 'ref_demo_settled_01');
+      assert.ok(demoRefund);
+      assert.strictEqual(demoRefund.is_simulated, true);
+      assert.ok(demoRefund.simulation_notice.includes('Simulated sandbox transaction'));
+    });
   });
 });
 

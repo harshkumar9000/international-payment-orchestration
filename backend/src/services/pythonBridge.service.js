@@ -4,7 +4,8 @@
  * Provides instant transparent JavaScript fallback if Python service is offline.
  */
 
-const PYTHON_SERVICE_URL = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
+const rawPythonUrl = process.env.PYTHON_SERVICE_URL || 'http://localhost:8000';
+const PYTHON_SERVICE_URL = rawPythonUrl.replace(/\/+$/, '');
 const TIMEOUT_MS = parseInt(process.env.INTELLIGENCE_SERVICE_TIMEOUT_MS || '3000', 10);
 
 async function callPythonService(path, method = 'POST', body = null) {

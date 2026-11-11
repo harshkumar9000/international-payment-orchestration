@@ -2,9 +2,9 @@
 
 > **"Smarter Payments. Borderless Possibilities."**
 
-[![Test Suite](https://img.shields.io/badge/Tests-46%2F46%20Passing-brightgreen?style=flat-square)](#testing--verification)
+[![Test Suite](https://img.shields.io/badge/Tests-54%2F54%20Passing-brightgreen?style=flat-square)](#testing--verification)
 [![Python Tests](https://img.shields.io/badge/Python%20Intelligence-28%2F28%20Pass-teal?style=flat-square&logo=python)](#testing--verification)
-[![Node Tests](https://img.shields.io/badge/Node%20Backend-18%2F18%20Pass-blue?style=flat-square&logo=node.js)](#testing--verification)
+[![Node Tests](https://img.shields.io/badge/Node%20Backend-26%2F26%20Pass-blue?style=flat-square&logo=node.js)](#testing--verification)
 [![Frontend](https://img.shields.io/badge/React%2018%20%7C%20Vite%20%7C%20Tailwind-Passing-61DAFB?style=flat-square&logo=react)](#technology-stack)
 [![Design](https://img.shields.io/badge/Design-Atlas%20FinTech%20%2F%20Navy%20%26%20Teal-14B8A6?style=flat-square)](#uiux-redesign--design-system)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%2F%20Supabase%20%2B%20Zero--Config%20JSON-336791?style=flat-square&logo=postgresql)](#dual-engine-data-layer)
@@ -192,20 +192,232 @@ npm --prefix frontend install
 pip3 install -r intelligence_service/requirements.txt
 ```
 
-### 2. Environment Configuration
+### 2. Environment Configuration & Database Mode Selection
+ATLAS.PAY supports two database modes:
+- **Cloud PostgreSQL Mode (`DB_PROVIDER=postgres`)**: Primary production & cloud database connected to **Supabase PostgreSQL**.
+- **Local JSON Mode (`DB_PROVIDER=json`)**: Zero-dependency persistent embedded storage (`backend/src/db/local_store.json`) for offline development.
+
 Copy the template configuration:
 ```bash
 cp .env.example .env
-cp .env.example backend/.env
 ```
 
-### 3. Seed Database
-Seed initial merchants, providers, routing rules, student accounts, guardian approvals, and stuck orphaned transactions:
+---
+
+## 🐘 Supabase PostgreSQL Integration Guide
+
+Follow these steps to connect your Supabase database:
+
+> [!NOTE]
+> **Cloud Verification Status:** Prepared and verified locally. Real cloud connection verification is pending until your actual Supabase database password is provided in `.env`.
+
+### Step 1: Create a Supabase Project
+1. Go to [database.new](https://database.new) and sign in to Supabase.
+2. Create a new project (e.g. `atlas-pay-db`) and set a strong database password. Save this password securely.
+3. Choose your nearest AWS region (e.g. `ap-south-1` for Mumbai / India).
+
+### Step 2: Get the PostgreSQL Session Pooler URI
+1. In your Supabase Project Dashboard, go to **Project Settings** (gear icon) -> **Database**.
+2. Scroll to the **Connection string** section.
+3. Select the **Session** connection method (Port `5432`).
+4. Copy the connection string URI. It will look like:
+   ```
+   postgresql://postgres.[project-ref]:[YOUR-PASSWORD]@aws-1-[region].pooler.supabase.com:5432/postgres
+   ```
+
+### Step 3: Add the URI to `.env` and Select PostgreSQL Mode
+Open your root `.env` file and set:
+```env
+DB_PROVIDER=postgres
+DATABASE_URL=postgresql://postgres.[project-ref]:your_actual_password@aws-1-[region].pooler.supabase.com:5432/postgres
+```
+*(Make sure to replace `[YOUR-PASSWORD]` with your real Supabase database password, and never commit `.env` to Git).*
+
+### Step 4: Run Versioned Migrations
+Execute the migration command to create the canonical tables and indexes on Supabase:
+```bash
+npm run db:migrate
+```
+This runs versioned SQL migrations (`001_initial_schema.sql`, `002_add_saved_cards_and_safety_fields.sql`) and creates the `schema_migrations` tracking table. It is fully idempotent and safe to re-run.
+
+### Step 5: Seed Demo Records Safely (Cloud Mode)
+To populate baseline demo records (demo merchant, payment providers, default routing rules, student profiles, and sample transaction history) into Supabase without truncating or overwriting user data:
+```bash
+npm run db:seed:cloud
+```
+> [!IMPORTANT]
+> `npm run db:seed:cloud` uses safe `ON CONFLICT` non-destructive upserts. It never drops tables and never overwrites user-created transactions.
+
+### Step 6: Start the Application
+```bash
+npm run dev
+```
+
+### Step 7: Check Database Health
+Verify the database connection state via the health endpoint:
+```bash
+curl http://localhost:5001/api/health
+```
+Response:
+```json
+{
+  "status": "online",
+  "services": {
+    "backend": "healthy",
+    "database": "postgresql_connected",
+    "python_intelligence": "connected"
+  }
+}
+```
+Possible database statuses:
+- `postgresql_connected` — Successfully connected to Supabase PostgreSQL.
+- `embedded_storage_active` — Running in local JSON fallback mode.
+- `database_unavailable` — PostgreSQL mode is active but database credentials are invalid or unreachable.
+
+### Step 8: Inspect Records in Supabase Table Editor
+Log in to your Supabase dashboard and open the **Table Editor** to inspect live tables:
+- `merchants`
+- `providers`
+- `routing_rules`
+- `transactions`
+- `student_profiles`
+- `guardian_approvals`
+- `saved_cards`
+- `refund_records`
+- `agentic_audit_logs`
+
+### Step 9: Switching Between Cloud PostgreSQL and Local JSON Mode
+You can toggle between modes at any time in your root `.env`:
+- To use Supabase PostgreSQL: `DB_PROVIDER=postgres`
+- To use zero-config local storage: `DB_PROVIDER=json`
+When switching to `json`, seed the local store with:
 ```bash
 npm run seed
 ```
 
-### 4. Run the Full Stack
+---
+
+## 🚀 Vercel Production Deployment Guide
+
+Deploy ATLAS.PAY to Vercel as **three independent, communicating projects** from the same GitHub repository:
+
+```mermaid
+flowchart LR
+    Browser["User Browser"] -->|Loads UI & React Router| Frontend["1. atlas-pay-frontend\n(Vercel SPA - Root: frontend)"]
+    Frontend -->|HTTPS API Requests| Backend["2. atlas-pay-api\n(Vercel Function - Root: backend)"]
+    Backend -->|Internal HTTPS Calls| Python["3. atlas-pay-intelligence\n(Vercel Function - Root: intelligence_service)"]
+    Backend -->|Shared Transaction Pooler :6543| Supabase[("Supabase PostgreSQL\n(atlas-pay-db)")]
+```
+
+> [!IMPORTANT]
+> **Recommended Deployment Order**:
+> 1. Deploy `atlas-pay-intelligence` first to get its production URL.
+> 2. Deploy `atlas-pay-api` second with the Python service URL and Supabase credentials.
+> 3. Deploy `atlas-pay-frontend` last with the backend API URL.
+
+---
+
+### Step 1: Deploy Python Intelligence Service (`atlas-pay-intelligence`)
+
+1. Go to the [Vercel Dashboard](https://vercel.com/dashboard) and click **Add New...** -> **Project**.
+2. Select your imported GitHub repository `international-payment-orchestration`.
+3. In **Project Name**, enter: `atlas-pay-intelligence`
+4. In **Root Directory**, click **Edit** and select: `intelligence_service`
+5. **Framework Preset**: Other (default)
+6. **Build & Output Settings**: Leave defaults.
+7. **Environment Variables**:
+   | Variable | Value | Description |
+   | :--- | :--- | :--- |
+   | `NODE_ENV` | `production` | Production mode |
+   | `PORT` | `8000` | Service port |
+8. Click **Deploy**.
+9. Note your deployed domain (e.g. `https://atlas-pay-intelligence.vercel.app`).
+10. Test health: `https://atlas-pay-intelligence.vercel.app/health`
+
+---
+
+### Step 2: Deploy Express Backend API (`atlas-pay-api`)
+
+1. In the Vercel Dashboard, click **Add New...** -> **Project**.
+2. Select the same repository `international-payment-orchestration`.
+3. In **Project Name**, enter: `atlas-pay-api`
+4. In **Root Directory**, click **Edit** and select: `backend`
+5. **Framework Preset**: Other (default)
+6. **Build & Output Settings**: Leave defaults.
+7. **Environment Variables**:
+   | Variable | Example Value | Description |
+   | :--- | :--- | :--- |
+   | `NODE_ENV` | `production` | Enables production security & logging |
+   | `DB_PROVIDER` | `postgres` | Selects Supabase PostgreSQL |
+   | `DATABASE_URL` | `postgresql://postgres.[project-ref]:[PASSWORD]@aws-1-[region].pooler.supabase.com:6543/postgres` | **Supabase Shared Transaction Pooler** (Port `6543`) |
+   | `DB_POOL_MAX` | `1` | Max connections per serverless function instance |
+   | `JWT_SECRET` | *(Random 32+ character string)* | Secret for signing merchant JWTs |
+   | `FRONTEND_URL` | `https://atlas-pay-frontend.vercel.app` | Production frontend domain for CORS |
+   | `PYTHON_SERVICE_URL` | `https://atlas-pay-intelligence.vercel.app` | Python Intelligence service URL from Step 1 |
+   | `INTELLIGENCE_SERVICE_TIMEOUT_MS` | `3000` | Bridge timeout before JS fallback |
+
+> [!TIP]
+> **Supabase Connection for Serverless**: Use the **Shared Transaction Pooler** on port **6543** (found in Supabase Dashboard -> Project Settings -> Database -> Connection string -> Mode: Transaction). This is optimized for serverless functions with PgBouncer connection reuse.
+
+8. Click **Deploy**.
+9. Note your deployed domain (e.g. `https://atlas-pay-api.vercel.app`).
+10. Test health: `https://atlas-pay-api.vercel.app/api/health`
+
+---
+
+### Step 3: Deploy Frontend Application (`atlas-pay-frontend`)
+
+1. In the Vercel Dashboard, click **Add New...** -> **Project**.
+2. Select the same repository `international-payment-orchestration`.
+3. In **Project Name**, enter: `atlas-pay-frontend`
+4. In **Root Directory**, click **Edit** and select: `frontend`
+5. **Framework Preset**: Vite (automatically detected)
+6. **Build & Output Settings**:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+7. **Environment Variables**:
+   | Variable | Value | Description |
+   | :--- | :--- | :--- |
+   | `VITE_API_BASE_URL` | `https://atlas-pay-api.vercel.app/api` | Full URL to your deployed backend API `/api` |
+   | `VITE_PYTHON_SERVICE_URL` | `https://atlas-pay-intelligence.vercel.app` | Full URL to your deployed Python service |
+
+> [!WARNING]
+> **Vite Environment Variables are Applied at Build Time**: Vite bakes `VITE_` variables into static assets during `npm run build`. If you update `VITE_API_BASE_URL` in the Vercel dashboard, you **must trigger a new Redeployment** in Vercel for the changes to take effect in browser code.
+
+8. Click **Deploy**.
+9. Direct refresh on React Router routes (e.g. `/student`, `/guardian`, `/checkout`) works automatically via the included [`frontend/vercel.json`](file:///Users/harshkumar/Documents/GitHub/international-payment-orchestration/frontend/vercel.json) SPA rewrite rule.
+
+---
+
+### Step 4: Production Verification & Health Checks
+
+Verify your deployment using these public HTTPS endpoints:
+
+| Endpoint | Target URL | Expected Response |
+| :--- | :--- | :--- |
+| **Backend API Health** | `https://atlas-pay-api.vercel.app/api/health` | `{"status":"online","services":{"backend":"healthy","database":"postgresql_connected","python_intelligence":"connected"}}` |
+| **Python Service Health** | `https://atlas-pay-intelligence.vercel.app/health` | `{"status":"healthy","service":"payment_intelligence","version":"1.0.0"}` |
+| **Frontend Live UI** | `https://atlas-pay-frontend.vercel.app` | Full interactive ATLAS.PAY platform UI |
+
+---
+
+### 🛠️ Common Deployment Troubleshooting
+
+1. **CORS Error in Browser Console**:
+   - Ensure `FRONTEND_URL` in the `atlas-pay-api` Vercel project matches your exact frontend domain (e.g. `https://atlas-pay-frontend.vercel.app` without a trailing slash).
+   - If using a Vercel preview domain (`*-git-*.vercel.app`), ATLAS.PAY automatically permits `*.vercel.app` origins.
+2. **Database Connection Errors (`database_unavailable`)**:
+   - Verify that `DATABASE_URL` in `atlas-pay-api` uses port **`6543`** (Transaction Pooler) and not `5432` (Session Pooler requires persistent connections).
+   - Confirm your database password is correctly encoded (if it contains special characters like `@` or `#`, URL-encode them).
+3. **Frontend Still Calling localhost**:
+   - Verify `VITE_API_BASE_URL` is set in Vercel project settings.
+   - Go to **Deployments** -> click the latest deployment -> click **Redeploy** (ensure "Redeploy with existing build cache" is unchecked).
+4. **Python Cold Start Timeout**:
+   - The backend `pythonBridge` includes an automated local JavaScript fallback engine. If the Python microservice is cold-starting, routing and fraud checks fail open safely without blocking user transactions.
+
+---
+
+### 3. Run the Full Stack
 Launch all three services simultaneously (Node.js backend, Python FastAPI intelligence service, and React frontend) with a single command:
 
 ```bash

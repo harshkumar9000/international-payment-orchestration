@@ -7,6 +7,8 @@
     "start": "node src/server.js",
     "dev": "node --watch-path=src/routes --watch-path=src/services --watch-path=src/middleware --watch-path=src/server.js src/server.js",
     "seed": "node src/db/seed.js",
+    "db:migrate": "node src/db/migrate.js",
+    "db:seed:cloud": "node src/db/seed.js --cloud",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {

@@ -2,7 +2,8 @@
  * API Client for International Payment Orchestration Backend
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const rawApiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, '');
 
 async function request(endpoint, options = {}) {
   const token = localStorage.getItem('atlas_auth_token');

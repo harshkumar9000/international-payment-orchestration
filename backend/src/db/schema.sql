@@ -1,11 +1,18 @@
 -- ==============================================================================
--- International Payment Orchestration Platform
--- PostgreSQL & Supabase Compatible Schema
+-- ATLAS.PAY — International Payment Orchestration Platform
+-- PostgreSQL & Supabase Canonical Database Schema
 -- ==============================================================================
 
 -- Enable UUID extension if PostgreSQL / Supabase
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Migration Tracking Table
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Merchants / Platform Users
 CREATE TABLE IF NOT EXISTS merchants (
@@ -31,9 +38,9 @@ CREATE TABLE IF NOT EXISTS providers (
     avg_latency_ms INTEGER NOT NULL,
     success_rate NUMERIC(5, 4) NOT NULL,
     uptime NUMERIC(6, 4) NOT NULL,
-    supported_currencies TEXT NOT NULL, -- JSON or comma-separated
-    supported_methods TEXT NOT NULL,
-    supported_countries TEXT NOT NULL,
+    supported_currencies TEXT NOT NULL, -- JSON array
+    supported_methods TEXT NOT NULL,    -- JSON array
+    supported_countries TEXT NOT NULL,  -- JSON array
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,15 +64,15 @@ CREATE TABLE IF NOT EXISTS transactions (
     merchant_id VARCHAR(64) NOT NULL,
     amount NUMERIC(12, 2) NOT NULL,
     currency VARCHAR(3) NOT NULL,
-    customer_amount NUMERIC(12, 2) NOT NULL,
-    customer_currency VARCHAR(3) NOT NULL,
+    customer_amount NUMERIC(12, 2) DEFAULT 0.00,
+    customer_currency VARCHAR(3) DEFAULT 'USD',
     exchange_rate NUMERIC(12, 6) DEFAULT 1.0,
     customer_email VARCHAR(255),
-    customer_country VARCHAR(2) NOT NULL,
+    customer_country VARCHAR(2) DEFAULT 'US',
     payment_method VARCHAR(64) NOT NULL,
-    primary_provider VARCHAR(64) NOT NULL,
+    primary_provider VARCHAR(64) DEFAULT 'stripe',
     executed_provider VARCHAR(64) NOT NULL,
-    status VARCHAR(32) NOT NULL, -- 'settled', 'recovered', 'failed', 'blocked', 'pending_3ds', 'pending_upi'
+    status VARCHAR(32) NOT NULL, -- 'settled', 'recovered', 'failed', 'blocked', 'pending', 'pending_3ds', 'pending_parent_approval', 'refunded'
     risk_score INTEGER DEFAULT 0,
     risk_level VARCHAR(32) DEFAULT 'LOW',
     decline_code VARCHAR(64),
@@ -118,7 +125,7 @@ CREATE TABLE IF NOT EXISTS student_profiles (
     user_id VARCHAR(64) NOT NULL,
     email VARCHAR(255) NOT NULL,
     student_name VARCHAR(255) NOT NULL,
-    date_of_birth DATE NOT NULL,
+    date_of_birth DATE, -- Nullable to allow unverified student record creation without classifying as adult
     is_minor BOOLEAN DEFAULT TRUE,
     institution_name VARCHAR(255) NOT NULL,
     student_id_number VARCHAR(64),
@@ -136,7 +143,7 @@ CREATE TABLE IF NOT EXISTS student_profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Parent / Guardian Approval Queue
+-- Parent / Guardian Approval Queue (With Idempotency & Audit)
 CREATE TABLE IF NOT EXISTS guardian_approvals (
     id VARCHAR(64) PRIMARY KEY,
     transaction_id VARCHAR(64) NOT NULL,
@@ -147,13 +154,15 @@ CREATE TABLE IF NOT EXISTS guardian_approvals (
     merchant_name VARCHAR(255) NOT NULL,
     merchant_category VARCHAR(64) NOT NULL,
     purpose_description TEXT,
-    status VARCHAR(32) DEFAULT 'PENDING', -- 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED'
+    status VARCHAR(32) DEFAULT 'PENDING', -- 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED', 'CANCELLED_DUPLICATE'
     decision_reason TEXT,
+    idempotency_key VARCHAR(128),
     requested_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    decided_at TIMESTAMP WITH TIME ZONE
+    decided_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Agentic Refund Ledger (Idempotent & Audited)
+-- Agentic Refund Ledger (Idempotent & Audited with Simulation Safeguards)
 CREATE TABLE IF NOT EXISTS refund_records (
     id VARCHAR(64) PRIMARY KEY,
     transaction_id VARCHAR(64) NOT NULL,
@@ -169,6 +178,8 @@ CREATE TABLE IF NOT EXISTS refund_records (
     agent_confidence_score NUMERIC(4, 2) DEFAULT 0.95,
     customer_notified BOOLEAN DEFAULT TRUE,
     initiated_by VARCHAR(64) DEFAULT 'AI_AGENT_AUTONOMOUS',
+    is_simulated BOOLEAN DEFAULT TRUE,
+    simulation_notice TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -186,7 +197,29 @@ CREATE TABLE IF NOT EXISTS agentic_audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Indexes for high-throughput FinTech queries
+-- Saved Payment Cards (Domestic RuPay & International Tokenized Cards)
+-- IMPORTANT: Full PAN and CVV are NEVER stored. Only masked numbers and gateway tokens.
+CREATE TABLE IF NOT EXISTS saved_cards (
+    id VARCHAR(64) PRIMARY KEY,
+    merchant_id VARCHAR(64) NOT NULL,
+    cardholder_name VARCHAR(255) NOT NULL,
+    card_number_masked VARCHAR(64) NOT NULL,
+    last_four VARCHAR(4) NOT NULL,
+    bin VARCHAR(16) NOT NULL,
+    network VARCHAR(32) NOT NULL,
+    card_type VARCHAR(128),
+    issuing_bank VARCHAR(128),
+    expiry VARCHAR(16),
+    international_support VARCHAR(64),
+    international_support_label VARCHAR(128),
+    international_support_notes TEXT,
+    is_default BOOLEAN DEFAULT FALSE,
+    token VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- High-Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_tx_merchant_created ON transactions(merchant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_tx_currency ON transactions(currency);
@@ -194,5 +227,7 @@ CREATE INDEX IF NOT EXISTS idx_tx_provider ON transactions(executed_provider);
 CREATE INDEX IF NOT EXISTS idx_routing_merchant ON routing_rules(merchant_id, priority_order ASC);
 CREATE INDEX IF NOT EXISTS idx_student_email ON student_profiles(email);
 CREATE INDEX IF NOT EXISTS idx_guardian_pending ON guardian_approvals(guardian_id, status);
+CREATE INDEX IF NOT EXISTS idx_guardian_idempotency ON guardian_approvals(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_refund_tx ON refund_records(transaction_id);
-
+CREATE INDEX IF NOT EXISTS idx_saved_cards_merchant ON saved_cards(merchant_id);
+CREATE INDEX IF NOT EXISTS idx_saved_cards_token ON saved_cards(token);
