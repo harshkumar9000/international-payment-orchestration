@@ -26,39 +26,87 @@ async function getStudentProfile(studentId) {
 
 /**
  * Accurately parse date of birth and calculate age without timezone shifting errors.
+ * Supports:
+ * 1. JavaScript Date objects (extracts UTC year, month, day).
+ * 2. Date-only strings: YYYY-MM-DD.
+ * 3. Valid ISO datetime strings: YYYY-MM-DDTHH:mm:ss.sssZ.
+ *
+ * Normalizes all valid dates to YYYY-MM-DD.
  * Returns:
  *   { status: 'VERIFIED', age: number, is_minor: boolean, date_of_birth: string }
  * or
  *   { status: 'UNVERIFIED', age: null, is_minor: null, reason: string }
  */
 function parseAndCalculateAge(dateOfBirth, referenceDate = new Date()) {
-  if (!dateOfBirth || typeof dateOfBirth !== 'string' || !dateOfBirth.trim()) {
+  if (dateOfBirth === null || dateOfBirth === undefined) {
     return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth is missing.' };
   }
 
-  const match = dateOfBirth.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth format is invalid (expected YYYY-MM-DD).' };
+  let birthYear = null;
+  let birthMonth = null;
+  let birthDay = null;
+  let normalizedDob = null;
+
+  // Case 1: JavaScript Date object (e.g. from PostgreSQL DATE column via node-postgres)
+  if (dateOfBirth instanceof Date) {
+    if (isNaN(dateOfBirth.getTime())) {
+      return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth is an invalid Date object.' };
+    }
+    birthYear = dateOfBirth.getUTCFullYear();
+    birthMonth = dateOfBirth.getUTCMonth() + 1;
+    birthDay = dateOfBirth.getUTCDate();
+    normalizedDob = `${String(birthYear).padStart(4, '0')}-${String(birthMonth).padStart(2, '0')}-${String(birthDay).padStart(2, '0')}`;
+  }
+  // Case 2: String input (Date-only YYYY-MM-DD or ISO datetime string)
+  else if (typeof dateOfBirth === 'string') {
+    const trimmed = dateOfBirth.trim();
+    if (!trimmed) {
+      return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth is missing.' };
+    }
+
+    // Date-only format: YYYY-MM-DD
+    const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnlyMatch) {
+      birthYear = parseInt(dateOnlyMatch[1], 10);
+      birthMonth = parseInt(dateOnlyMatch[2], 10);
+      birthDay = parseInt(dateOnlyMatch[3], 10);
+      normalizedDob = `${dateOnlyMatch[1]}-${dateOnlyMatch[2]}-${dateOnlyMatch[3]}`;
+    } else {
+      // ISO datetime format (e.g. 2009-05-15T00:00:00.000Z or with offset)
+      const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/);
+      if (isoMatch) {
+        const parsedTime = Date.parse(trimmed);
+        if (isNaN(parsedTime)) {
+          return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'ISO date of birth timestamp is malformed.' };
+        }
+        birthYear = parseInt(isoMatch[1], 10);
+        birthMonth = parseInt(isoMatch[2], 10);
+        birthDay = parseInt(isoMatch[3], 10);
+        normalizedDob = `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+      } else {
+        return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth format is invalid (expected YYYY-MM-DD or ISO timestamp).' };
+      }
+    }
+  } else {
+    return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth type is unsupported.' };
   }
 
-  const birthYear = parseInt(match[1], 10);
-  const birthMonth = parseInt(match[2], 10);
-  const birthDay = parseInt(match[3], 10);
-
+  // Strict Calendar Validation
   if (birthMonth < 1 || birthMonth > 12 || birthDay < 1 || birthDay > 31) {
     return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth contains invalid calendar values.' };
   }
 
-  // Check valid days in month using UTC
+  // Check valid days in month using UTC (strictly checks leap years and month boundaries)
   const daysInMonth = new Date(Date.UTC(birthYear, birthMonth, 0)).getUTCDate();
   if (birthDay > daysInMonth) {
     return { status: 'UNVERIFIED', age: null, is_minor: null, reason: 'Date of birth specifies an invalid day for that month.' };
   }
 
-  // Current year/month/day using UTC to prevent local timezone offsets
-  const currentYear = referenceDate.getUTCFullYear();
-  const currentMonth = referenceDate.getUTCMonth() + 1;
-  const currentDay = referenceDate.getUTCDate();
+  // Current year/month/day using UTC getters to prevent local timezone shifting errors
+  const ref = (referenceDate instanceof Date && !isNaN(referenceDate.getTime())) ? referenceDate : new Date();
+  const currentYear = ref.getUTCFullYear();
+  const currentMonth = ref.getUTCMonth() + 1;
+  const currentDay = ref.getUTCDate();
 
   // Future DOB check
   if (
@@ -83,7 +131,7 @@ function parseAndCalculateAge(dateOfBirth, referenceDate = new Date()) {
     status: 'VERIFIED',
     age,
     is_minor: age < 18,
-    date_of_birth: `${match[1]}-${match[2]}-${match[3]}`
+    date_of_birth: normalizedDob
   };
 }
 

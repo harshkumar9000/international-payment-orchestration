@@ -1245,8 +1245,8 @@ describe('International Payment Orchestration API Suite', () => {
 
     after(async () => {
       // Restore environment and reset database back to isolated test store state
-      process.env.VERCEL = savedEnv.VERCEL;
-      process.env.DB_PROVIDER = savedEnv.DB_PROVIDER;
+      delete process.env.VERCEL;
+      process.env.DB_PROVIDER = 'json';
       process.env.DATABASE_URL = savedEnv.DATABASE_URL;
       process.env.DB_POOL_MAX = savedEnv.DB_POOL_MAX;
       db._setPoolConstructorForTesting(null);
@@ -1518,6 +1518,151 @@ describe('International Payment Orchestration API Suite', () => {
       assert.strictEqual(typeof apiModule, 'function');
       assert.strictEqual(apiModule, serverModule);
       assert.strictEqual(typeof apiModule.listen, 'function');
+    });
+  });
+
+  describe('PostgreSQL DOB Parsing & Student Age Verification Regression Suite', () => {
+    // Reference date for Aarav Sharma verification: November 11, 2026
+    const refNov11_2026 = new Date(Date.UTC(2026, 10, 11));
+
+    test('1. String 2009-05-15 parses accurately and verifies Aarav as 17-year-old minor', () => {
+      const res = parseAndCalculateAge('2009-05-15', refNov11_2026);
+      assert.strictEqual(res.status, 'VERIFIED');
+      assert.strictEqual(res.age, 17);
+      assert.strictEqual(res.is_minor, true);
+      assert.strictEqual(res.date_of_birth, '2009-05-15');
+      assert.strictEqual(calculateAge('2009-05-15', refNov11_2026), 17);
+    });
+
+    test('2. ISO string 2009-05-15T00:00:00.000Z parses and normalizes to YYYY-MM-DD', () => {
+      const res = parseAndCalculateAge('2009-05-15T00:00:00.000Z', refNov11_2026);
+      assert.strictEqual(res.status, 'VERIFIED');
+      assert.strictEqual(res.age, 17);
+      assert.strictEqual(res.is_minor, true);
+      assert.strictEqual(res.date_of_birth, '2009-05-15');
+      assert.strictEqual(calculateAge('2009-05-15T00:00:00.000Z', refNov11_2026), 17);
+    });
+
+    test('3. JavaScript Date object representing May 15, 2009 calculates age 17 via UTC getters', () => {
+      const dateObj = new Date(Date.UTC(2009, 4, 15));
+      const res = parseAndCalculateAge(dateObj, refNov11_2026);
+      assert.strictEqual(res.status, 'VERIFIED');
+      assert.strictEqual(res.age, 17);
+      assert.strictEqual(res.is_minor, true);
+      assert.strictEqual(res.date_of_birth, '2009-05-15');
+      assert.strictEqual(calculateAge(dateObj, refNov11_2026), 17);
+    });
+
+    test('4. Missing or empty DOB returns UNVERIFIED and null age', () => {
+      const resUndefined = parseAndCalculateAge(undefined, refNov11_2026);
+      assert.strictEqual(resUndefined.status, 'UNVERIFIED');
+      assert.strictEqual(resUndefined.age, null);
+      assert.strictEqual(resUndefined.is_minor, null);
+      assert.strictEqual(calculateAge(undefined), null);
+
+      const resEmpty = parseAndCalculateAge('   ', refNov11_2026);
+      assert.strictEqual(resEmpty.status, 'UNVERIFIED');
+      assert.strictEqual(calculateAge('   '), null);
+    });
+
+    test('5. Null DOB returns UNVERIFIED and null age', () => {
+      const resNull = parseAndCalculateAge(null, refNov11_2026);
+      assert.strictEqual(resNull.status, 'UNVERIFIED');
+      assert.strictEqual(resNull.age, null);
+      assert.strictEqual(resNull.is_minor, null);
+      assert.strictEqual(calculateAge(null), null);
+    });
+
+    test('6. Invalid dates like 2009-02-30 are strictly rejected', () => {
+      const resStr = parseAndCalculateAge('2009-02-30', refNov11_2026);
+      assert.strictEqual(resStr.status, 'UNVERIFIED');
+      assert.strictEqual(resStr.age, null);
+      assert.ok(resStr.reason.includes('invalid day'));
+
+      const resIso = parseAndCalculateAge('2009-02-30T00:00:00.000Z', refNov11_2026);
+      assert.strictEqual(resIso.status, 'UNVERIFIED');
+      assert.strictEqual(resIso.age, null);
+    });
+
+    test('7. Future DOB cannot bypass verification', () => {
+      const resFuture = parseAndCalculateAge('2030-01-01', refNov11_2026);
+      assert.strictEqual(resFuture.status, 'UNVERIFIED');
+      assert.strictEqual(resFuture.age, null);
+      assert.ok(resFuture.reason.includes('future'));
+    });
+
+    test('8. Leap-year DOB validation (2008-02-29 valid, 2009-02-29 invalid)', () => {
+      const resLeapValid = parseAndCalculateAge('2008-02-29', refNov11_2026);
+      assert.strictEqual(resLeapValid.status, 'VERIFIED');
+      assert.strictEqual(resLeapValid.age, 18);
+      assert.strictEqual(resLeapValid.is_minor, false);
+      assert.strictEqual(resLeapValid.date_of_birth, '2008-02-29');
+
+      const resLeapInvalid = parseAndCalculateAge('2009-02-29', refNov11_2026);
+      assert.strictEqual(resLeapInvalid.status, 'UNVERIFIED');
+      assert.strictEqual(resLeapInvalid.age, null);
+    });
+
+    test('9. Precise age calculation around student birthday', () => {
+      const dob = '2009-05-15';
+
+      // Day before 17th birthday (May 14, 2026) -> Age 16
+      const dayBefore17 = parseAndCalculateAge(dob, new Date(Date.UTC(2026, 4, 14)));
+      assert.strictEqual(dayBefore17.age, 16);
+      assert.strictEqual(dayBefore17.is_minor, true);
+
+      // On 17th birthday (May 15, 2026) -> Age 17
+      const on17th = parseAndCalculateAge(dob, new Date(Date.UTC(2026, 4, 15)));
+      assert.strictEqual(on17th.age, 17);
+      assert.strictEqual(on17th.is_minor, true);
+
+      // Day after 17th birthday (May 16, 2026) -> Age 17
+      const dayAfter17 = parseAndCalculateAge(dob, new Date(Date.UTC(2026, 4, 16)));
+      assert.strictEqual(dayAfter17.age, 17);
+      assert.strictEqual(dayAfter17.is_minor, true);
+
+      // Day before 18th birthday (May 14, 2027) -> Age 17 (Minor)
+      const dayBefore18 = parseAndCalculateAge(dob, new Date(Date.UTC(2027, 4, 14)));
+      assert.strictEqual(dayBefore18.age, 17);
+      assert.strictEqual(dayBefore18.is_minor, true);
+
+      // On 18th birthday (May 15, 2027) -> Age 18 (Adult)
+      const on18th = parseAndCalculateAge(dob, new Date(Date.UTC(2027, 4, 15)));
+      assert.strictEqual(on18th.age, 18);
+      assert.strictEqual(on18th.is_minor, false);
+    });
+
+    test('10. Student payment verification and profile endpoint handle Date objects and ISO strings', async () => {
+      // 10A. Verification with ISO string formatted from Date object
+      const pgDateObj = new Date(Date.UTC(2009, 4, 15));
+      const verifyRes = await fetch(`${BASE_URL}/api/student/verify-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_id: 'stu_aarav_sharma_01',
+          payment_data: {
+            date_of_birth: pgDateObj.toISOString(),
+            amount: 35,
+            currency: 'USD',
+            merchant_name: 'Harvard edX',
+            merchant_category: 'online_courses'
+          }
+        })
+      });
+      assert.strictEqual(verifyRes.status, 200);
+      const verifyData = await verifyRes.json();
+      assert.strictEqual(verifyData.verification.status, 'APPROVED');
+      assert.strictEqual(verifyData.verification.requires_parent_approval, false);
+      assert.strictEqual(verifyData.profile.is_minor, true);
+
+      // 10B. GET /api/student/profile returns normalized date_of_birth, age 17, is_minor true
+      const profRes = await fetch(`${BASE_URL}/api/student/profile?student_id=stu_aarav_sharma_01`);
+      assert.strictEqual(profRes.status, 200);
+      const profData = await profRes.json();
+      assert.strictEqual(profData.profile.date_of_birth, '2009-05-15');
+      assert.strictEqual(profData.profile.age, 17);
+      assert.strictEqual(profData.profile.is_minor, true);
+      assert.strictEqual(profData.profile.age_verification_status, 'VERIFIED');
     });
   });
 });

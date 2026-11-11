@@ -9,9 +9,15 @@
  * 2. Local JSON mode (DB_PROVIDER=json): Zero-dependency persistent embedded storage
  *    via local_store.json (or isolated test store) for offline local development and automated testing.
  */
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const fs = require('fs');
 const path = require('path');
+
+// Ensure PostgreSQL DATE (OID 1082) columns return clean 'YYYY-MM-DD' strings,
+// preventing node-postgres local timezone shifts from corrupting calendar dates.
+if (types && typeof types.setTypeParser === 'function') {
+  types.setTypeParser(1082, (val) => val);
+}
 
 let PoolConstructor = Pool;
 let pool = null;

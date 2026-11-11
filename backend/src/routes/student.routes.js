@@ -40,14 +40,22 @@ router.get('/profile', optionalAuth, async (req, res) => {
       t.customer_email === profile.email || t.metadata_json?.includes(profile.id)
     );
 
-    const verifiedAge = studentPaymentService.calculateAge(profile.date_of_birth);
+    const ageInfo = studentPaymentService.parseAndCalculateAge(profile.date_of_birth);
+    const verifiedAge = ageInfo.status === 'VERIFIED' ? ageInfo.age : null;
+    const normalizedDob = ageInfo.status === 'VERIFIED'
+      ? ageInfo.date_of_birth
+      : (typeof profile.date_of_birth === 'string'
+          ? profile.date_of_birth
+          : (profile.date_of_birth instanceof Date ? profile.date_of_birth.toISOString().split('T')[0] : profile.date_of_birth));
     const todayMidnight = new Date();
     todayMidnight.setHours(0, 0, 0, 0);
 
     const fullProfile = {
       ...profile,
+      date_of_birth: normalizedDob,
       age: verifiedAge,
-      is_minor: verifiedAge !== null ? verifiedAge < 18 : null,
+      is_minor: ageInfo.status === 'VERIFIED' ? ageInfo.is_minor : null,
+      age_verification_status: ageInfo.status,
       spending_limits: {
         daily_limit: parseFloat(profile.daily_limit || 100),
         weekly_limit: parseFloat(profile.weekly_limit || 400),

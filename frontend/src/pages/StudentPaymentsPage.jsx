@@ -23,6 +23,7 @@ import {
 
 export default function StudentPaymentsPage({ setActivePage }) {
   const [profile, setProfile] = useState(null);
+  const [profileError, setProfileError] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [recentTxs, setRecentTxs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,33 +39,14 @@ export default function StudentPaymentsPage({ setActivePage }) {
 
   async function loadStudentData() {
     setLoading(true);
+    setProfileError(null);
     try {
-      const studentId = 'stu_aarav_sharma';
+      const studentId = 'stu_aarav_sharma_01';
       const [pRes, aRes, tRes] = await Promise.all([
         (typeof api.student?.getProfile === 'function'
           ? api.student.getProfile(studentId)
-          : Promise.resolve(null)
-        ).catch(() => ({
-          student: {
-            id: 'stu_aarav_sharma',
-            first_name: 'Aarav',
-            last_name: 'Sharma',
-            email: 'aarav.sharma@student.edu',
-            age: 17,
-            is_minor: true,
-            guardian_id: 'guard_priya_sharma',
-            guardian_email: 'priya.sharma@guardian.com',
-            spending_limits: {
-              daily_limit: 100,
-              weekly_limit: 250,
-              monthly_limit: 500,
-              current_daily_spend: 0,
-              current_weekly_spend: 49,
-              current_monthly_spend: 128
-            },
-            whitelisted_categories: ['education', 'books', 'software_tools', 'certification_fees']
-          }
-        })),
+          : Promise.reject(new Error('Student profile service is unavailable.'))
+        ),
         (typeof api.student?.listApprovals === 'function'
           ? api.student.listApprovals(studentId)
           : Promise.resolve({ approvals: [] })
@@ -75,7 +57,11 @@ export default function StudentPaymentsPage({ setActivePage }) {
         ).catch(() => ({ transactions: [] }))
       ]);
 
-      setProfile(pRes?.student || pRes?.profile || pRes);
+      const stuProfile = pRes?.student || pRes?.profile || pRes;
+      if (!stuProfile) {
+        throw new Error('Student profile not found.');
+      }
+      setProfile(stuProfile);
       const rawApprovals = aRes?.approvals || [];
       const uniqueApprovals = [];
       const seenApprIds = new Set();
@@ -89,6 +75,8 @@ export default function StudentPaymentsPage({ setActivePage }) {
       setRecentTxs(tRes?.transactions || []);
     } catch (err) {
       console.error('Error loading student data:', err);
+      setProfileError(err.message || 'Unable to load verified student profile.');
+      setProfile(null);
     } finally {
       setLoading(false);
     }
@@ -218,20 +206,53 @@ export default function StudentPaymentsPage({ setActivePage }) {
 
   return (
     <div className="space-y-6 pb-12">
+      {/* Profile Error State (Fail Closed) */}
+      {profileError && (
+        <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 text-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-6 h-6 text-rose-400 shrink-0" />
+            <div>
+              <h3 className="font-bold text-rose-300 text-sm">Student Profile Unavailable</h3>
+              <p className="text-xs text-rose-200/90">{profileError}</p>
+            </div>
+          </div>
+          <button
+            onClick={loadStudentData}
+            className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs rounded-xl transition-all cursor-pointer shrink-0"
+          >
+            Retry Verification
+          </button>
+        </div>
+      )}
+
       {/* Student Banner */}
       <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-teal-950 p-6 rounded-2xl border border-indigo-500/20 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
-              <GraduationCap className="w-3.5 h-3.5" />
-              Student Account (Under 18)
-            </span>
+            {profile?.age !== null && profile?.age !== undefined ? (
+              profile?.is_minor ? (
+                <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  Verified Student (Under 18)
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center gap-1.5">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  Verified Student (Adult, 18+)
+                </span>
+              )
+            ) : (
+              <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Age Unverified
+              </span>
+            )}
             <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-              Parent Linked: {profile?.guardian_email || 'priya.sharma@guardian.com'}
+              Parent Linked: {profile?.guardian_email || 'priya.sharma@parent.in'}
             </span>
           </div>
           <h1 className="page-heading text-[26px] sm:text-[30px] font-semibold tracking-[-0.025em] text-white leading-tight">
-            {profile?.student_name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Aarav Sharma'} ({profile?.age || 17} Years Old)
+            {profile?.student_name || `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() || 'Student'} ({profile?.age !== null && profile?.age !== undefined ? `${profile.age} Years Old` : 'Age Unverified'})
           </h1>
           <p className="text-[14.5px] text-slate-300 max-w-2xl font-normal leading-[1.5]">
             Pay safely for international university courses, tech certifications, and learning tools with spending limits and parent guidance.
@@ -256,6 +277,19 @@ export default function StudentPaymentsPage({ setActivePage }) {
           </button>
         </div>
       </div>
+
+      {/* Age Unverified Warning Banner */}
+      {(!profile?.age && profile?.age !== 0) && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3 text-amber-200">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-xs space-y-1">
+            <p className="font-bold text-amber-300">Age Verification Required</p>
+            <p className="text-amber-200/90 leading-relaxed">
+              Date of birth is unverified. Minor safety rules and guardian controls require verified age before educational payment processing.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Spending Limits & Safety Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -478,10 +512,10 @@ export default function StudentPaymentsPage({ setActivePage }) {
 
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || (!profile?.age && profile?.age !== 0) || !profile}
               className={`w-full py-2.5 px-4 font-semibold text-xs rounded-xl shadow-md flex items-center justify-center gap-2 transition-all ${
-                submitting
-                  ? 'bg-indigo-400 dark:bg-indigo-700/60 cursor-not-allowed opacity-75 text-white'
+                submitting || (!profile?.age && profile?.age !== 0) || !profile
+                  ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
                   : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 cursor-pointer'
               }`}
             >
@@ -489,6 +523,11 @@ export default function StudentPaymentsPage({ setActivePage }) {
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span>Submitting Request...</span>
+                </>
+              ) : (!profile?.age && profile?.age !== 0) ? (
+                <>
+                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                  <span>Age Verification Required Before Payment</span>
                 </>
               ) : (
                 <>

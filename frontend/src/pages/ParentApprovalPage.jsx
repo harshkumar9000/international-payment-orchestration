@@ -167,7 +167,7 @@ export default function ParentApprovalPage({ setActivePage }) {
             <span className="text-xs text-slate-300">Logged in as: Priya Sharma (priya.sharma@guardian.com)</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Supervising Student: Aarav Sharma (Age 17)
+            Supervising Student: {profile?.student_name || 'Aarav Sharma'} ({profile?.age !== null && profile?.age !== undefined ? `Age ${profile.age}` : 'Age Unverified'})
           </h1>
           <p className="text-xs text-slate-300 max-w-2xl">
             Review and approve your student's online learning course payments, adjust daily and monthly spending allowances, and manage allowed purchase categories.
