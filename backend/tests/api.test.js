@@ -11,7 +11,7 @@ process.env.TEST_STORE_FILE = path.join(__dirname, 'local_store.test.json');
 
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert');
-const { app, startServer } = require('../src/server');
+const { app, startServer, ensureDbInitialized, _resetServerlessInitPromiseForTesting } = require('../src/server');
 const db = require('../src/db/db');
 const seed = require('../src/db/seed');
 const { calculateAge, parseAndCalculateAge } = require('../src/services/studentPayment.service');
@@ -1228,6 +1228,261 @@ describe('International Payment Orchestration API Suite', () => {
       assert.ok(demoRefund);
       assert.strictEqual(demoRefund.is_simulated, true);
       assert.ok(demoRefund.simulation_notice.includes('Simulated sandbox transaction'));
+    });
+  });
+
+  describe('Vercel Serverless & Supabase PostgreSQL Initialization Regression Suite', () => {
+    let savedEnv;
+
+    before(() => {
+      savedEnv = {
+        VERCEL: process.env.VERCEL,
+        DB_PROVIDER: process.env.DB_PROVIDER,
+        DATABASE_URL: process.env.DATABASE_URL,
+        DB_POOL_MAX: process.env.DB_POOL_MAX
+      };
+    });
+
+    after(async () => {
+      // Restore environment and reset database back to isolated test store state
+      process.env.VERCEL = savedEnv.VERCEL;
+      process.env.DB_PROVIDER = savedEnv.DB_PROVIDER;
+      process.env.DATABASE_URL = savedEnv.DATABASE_URL;
+      process.env.DB_POOL_MAX = savedEnv.DB_POOL_MAX;
+      db._setPoolConstructorForTesting(null);
+      await db.init({ force: true });
+    });
+
+    test('1. Vercel starts with the PostgreSQL provider when DB_PROVIDER=postgres', async () => {
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.user:pass@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+      let poolCreated = false;
+      class MockPoolSuccess {
+        constructor() {
+          poolCreated = true;
+        }
+        async connect() {
+          return {
+            query: async () => ({ rows: [{ '?column?': 1 }] }),
+            release: () => {}
+          };
+        }
+        async query() {
+          return { rows: [] };
+        }
+        async end() {}
+      }
+
+      db._setPoolConstructorForTesting(MockPoolSuccess);
+      const ok = await db.init({ force: true });
+
+      assert.strictEqual(ok, true);
+      assert.strictEqual(poolCreated, true);
+      assert.strictEqual(db.getProvider(), 'postgres');
+      assert.strictEqual(db.isPostgres(), true);
+      assert.strictEqual(db.getStatus(), 'postgresql_connected');
+    });
+
+    test('2. The first serverless request calls database initialization', async () => {
+      // Simulate cold container where db is uninitialized
+      db._resetForTesting();
+      _resetServerlessInitPromiseForTesting();
+      assert.strictEqual(db.isInitialized(), false);
+      assert.strictEqual(db.getStatus(), 'uninitialized');
+
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.user:pass@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+      let initCalled = false;
+      class MockColdPool {
+        constructor() {
+          initCalled = true;
+        }
+        async connect() {
+          return {
+            query: async () => ({ rows: [{ '?column?': 1 }] }),
+            release: () => {}
+          };
+        }
+        async query() {
+          return { rows: [] };
+        }
+        async end() {}
+      }
+
+      db._setPoolConstructorForTesting(MockColdPool);
+
+      // Trigger initialization through the serverless entrypoint helper
+      const initResult = await ensureDbInitialized();
+      assert.strictEqual(initResult, true);
+      assert.strictEqual(initCalled, true);
+      assert.strictEqual(db.isInitialized(), true);
+      assert.strictEqual(db.getStatus(), 'postgresql_connected');
+    });
+
+    test('3. Initial embedded_storage_active does not skip initialization', async () => {
+      // Simulate state where initial status was set before request arrives
+      db._setMockPoolForTesting(null, 'json', 'embedded_storage_active', false);
+      _resetServerlessInitPromiseForTesting();
+
+      // On Vercel, having embedded_storage_active before request must NOT skip init
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.user:pass@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+      let executedInit = false;
+      class MockPoolReInit {
+        constructor() {
+          executedInit = true;
+        }
+        async connect() {
+          return {
+            query: async () => ({ rows: [{ '?column?': 1 }] }),
+            release: () => {}
+          };
+        }
+        async query() {
+          return { rows: [] };
+        }
+        async end() {}
+      }
+
+      db._setPoolConstructorForTesting(MockPoolReInit);
+      await ensureDbInitialized();
+
+      assert.strictEqual(executedInit, true);
+      assert.strictEqual(db.getProvider(), 'postgres');
+      assert.strictEqual(db.getStatus(), 'postgresql_connected');
+    });
+
+    test('4. PostgreSQL success produces postgresql_connected', async () => {
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.user:pass@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+      class MockConnectedPool {
+        async connect() {
+          return {
+            query: async () => ({ rows: [{ '?column?': 1 }] }),
+            release: () => {}
+          };
+        }
+        async query() { return { rows: [] }; }
+        async end() {}
+      }
+
+      db._setPoolConstructorForTesting(MockConnectedPool);
+      const ok = await db.init({ force: true });
+
+      assert.strictEqual(ok, true);
+      assert.strictEqual(db.getStatus(), 'postgresql_connected');
+      assert.strictEqual(db.isReady(), true);
+      assert.strictEqual(db.isPostgres(), true);
+    });
+
+    test('5. Missing DATABASE_URL produces database_unavailable', async () => {
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      delete process.env.DATABASE_URL;
+
+      const ok = await db.init({ force: true, throwOnError: false });
+
+      assert.strictEqual(ok, false);
+      assert.strictEqual(db.getStatus(), 'database_unavailable');
+      assert.strictEqual(db.isReady(), false);
+      assert.notStrictEqual(db.getStatus(), 'embedded_storage_active');
+      assert.ok(db.getLastError());
+      assert.ok(db.getLastError().message.includes('DATABASE_URL is missing'));
+    });
+
+    test('6. Failed PostgreSQL connection never falls back to JSON', async () => {
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.user:pass@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+      class MockFailingPool {
+        async connect() {
+          throw new Error('Connection timeout to Supabase pooler host');
+        }
+        async end() {}
+      }
+
+      db._setPoolConstructorForTesting(MockFailingPool);
+      const ok = await db.init({ force: true, throwOnError: false });
+
+      assert.strictEqual(ok, false);
+      assert.strictEqual(db.getStatus(), 'database_unavailable');
+      assert.strictEqual(db.getProvider(), 'postgres');
+      assert.strictEqual(db.isReady(), false);
+
+      // Verify that database operations throw and NEVER return or read local_store.json
+      await assert.rejects(async () => {
+        await db.table('merchants').find();
+      }, /Database unavailable: PostgreSQL is configured but/);
+    });
+
+    test('7. Local JSON development still works', async () => {
+      delete process.env.VERCEL;
+      process.env.DB_PROVIDER = 'json';
+      db._setPoolConstructorForTesting(null);
+
+      const ok = await db.init({ force: true });
+
+      assert.strictEqual(ok, true);
+      assert.strictEqual(db.getProvider(), 'json');
+      assert.strictEqual(db.getStatus(), 'embedded_storage_active');
+      assert.strictEqual(db.isReady(), true);
+
+      // Verify CRUD operation works cleanly in local JSON mode
+      const merchants = await db.table('merchants').find();
+      assert.ok(Array.isArray(merchants));
+    });
+
+    test('8. Concurrent serverless requests do not create duplicate pools', async () => {
+      process.env.VERCEL = '1';
+      process.env.DB_PROVIDER = 'postgres';
+      process.env.DATABASE_URL = 'postgresql://postgres.user:pass@aws-0-us-west-1.pooler.supabase.com:6543/postgres';
+
+      let poolCreationCount = 0;
+      let connectionAttempts = 0;
+
+      class MockDelayedPool {
+        constructor() {
+          poolCreationCount++;
+        }
+        async connect() {
+          connectionAttempts++;
+          // Simulate network latency to test concurrency racing
+          await new Promise(resolve => setTimeout(resolve, 25));
+          return {
+            query: async () => ({ rows: [{ '?column?': 1 }] }),
+            release: () => {}
+          };
+        }
+        async query() { return { rows: [] }; }
+        async end() {}
+      }
+
+      db._resetForTesting();
+      db._setPoolConstructorForTesting(MockDelayedPool);
+      _resetServerlessInitPromiseForTesting();
+
+      // Launch 10 simultaneous concurrent requests during cold start
+      const concurrentRequests = Array.from({ length: 10 }, () => ensureDbInitialized());
+      const results = await Promise.all(concurrentRequests);
+
+      // Every concurrent request must successfully resolve
+      for (const res of results) {
+        assert.strictEqual(res, true);
+      }
+
+      // Exactly ONE pool must have been created across all 10 concurrent requests
+      assert.strictEqual(poolCreationCount, 1);
+      assert.strictEqual(connectionAttempts, 1);
+      assert.strictEqual(db.getStatus(), 'postgresql_connected');
     });
   });
 });

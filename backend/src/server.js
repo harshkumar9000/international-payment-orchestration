@@ -80,16 +80,35 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Lazy Serverless Database Initialization (Cold-Start Safe)
+// Module-scoped initialization promise ensuring first serverless request triggers
+// initialization, and concurrent requests await the exact same in-flight attempt.
 let serverlessInitPromise = null;
-app.use(async (req, res, next) => {
-  if (!db.isReady()) {
-    if (!serverlessInitPromise) {
-      serverlessInitPromise = db.init({ throwOnError: false }).catch(err => {
-        console.error('❌ [Serverless DB Init Error]:', err.message);
+
+function ensureDbInitialized() {
+  if (db.isReady()) {
+    return Promise.resolve(true);
+  }
+  if (!serverlessInitPromise) {
+    serverlessInitPromise = db.init({ throwOnError: false })
+      .catch(err => {
+        console.error('❌ [Database Init Error]:', err.message);
+        return false;
+      })
+      .finally(() => {
+        if (!db.isReady()) {
+          serverlessInitPromise = null;
+        }
       });
-    }
-    await serverlessInitPromise;
+  }
+  return serverlessInitPromise;
+}
+
+// Database initialization middleware (cold-start safe for serverless and development)
+app.use(async (req, res, next) => {
+  try {
+    await ensureDbInitialized();
+  } catch (err) {
+    console.error('❌ [Serverless DB Init Middleware Error]:', err.message);
   }
   next();
 });
@@ -161,7 +180,7 @@ app.use((err, req, res, next) => {
 
 // Start Server function
 async function startServer() {
-  const dbOk = await db.init();
+  const dbOk = await ensureDbInitialized();
   if (db.getProvider() === 'postgres' && !dbOk) {
     console.warn('⚠️ [Backend] Started in PostgreSQL mode, but database is unavailable. Database endpoints will report failure until a valid DATABASE_URL is provided.');
   }
@@ -177,6 +196,7 @@ async function startServer() {
     console.log('\n🛑 [Backend] Gracefully shutting down...');
     server.close(async () => {
       await db.close();
+      serverlessInitPromise = null;
       console.log('✅ [Backend] Closed database pool and HTTP server.');
       process.exit(0);
     });
@@ -188,9 +208,13 @@ async function startServer() {
   return { app, server };
 }
 
+function _resetServerlessInitPromiseForTesting() {
+  serverlessInitPromise = null;
+}
+
 if (require.main === module) {
   startServer();
 }
 
-module.exports = { app, startServer };
+module.exports = { app, startServer, ensureDbInitialized, _resetServerlessInitPromiseForTesting };
 

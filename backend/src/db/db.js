@@ -13,10 +13,13 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
+let PoolConstructor = Pool;
 let pool = null;
-let currentProvider = 'json'; // 'postgres' | 'json'
-let dbStatus = 'embedded_storage_active'; // 'postgresql_connected' | 'embedded_storage_active' | 'database_unavailable'
+let currentProvider = 'uninitialized'; // 'postgres' | 'json' | 'uninitialized'
+let dbStatus = 'uninitialized'; // 'postgresql_connected' | 'embedded_storage_active' | 'database_unavailable' | 'uninitialized'
 let lastDbError = null;
+let isInitialized = false;
+let initPromise = null;
 
 // Allowlisted table names to prevent SQL injection in dynamic identifier contexts
 const ALLOWED_TABLES = new Set([
@@ -84,6 +87,9 @@ let fallbackStore = {
 
 // Load existing local store if present
 function loadFallbackStore() {
+  if (process.env.VERCEL) {
+    return; // Never read local_store.json in Vercel production
+  }
   try {
     const storeFile = getLocalStoreFile();
     if (fs.existsSync(storeFile)) {
@@ -97,6 +103,9 @@ function loadFallbackStore() {
 
 // Persist fallback store to disk
 function saveFallbackStore() {
+  if (process.env.VERCEL) {
+    return; // Never write local_store.json in Vercel production
+  }
   try {
     const storeFile = getLocalStoreFile();
     fs.writeFileSync(storeFile, JSON.stringify(fallbackStore, null, 2), 'utf8');
@@ -105,24 +114,126 @@ function saveFallbackStore() {
   }
 }
 
-// Mask password in database URLs for secure logging
-function maskDatabaseUrl(url) {
-  if (!url) return '';
-  return url.replace(/:([^:@]+)@/, ':****@');
+// Safe check if database URL targets port 6543 (Supabase Transaction/Session pooler)
+function checkUsesPort6543(url) {
+  if (!url || typeof url !== 'string') return false;
+  return /:6543(\/|$|\?)/.test(url);
+}
+
+// Sanitize error messages to eliminate accidental password or token leakage
+function sanitizeErrorMessage(msg) {
+  if (!msg) return '';
+  return String(msg)
+    .replace(/:\/\/[^:]+:([^@]+)@/g, '://***:****@')
+    .replace(/:([^:@\s]+)@/g, ':****@');
 }
 
 /**
- * Initialize connection based on DB_PROVIDER environment variable
+ * Safe deployment diagnostics
+ * Reports only: Runtime, Configured Provider, DATABASE_URL presence, Port 6543 check,
+ * and Status/sanitized error. Never logs DATABASE_URL, passwords, or JWT secrets.
+ */
+function logDiagnostics({ runtime, configuredProvider, hasDatabaseUrl, usesPort6543, status, error = null }) {
+  console.log('🔍 [DB Diagnostics] ----------------------------------------');
+  console.log(`   Runtime:                    ${runtime}`);
+  console.log(`   Configured Provider:        ${configuredProvider}`);
+  console.log(`   DATABASE_URL Present:       ${hasDatabaseUrl}`);
+  console.log(`   Supabase Pooler Port 6543:  ${usesPort6543 ? 'YES (Port 6543 Verified)' : 'NO (Verify port 6543 for serverless)'}`);
+  console.log(`   Database Status:            ${status}`);
+  if (error) {
+    console.log(`   Diagnostics Notice:         ${sanitizeErrorMessage(error.message || error)}`);
+  }
+  console.log('-----------------------------------------------------------');
+}
+
+/**
+ * Initialize connection based on environment and DB_PROVIDER
+ * Cold-start safe, module-promise deduplicated, warm-invocation reusable.
  */
 async function initDb(options = {}) {
-  const reqProvider = (process.env.DB_PROVIDER || 'json').toLowerCase().trim();
-  currentProvider = reqProvider === 'postgres' ? 'postgres' : 'json';
+  // If forced re-initialization requested (e.g. switching environments in tests)
+  if (options.force) {
+    initPromise = null;
+    if (pool) {
+      try {
+        await pool.end();
+      } catch (_) {}
+      pool = null;
+    }
+    isInitialized = false;
+    dbStatus = 'uninitialized';
+    currentProvider = 'uninitialized';
+  }
+
+  const isVercel = Boolean(process.env.VERCEL);
+  const targetProvider = (isVercel || (process.env.DB_PROVIDER || 'json').toLowerCase().trim() === 'postgres') ? 'postgres' : 'json';
+
+  // Reuse active healthy pool across serverless warm invocations
+  if (isInitialized && currentProvider === targetProvider) {
+    if (targetProvider === 'postgres' && pool && dbStatus === 'postgresql_connected') {
+      return true;
+    }
+    if (targetProvider === 'json' && dbStatus === 'embedded_storage_active') {
+      return true;
+    }
+  }
+
+  // Share in-flight initialization promise across concurrent requests
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = _executeInit(options, isVercel, targetProvider).finally(() => {
+    initPromise = null;
+  });
+
+  return initPromise;
+}
+
+async function _executeInit(options = {}, isVercel, targetProvider) {
+  const runtime = isVercel ? 'Vercel Serverless' : 'Local / Dedicated Node.js';
+  const rawProvider = (process.env.DB_PROVIDER || (isVercel ? 'postgres' : 'json')).toLowerCase().trim();
+  const databaseUrl = process.env.DATABASE_URL || '';
+  const hasDatabaseUrl = Boolean(databaseUrl && databaseUrl.trim().length > 0);
+  const isPlaceholderUrl = databaseUrl.includes('[YOUR-PASSWORD]') || databaseUrl.includes('PASTE_YOUR_');
+  const usesPort6543 = checkUsesPort6543(databaseUrl);
+
+  currentProvider = targetProvider;
+
+  if (isVercel && rawProvider !== 'postgres') {
+    console.warn(`⚠️ [DB] DB_PROVIDER is set to '${rawProvider}', but Vercel requires 'postgres'. Enforcing PostgreSQL mode.`);
+  }
 
   if (currentProvider === 'json') {
+    if (isVercel) {
+      // Hard security check: never allow local JSON mode on Vercel
+      dbStatus = 'database_unavailable';
+      isInitialized = true;
+      lastDbError = new Error('Local JSON mode is completely disabled in Vercel production. PostgreSQL is required.');
+      logDiagnostics({
+        runtime,
+        configuredProvider: 'json (rejected)',
+        hasDatabaseUrl,
+        usesPort6543,
+        status: dbStatus,
+        error: lastDbError
+      });
+      return false;
+    }
+
     loadFallbackStore();
     dbStatus = 'embedded_storage_active';
+    isInitialized = true;
     lastDbError = null;
+
     if (process.env.NODE_ENV !== 'test') {
+      logDiagnostics({
+        runtime,
+        configuredProvider: 'json',
+        hasDatabaseUrl,
+        usesPort6543,
+        status: dbStatus
+      });
       console.log('ℹ️ [DB] Running in Local JSON mode (embedded storage: local_store.json).');
     }
     return true;
@@ -130,18 +241,32 @@ async function initDb(options = {}) {
 
   // PostgreSQL mode
   dbStatus = 'database_unavailable';
-  const databaseUrl = process.env.DATABASE_URL;
 
   // Verify connection string presence and placeholder replacement
-  if (
-    !databaseUrl ||
-    databaseUrl.trim() === '' ||
-    databaseUrl.includes('[YOUR-PASSWORD]') ||
-    databaseUrl.includes('PASTE_YOUR_')
-  ) {
-    lastDbError = new Error('DATABASE_URL is missing or contains unreplaced placeholders. Set a valid PostgreSQL connection string in .env.');
-    console.error('❌ [DB] PostgreSQL mode selected (DB_PROVIDER=postgres), but DATABASE_URL is missing or contains placeholders.');
-    console.error('   Please provide your Supabase Session Pooler connection string in your root .env file.');
+  if (!hasDatabaseUrl || isPlaceholderUrl) {
+    const reason = !hasDatabaseUrl
+      ? 'DATABASE_URL is missing.'
+      : 'DATABASE_URL contains unreplaced placeholder credentials ([YOUR-PASSWORD]).';
+
+    lastDbError = new Error(`PostgreSQL configuration error: ${reason} Set a valid PostgreSQL connection string.`);
+    isInitialized = true;
+
+    logDiagnostics({
+      runtime,
+      configuredProvider: 'postgres',
+      hasDatabaseUrl,
+      usesPort6543,
+      status: dbStatus,
+      error: lastDbError
+    });
+
+    console.error(`❌ [DB] PostgreSQL mode selected, but ${reason}`);
+    if (isVercel) {
+      console.error('   In Vercel: Set DATABASE_URL in Project Settings -> Environment Variables with port 6543 (Transaction Pooler).');
+    } else {
+      console.error('   In Local: Provide your Supabase Session Pooler connection string in your root .env file.');
+    }
+
     if (options.throwOnError) {
       throw lastDbError;
     }
@@ -154,18 +279,20 @@ async function initDb(options = {}) {
   }
 
   try {
-    const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+    const isServerless = isVercel || Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
     const maxPoolSize = process.env.DB_POOL_MAX
       ? parseInt(process.env.DB_POOL_MAX, 10)
       : (isServerless ? 1 : 10);
 
-    pool = new Pool({
-      connectionString: databaseUrl,
-      ssl: { rejectUnauthorized: false },
-      max: maxPoolSize,
-      idleTimeoutMillis: isServerless ? 1000 : 30000,
-      connectionTimeoutMillis: 5000
-    });
+    if (!pool) {
+      pool = new PoolConstructor({
+        connectionString: databaseUrl,
+        ssl: { rejectUnauthorized: false },
+        max: maxPoolSize,
+        idleTimeoutMillis: isServerless ? 1000 : 30000,
+        connectionTimeoutMillis: 5000
+      });
+    }
 
     // Test connectivity
     const client = await pool.connect();
@@ -174,12 +301,33 @@ async function initDb(options = {}) {
 
     dbStatus = 'postgresql_connected';
     lastDbError = null;
-    console.log(`✅ [DB] Connected successfully to Supabase PostgreSQL (${maskDatabaseUrl(databaseUrl)})`);
+    isInitialized = true;
+
+    logDiagnostics({
+      runtime,
+      configuredProvider: 'postgres',
+      hasDatabaseUrl: true,
+      usesPort6543,
+      status: dbStatus
+    });
+
+    console.log('✅ [DB] Connected successfully to Supabase PostgreSQL pool.');
     return true;
   } catch (err) {
     dbStatus = 'database_unavailable';
     lastDbError = err;
-    console.error(`❌ [DB] PostgreSQL connection failed: ${err.message}. Database marked as database_unavailable.`);
+    isInitialized = true;
+
+    logDiagnostics({
+      runtime,
+      configuredProvider: 'postgres',
+      hasDatabaseUrl: true,
+      usesPort6543,
+      status: dbStatus,
+      error: err
+    });
+
+    console.error(`❌ [DB] PostgreSQL connection failed: ${sanitizeErrorMessage(err.message)}. Database marked as database_unavailable.`);
     if (pool) {
       try {
         await pool.end();
@@ -203,8 +351,12 @@ async function closeDb() {
     } catch (_) {}
     pool = null;
   }
+  isInitialized = false;
+  initPromise = null;
   if (currentProvider === 'postgres') {
     dbStatus = 'database_unavailable';
+  } else {
+    dbStatus = 'uninitialized';
   }
 }
 
@@ -235,7 +387,8 @@ const db = {
 
   // Status accessors
   isPostgres: () => currentProvider === 'postgres' && dbStatus === 'postgresql_connected',
-  isReady: () => dbStatus === 'postgresql_connected' || dbStatus === 'embedded_storage_active',
+  isReady: () => isInitialized && (dbStatus === 'postgresql_connected' || dbStatus === 'embedded_storage_active'),
+  isInitialized: () => isInitialized,
   getProvider: () => currentProvider,
   getStatus: () => dbStatus,
   getLastError: () => lastDbError,
@@ -243,6 +396,10 @@ const db = {
   // Table operations
   table: (tableName) => {
     validateTableName(tableName);
+
+    if (process.env.VERCEL && currentProvider !== 'postgres') {
+      throw new Error(`[DB Security Error] Table operation on '${tableName}' blocked: PostgreSQL is required in Vercel production.`);
+    }
 
     return {
       find: async (predicate = null) => {
@@ -414,6 +571,9 @@ const db = {
   },
 
   resetStore: () => {
+    if (process.env.VERCEL) {
+      throw new Error('[DB Security Error] resetStore() cannot be called in Vercel production.');
+    }
     fallbackStore = {
       merchants: [],
       providers: [],
@@ -431,12 +591,30 @@ const db = {
     saveFallbackStore();
   },
 
+  // Test helper to inject custom Pool constructor (for mocking in unit tests)
+  _setPoolConstructorForTesting: (customPoolConstructor) => {
+    PoolConstructor = customPoolConstructor || Pool;
+  },
+
   // Test helper to inject mock pool in isolated unit tests
-  _setMockPoolForTesting: (mockPool, provider = 'postgres', status = 'postgresql_connected') => {
+  _setMockPoolForTesting: (mockPool, provider = 'postgres', status = 'postgresql_connected', initialized = true) => {
     pool = mockPool;
     currentProvider = provider;
     dbStatus = status;
     lastDbError = null;
+    isInitialized = initialized;
+  },
+
+  _getPoolForTesting: () => pool,
+
+  _resetForTesting: () => {
+    pool = null;
+    currentProvider = 'uninitialized';
+    dbStatus = 'uninitialized';
+    lastDbError = null;
+    isInitialized = false;
+    initPromise = null;
+    PoolConstructor = Pool;
   }
 };
 
