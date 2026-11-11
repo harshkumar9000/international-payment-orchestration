@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -21,92 +21,28 @@ import MyCardsPage from './pages/MyCardsPage';
 import PaymentCompatibilityPage from './pages/PaymentCompatibilityPage';
 import TransactionsPage from './pages/TransactionsPage';
 import StudentPaymentsPage from './pages/StudentPaymentsPage';
+import ParentApprovalPage from './pages/ParentApprovalPage';
 import SettingsPage from './pages/SettingsPage';
 
-// Map URL paths to internal activePage keys
-function getPageFromPath(path) {
-  const clean = path.replace(/\/$/, '') || '/';
-  switch (clean) {
-    case '/':
-    case '/landing':
-      return 'landing';
-    case '/login':
-      return 'login';
-    case '/signup':
-    case '/register':
-      return 'signup';
-    case '/forgot-password':
-      return 'forgot-password';
-    case '/auth/callback':
-      return 'auth-callback';
-    case '/dashboard':
-      return 'dashboard';
-    case '/checkout':
-      return 'checkout';
-    case '/cards':
-      return 'cards';
-    case '/rupay-upi':
-    case '/compatibility':
-      return 'rupay-upi';
-    case '/transactions':
-      return 'transactions';
-    case '/student-payments':
-    case '/student':
-      return 'student-payments';
-    case '/settings':
-      return 'settings';
-    default:
-      return 'landing';
-  }
-}
+// Route Utilities
+import {
+  getPageFromPath,
+  getPathFromPage,
+  PROTECTED_PAGES,
+  PUBLIC_PAGES,
+  resolveAuthRedirect
+} from './utils/routeUtils';
 
-// Map internal activePage keys to canonical URL paths
-function getPathFromPage(page) {
-  switch (page) {
-    case 'landing':
-      return '/';
-    case 'login':
-      return '/login';
-    case 'signup':
-    case 'register':
-      return '/signup';
-    case 'forgot-password':
-      return '/forgot-password';
-    case 'auth-callback':
-      return '/auth/callback';
-    case 'dashboard':
-      return '/dashboard';
-    case 'checkout':
-      return '/checkout';
-    case 'cards':
-      return '/cards';
-    case 'rupay-upi':
-      return '/rupay-upi';
-    case 'transactions':
-      return '/transactions';
-    case 'student-payments':
-    case 'student':
-      return '/student-payments';
-    case 'settings':
-      return '/settings';
-    default:
-      return '/';
-  }
-}
-
-const PROTECTED_PAGES = [
-  'dashboard',
-  'checkout',
-  'cards',
-  'rupay-upi',
-  'transactions',
-  'student-payments',
-  'settings'
-];
+import {
+  AlertTriangle,
+  LayoutDashboard,
+  Globe2,
+  ArrowRight
+} from 'lucide-react';
 
 function AppContent() {
   const { isAuthenticated, loading } = useAuth();
-  
+
   const [activePage, setActivePageState] = useState(() => {
     if (typeof window !== 'undefined') {
       return getPageFromPath(window.location.pathname);
@@ -118,41 +54,63 @@ function AppContent() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Synchronize browser history and URL when activePage changes
-  const setActivePage = (page) => {
+  const setActivePage = useCallback((page) => {
     setActivePageState(page);
-    const targetPath = getPathFromPage(page);
-    if (window.location.pathname !== targetPath) {
-      window.history.pushState({ page }, '', targetPath);
+    if (typeof window !== 'undefined') {
+      const targetPath = getPathFromPage(page);
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState({ page }, '', targetPath);
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  // Handle browser Back / Forward buttons
+  // Handle browser Back / Forward buttons (popstate)
   useEffect(() => {
     const handlePopState = () => {
-      const page = getPageFromPath(window.location.pathname);
-      setActivePageState(page);
+      if (typeof window !== 'undefined') {
+        const page = getPageFromPath(window.location.pathname);
+        setActivePageState(page);
+      }
     };
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Access Control Enforcement:
-  // If user is unauthenticated and attempts to access protected dashboard pages,
-  // save the intended destination and redirect to /login
+  // Access Control & Protected Route Enforcement
   useEffect(() => {
-    if (!loading) {
-      if (!isAuthenticated && PROTECTED_PAGES.includes(activePage)) {
-        sessionStorage.setItem('atlas_redirect_after_login', getPathFromPage(activePage));
-        setActivePage('login');
-      } else if (isAuthenticated && ['login', 'signup'].includes(activePage)) {
-        setActivePage('dashboard');
-      }
-    }
-  }, [isAuthenticated, activePage, loading]);
+    if (loading) return;
 
-  const isPublicView = ['landing', 'login', 'signup', 'forgot-password', 'auth-callback'].includes(activePage);
+    let savedRedirect = null;
+    try {
+      savedRedirect = sessionStorage.getItem('atlas_redirect_after_login');
+    } catch (_) {}
+
+    const { redirect, saveRedirect } = resolveAuthRedirect({
+      isAuthenticated,
+      activePage,
+      savedRedirect
+    });
+
+    if (saveRedirect) {
+      try {
+        sessionStorage.setItem('atlas_redirect_after_login', saveRedirect);
+      } catch (_) {}
+    }
+
+    if (redirect) {
+      if (redirect === 'dashboard' && savedRedirect) {
+        try {
+          sessionStorage.removeItem('atlas_redirect_after_login');
+        } catch (_) {}
+      }
+      setActivePage(redirect);
+    }
+  }, [isAuthenticated, activePage, loading, setActivePage]);
+
+  // Determine if the current activePage belongs in the public navbar/footer layout
+  const isPublicView = PUBLIC_PAGES.includes(activePage);
 
   if (loading) {
     return (
@@ -174,6 +132,43 @@ function AppContent() {
           <div className="min-h-screen bg-black">
             <LandingPage setActivePage={setActivePage} />
           </div>
+        ) : activePage === 'not-found' ? (
+          <div className="flex flex-col min-h-screen bg-[#F7F7F7] dark:bg-[#080808] text-[#111111] dark:text-white">
+            <Navbar activePage={activePage} setActivePage={setActivePage} />
+            <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-20 flex items-center justify-center">
+              <div className="max-w-md w-full text-center space-y-5">
+                <div className="w-16 h-16 rounded-2xl bg-[#EEEEEE] dark:bg-[#1A1A1A] border border-[#DEDEDE] dark:border-[#333333] text-[#111111] dark:text-white flex items-center justify-center mx-auto shadow-sm">
+                  <Globe2 className="w-8 h-8" />
+                </div>
+                <div className="space-y-2">
+                  <h1 className="text-2xl font-bold tracking-tight text-[#111111] dark:text-white">
+                    404 — Page Not Found
+                  </h1>
+                  <p className="text-xs text-[#666666] dark:text-[#999999] leading-relaxed">
+                    The requested URL path does not exist on the ATLAS.PAY platform.
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActivePage('landing')}
+                    className="px-4 py-2 border border-[#DEDEDE] dark:border-[#333333] hover:bg-[#EEEEEE] dark:hover:bg-[#1A1A1A] text-[#111111] dark:text-white font-semibold text-xs rounded-xl transition-all cursor-pointer"
+                  >
+                    Home Page
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActivePage(isAuthenticated ? 'dashboard' : 'login')}
+                    className="px-4 py-2 bg-black hover:bg-[#222222] dark:bg-white dark:hover:bg-[#EEEEEE] text-white dark:text-black font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <span>{isAuthenticated ? 'Go to Dashboard' : 'Sign In'}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </main>
+            <Footer setActivePage={setActivePage} />
+          </div>
         ) : (
           <div className="flex flex-col min-h-screen bg-[#F7F7F7] text-[#111111]">
             <Navbar activePage={activePage} setActivePage={setActivePage} />
@@ -187,7 +182,7 @@ function AppContent() {
           </div>
         )
       ) : (
-        // Authenticated FinTech Dashboard Layout
+        // Authenticated FinTech Workspace Shell
         <div className="flex min-h-screen">
           {/* Collapsible & Mobile Sidebar */}
           <Sidebar
@@ -221,7 +216,29 @@ function AppContent() {
               {activePage === 'rupay-upi' && <PaymentCompatibilityPage setActivePage={setActivePage} />}
               {activePage === 'transactions' && <TransactionsPage setActivePage={setActivePage} />}
               {activePage === 'student-payments' && <StudentPaymentsPage setActivePage={setActivePage} />}
+              {activePage === 'guardian' && <ParentApprovalPage setActivePage={setActivePage} />}
               {activePage === 'settings' && <SettingsPage setActivePage={setActivePage} />}
+
+              {/* Defensive Fallback: Guarantees authenticated workspace NEVER renders an empty/blank container */}
+              {!PROTECTED_PAGES.includes(activePage) && (
+                <div className="py-16 text-center space-y-4 max-w-md mx-auto">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center mx-auto">
+                    <AlertTriangle className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-xl font-bold text-[#111111] dark:text-white">Workspace Page Not Found</h2>
+                  <p className="text-xs text-[#666666] dark:text-[#999999] leading-relaxed">
+                    The requested workspace view <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 font-mono text-[11px]">{activePage}</code> is not supported or does not exist.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActivePage('dashboard')}
+                    className="px-4 py-2 bg-black hover:bg-[#222222] dark:bg-white dark:hover:bg-[#EEEEEE] text-white dark:text-black font-semibold text-xs rounded-xl shadow-md transition-all cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span>Return to Dashboard</span>
+                  </button>
+                </div>
+              )}
             </main>
 
             <footer className="py-4 px-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">

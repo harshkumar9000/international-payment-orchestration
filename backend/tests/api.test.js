@@ -1878,5 +1878,240 @@ describe('International Payment Orchestration API Suite', () => {
       assert.strictEqual(Number(limitsData.profile.daily_limit), 150);
     });
   });
+
+  describe('Frontend Routing, Dashboard Resilience & Auth Lifecycle Regression Suite', () => {
+    let routeUtils;
+
+    before(async () => {
+      routeUtils = await import('../../frontend/src/utils/routeUtils.js');
+    });
+
+    test('1. Routing: Maps all protected and core routes accurately', () => {
+      const { getPageFromPath, isProtectedPage } = routeUtils;
+
+      const routes = [
+        { path: '/dashboard', page: 'dashboard' },
+        { path: '/checkout', page: 'checkout' },
+        { path: '/cards', page: 'cards' },
+        { path: '/my-cards', page: 'cards' },
+        { path: '/rupay-upi', page: 'rupay-upi' },
+        { path: '/compatibility', page: 'rupay-upi' },
+        { path: '/transactions', page: 'transactions' },
+        { path: '/history', page: 'transactions' },
+        { path: '/student-payments', page: 'student-payments' },
+        { path: '/student', page: 'student-payments' },
+        { path: '/guardian', page: 'guardian' },
+        { path: '/parent-approval', page: 'guardian' },
+        { path: '/parent', page: 'guardian' },
+        { path: '/settings', page: 'settings' }
+      ];
+
+      for (const { path, page } of routes) {
+        const resolved = getPageFromPath(path);
+        assert.strictEqual(resolved, page, `Path "${path}" must map to page "${page}"`);
+        assert.strictEqual(isProtectedPage(resolved), true, `Page "${resolved}" must be classified as protected`);
+      }
+    });
+
+    test('2. Routing: Normalizes trailing slashes, duplicate slashes, queries, and hashes', () => {
+      const { normalizePath, getPageFromPath } = routeUtils;
+
+      // Trailing slashes
+      assert.strictEqual(normalizePath('/dashboard/'), '/dashboard');
+      assert.strictEqual(getPageFromPath('/dashboard/'), 'dashboard');
+
+      assert.strictEqual(normalizePath('/checkout///'), '/checkout');
+      assert.strictEqual(getPageFromPath('/checkout///'), 'checkout');
+
+      assert.strictEqual(normalizePath('///transactions///'), '/transactions');
+      assert.strictEqual(getPageFromPath('///transactions///'), 'transactions');
+
+      assert.strictEqual(normalizePath('/student-payments/'), '/student-payments');
+      assert.strictEqual(getPageFromPath('/student-payments/'), 'student-payments');
+
+      assert.strictEqual(normalizePath('/settings/'), '/settings');
+      assert.strictEqual(getPageFromPath('/settings/'), 'settings');
+
+      assert.strictEqual(normalizePath('/cards/'), '/cards');
+      assert.strictEqual(getPageFromPath('/cards/'), 'cards');
+
+      assert.strictEqual(normalizePath('/rupay-upi/'), '/rupay-upi');
+      assert.strictEqual(getPageFromPath('/rupay-upi/'), 'rupay-upi');
+
+      // Root slash preservation
+      assert.strictEqual(normalizePath('/'), '/');
+      assert.strictEqual(normalizePath('///'), '/');
+      assert.strictEqual(getPageFromPath('///'), 'landing');
+
+      // Query parameters and hash anchors
+      assert.strictEqual(normalizePath('/dashboard?currency=INR&period=week'), '/dashboard');
+      assert.strictEqual(getPageFromPath('/dashboard?currency=INR&period=week'), 'dashboard');
+
+      assert.strictEqual(normalizePath('/checkout?order_id=ORD-9821#pay'), '/checkout');
+      assert.strictEqual(getPageFromPath('/checkout?order_id=ORD-9821#pay'), 'checkout');
+    });
+
+    test('3. Routing: Unknown routes resolve to not-found and never leave main workspace blank', () => {
+      const { getPageFromPath, getPathFromPage, isPublicPage, PROTECTED_PAGES } = routeUtils;
+
+      const unknownPaths = [
+        '/unknown-path',
+        '/random-slug',
+        '/dashboard/subpage',
+        '/admin/secret',
+        '/invalid-route-123'
+      ];
+
+      for (const p of unknownPaths) {
+        const resolved = getPageFromPath(p);
+        assert.strictEqual(resolved, 'not-found', `Unknown path "${p}" must resolve to "not-found"`);
+        assert.strictEqual(isPublicPage(resolved), true, `Page "${resolved}" must be a public page`);
+        assert.strictEqual(getPathFromPage(resolved), '/not-found');
+      }
+
+      // Defensive workspace fallback verification:
+      // Any page not in PROTECTED_PAGES is caught by the defensive fallback
+      assert.strictEqual(PROTECTED_PAGES.includes('not-found'), false);
+      assert.strictEqual(PROTECTED_PAGES.includes('unknown-view'), false);
+    });
+
+    test('4. Access Control: Unauthenticated redirects save destination and navigate to login', () => {
+      const { resolveAuthRedirect } = routeUtils;
+
+      // Accessing /dashboard while unauthenticated
+      const dashRedirect = resolveAuthRedirect({
+        isAuthenticated: false,
+        activePage: 'dashboard',
+        savedRedirect: null
+      });
+      assert.deepStrictEqual(dashRedirect, {
+        redirect: 'login',
+        saveRedirect: '/dashboard'
+      });
+
+      // Accessing /checkout while unauthenticated
+      const checkoutRedirect = resolveAuthRedirect({
+        isAuthenticated: false,
+        activePage: 'checkout',
+        savedRedirect: null
+      });
+      assert.deepStrictEqual(checkoutRedirect, {
+        redirect: 'login',
+        saveRedirect: '/checkout'
+      });
+
+      // Accessing public page while unauthenticated -> No redirect
+      const publicRedirect = resolveAuthRedirect({
+        isAuthenticated: false,
+        activePage: 'landing',
+        savedRedirect: null
+      });
+      assert.deepStrictEqual(publicRedirect, {
+        redirect: null,
+        saveRedirect: null
+      });
+    });
+
+    test('5. Access Control: Authenticated redirects send users to saved destination or dashboard without loops', () => {
+      const { resolveAuthRedirect } = routeUtils;
+
+      // Authenticated user on /login with saved redirect to /checkout
+      const withSaved = resolveAuthRedirect({
+        isAuthenticated: true,
+        activePage: 'login',
+        savedRedirect: '/checkout'
+      });
+      assert.deepStrictEqual(withSaved, {
+        redirect: 'checkout',
+        saveRedirect: null
+      });
+
+      // Authenticated user on /login with no saved redirect -> sends to dashboard
+      const withoutSaved = resolveAuthRedirect({
+        isAuthenticated: true,
+        activePage: 'login',
+        savedRedirect: null
+      });
+      assert.deepStrictEqual(withoutSaved, {
+        redirect: 'dashboard',
+        saveRedirect: null
+      });
+
+      // Authenticated user on /signup -> sends to dashboard
+      const onSignup = resolveAuthRedirect({
+        isAuthenticated: true,
+        activePage: 'signup',
+        savedRedirect: null
+      });
+      assert.deepStrictEqual(onSignup, {
+        redirect: 'dashboard',
+        saveRedirect: null
+      });
+
+      // Authenticated user on /dashboard -> stays on dashboard (NO redirect loop)
+      const onDashboard = resolveAuthRedirect({
+        isAuthenticated: true,
+        activePage: 'dashboard',
+        savedRedirect: null
+      });
+      assert.deepStrictEqual(onDashboard, {
+        redirect: null,
+        saveRedirect: null
+      });
+    });
+
+    test('6. Error Diagnostics: Sanitizes sensitive tokens, secrets, and credentials in component stacks', () => {
+      const { sanitizeErrorDetails } = routeUtils;
+
+      const sensitiveMsg = 'Network failure while requesting https://api.atlaspay.com/auth/me with Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secretToken123456';
+      const sensitiveStack = `Error: Authentication rejected
+        at request (api.js:29:15)
+        at loadUser (AuthContext.jsx:32:19)?password=SuperSecretPassword123&token=mySecretApiKey999
+        at App (App.jsx:218:20)`;
+
+      const result = sanitizeErrorDetails(
+        new Error(sensitiveMsg),
+        { componentStack: sensitiveStack }
+      );
+
+      // Bearer token must be redacted
+      assert.ok(!result.message.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.secretToken123456'));
+      assert.ok(result.message.includes('Bearer [REDACTED]'));
+
+      // Passwords and API secrets in component stack must be redacted
+      assert.ok(!result.componentStack.includes('SuperSecretPassword123'));
+      assert.ok(!result.componentStack.includes('mySecretApiKey999'));
+      assert.ok(result.componentStack.includes('password=[REDACTED]'));
+    });
+
+    test('7. Dashboard API Availability & Real Data Verification', async () => {
+      // 7A. Core metrics endpoint returns 200 with required volume and transaction counters
+      const metricsRes = await fetch(`${BASE_URL}/api/analytics/metrics`);
+      assert.strictEqual(metricsRes.status, 200);
+      const metricsData = await metricsRes.json();
+      assert.ok(metricsData.total_volume_usd !== undefined);
+      assert.ok(metricsData.total_transactions !== undefined);
+      assert.ok(metricsData.settled_transactions !== undefined);
+
+      // 7B. Volume chart endpoint returns 7-day array
+      const chartRes = await fetch(`${BASE_URL}/api/analytics/volume-chart`);
+      assert.strictEqual(chartRes.status, 200);
+      const chartData = await chartRes.json();
+      assert.ok(Array.isArray(chartData.labels));
+      assert.strictEqual(chartData.labels.length, 7);
+      assert.ok(Array.isArray(chartData.volumes));
+      assert.strictEqual(chartData.volumes.length, 7);
+
+      // 7C. Transactions endpoint returns real array without fabricating fake amounts
+      const txRes = await fetch(`${BASE_URL}/api/transactions?limit=6`);
+      assert.strictEqual(txRes.status, 200);
+      const txData = await txRes.json();
+      assert.ok(Array.isArray(txData.transactions));
+      for (const tx of txData.transactions) {
+        assert.ok(tx.id, 'Transaction must have an ID');
+        assert.ok(typeof tx.amount === 'number' || !isNaN(Number(tx.amount)), 'Transaction amount must be numeric');
+      }
+    });
+  });
 });
 

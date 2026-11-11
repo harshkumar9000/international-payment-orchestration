@@ -18,34 +18,72 @@ export function AuthProvider({ children }) {
       const saved = localStorage.getItem('atlas_merchant');
       return saved && saved !== 'undefined' && saved !== 'null' ? JSON.parse(saved) : null;
     } catch (e) {
-      localStorage.removeItem('atlas_merchant');
+      try {
+        localStorage.removeItem('atlas_merchant');
+      } catch (_) {}
       return null;
     }
   });
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadUser() {
-      if (token) {
-        try {
-          const res = await api.auth.getMe();
+      if (!token) {
+        if (isMounted) {
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const res = await api.auth.getMe();
+        if (isMounted && res?.merchant) {
           setMerchant(res.merchant);
-          localStorage.setItem('atlas_merchant', JSON.stringify(res.merchant));
-        } catch (err) {
-          console.warn('[Auth] Token invalid or expired, resetting:', err.message);
+          try {
+            localStorage.setItem('atlas_merchant', JSON.stringify(res.merchant));
+          } catch (_) {}
+        }
+      } catch (err) {
+        if (!isMounted) return;
+
+        // Distinguish genuine 401/403 auth failures from transient network or server errors
+        const isAuthExpired = err.status === 401 || err.status === 403;
+
+        if (isAuthExpired) {
+          console.warn('[Auth] Token invalid or expired, resetting session:', err.message);
           logout();
+        } else {
+          // Network error (status 0) or temporary server downtime (500+):
+          // Preserve valid local credentials and cached merchant profile rather than abruptly clearing session
+          console.warn('[Auth] Backend profile sync temporarily unavailable (network/server issue); maintaining active session:', err.message);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
-      setLoading(false);
     }
+
     loadUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token]);
 
   const handleAuthSuccess = (res) => {
+    if (!res) return;
     setToken(res.token);
     setMerchant(res.merchant);
-    localStorage.setItem('atlas_auth_token', res.token);
-    localStorage.setItem('atlas_merchant', JSON.stringify(res.merchant));
+    try {
+      if (res.token) localStorage.setItem('atlas_auth_token', res.token);
+      if (res.merchant) localStorage.setItem('atlas_merchant', JSON.stringify(res.merchant));
+    } catch (e) {
+      console.warn('[Auth] Unable to save auth data to localStorage:', e);
+    }
   };
 
   const login = async (email, password) => {
@@ -69,16 +107,18 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setToken(null);
     setMerchant(null);
-    localStorage.removeItem('atlas_auth_token');
-    localStorage.removeItem('atlas_merchant');
+    try {
+      localStorage.removeItem('atlas_auth_token');
+      localStorage.removeItem('atlas_merchant');
+    } catch (_) {}
   };
 
   const forgotPassword = async (email) => {
     return await api.auth.forgotPassword({ email });
   };
 
-  const resetPassword = async (email, token, new_password) => {
-    return await api.auth.resetPassword({ email, token, new_password });
+  const resetPassword = async (email, resetToken, new_password) => {
+    return await api.auth.resetPassword({ email, token: resetToken, new_password });
   };
 
   return (
@@ -106,4 +146,3 @@ export function useAuth() {
   }
   return context;
 }
-

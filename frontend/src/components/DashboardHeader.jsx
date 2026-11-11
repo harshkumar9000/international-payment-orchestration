@@ -30,6 +30,7 @@ export default function DashboardHeader({
     'rupay-upi': { group: 'RAILS', title: 'RuPay & UPI International' },
     'transactions': { group: 'RECORDS', title: 'Transaction History' },
     'student-payments': { group: 'GUARDRAILS', title: 'Student Payments' },
+    'guardian': { group: 'GUARDRAILS', title: 'Parent & Guardian Portal' },
     'settings': { group: 'ACCOUNT', title: 'Settings' }
   };
 

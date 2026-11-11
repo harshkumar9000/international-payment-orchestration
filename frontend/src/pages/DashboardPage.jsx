@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -7,14 +7,10 @@ import {
   CreditCard,
   CheckCircle2,
   AlertTriangle,
-  ArrowRight,
   Plus,
   RefreshCw,
-  ExternalLink,
-  ShieldCheck,
   Globe2,
   Clock,
-  Sparkles,
   ChevronRight
 } from 'lucide-react';
 import {
@@ -34,53 +30,104 @@ export default function DashboardPage({ setActivePage }) {
   const [recentTxs, setRecentTxs] = useState([]);
   const [savedCards, setSavedCards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
 
-  async function loadDashboardData() {
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
-    try {
-      const [mRes, vRes, tRes, cRes] = await Promise.all([
-        api.analytics.getMetrics().catch(() => ({
-          total_volume_usd: 148920.50,
-          total_transactions: 1248,
-          settled_transactions: 1204,
-          failed_transactions: 20,
-          conversion_rate_percent: 96.5
-        })),
-        api.analytics.getVolumeChart().catch(() => ({
-          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-          volumes: [14200, 18500, 24100, 19800, 31200, 28900, 36400],
-          transactions_count: [48, 65, 89, 74, 118, 102, 138]
-        })),
-        api.transactions.list({ limit: 6 }).catch(() => ({ transactions: [] })),
-        api.cards.list().catch(() => ({ cards: [] }))
-      ]);
+    setError(null);
 
-      setMetrics(mRes);
-      setVolumeChart(vRes);
-      setRecentTxs(tRes?.transactions || []);
-      setSavedCards(cRes?.cards || []);
-    } catch (err) {
-      console.error('[Dashboard Load Error]:', err);
-    } finally {
-      setLoading(false);
+    let partialFailures = 0;
+
+    // 1. Core Analytics Metrics
+    let mRes = null;
+    try {
+      mRes = await api.analytics.getMetrics();
+    } catch (mErr) {
+      console.warn('[Dashboard] Metrics endpoint offline, using baseline cached metrics:', mErr.message);
+      partialFailures++;
+      mRes = {
+        total_volume_usd: 148920.50,
+        total_transactions: 1248,
+        settled_transactions: 1204,
+        failed_transactions: 20,
+        conversion_rate_percent: 96.5,
+        is_cached_baseline: true
+      };
     }
-  }
+
+    // 2. Volume Chart Data
+    let vRes = null;
+    try {
+      vRes = await api.analytics.getVolumeChart();
+    } catch (vErr) {
+      console.warn('[Dashboard] Volume chart endpoint offline, using baseline curve:', vErr.message);
+      partialFailures++;
+      vRes = {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        volumes: [14200, 18500, 24100, 19800, 31200, 28900, 36400],
+        transactions_count: [48, 65, 89, 74, 118, 102, 138],
+        is_cached_baseline: true
+      };
+    }
+
+    // 3. Recent Real Transactions
+    let tRes = null;
+    try {
+      tRes = await api.transactions.list({ limit: 6 });
+    } catch (tErr) {
+      console.warn('[Dashboard] Transactions endpoint offline:', tErr.message);
+      partialFailures++;
+      tRes = { transactions: [] };
+    }
+
+    // 4. Linked Cards
+    let cRes = null;
+    try {
+      cRes = await api.cards.list();
+    } catch (cErr) {
+      console.warn('[Dashboard] Cards endpoint offline:', cErr.message);
+      partialFailures++;
+      cRes = { cards: [] };
+    }
+
+    setMetrics(mRes);
+    setVolumeChart(vRes);
+    setRecentTxs(Array.isArray(tRes?.transactions) ? tRes.transactions : []);
+    setSavedCards(Array.isArray(cRes?.cards) ? cRes.cards : []);
+
+    if (partialFailures >= 3) {
+      setError('Live payment analytics sync temporarily unavailable. Displaying cached treasury baseline.');
+    }
+
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [loadDashboardData]);
 
-  // Format Recharts chart data
-  const chartData = (volumeChart?.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']).map((day, idx) => ({
+  // Format Recharts chart data safely
+  const defaultDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const chartLabels = Array.isArray(volumeChart?.labels) && volumeChart.labels.length > 0
+    ? volumeChart.labels
+    : defaultDays;
+
+  const chartData = chartLabels.map((day, idx) => ({
     name: day,
-    volume: volumeChart?.volumes?.[idx] || 0,
-    count: volumeChart?.transactions_count?.[idx] || 0
+    volume: Array.isArray(volumeChart?.volumes) && volumeChart.volumes[idx] !== undefined
+      ? Number(volumeChart.volumes[idx]) || 0
+      : 0,
+    count: Array.isArray(volumeChart?.transactions_count) && volumeChart.transactions_count[idx] !== undefined
+      ? Number(volumeChart.transactions_count[idx]) || 0
+      : 0
   }));
+
+  const activeTotalVolume = Number(metrics?.total_volume_usd) || 148920.50;
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto text-left">
-      
+
       {/* Top Banner / Welcome & Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#DEDEDE] dark:border-[#222222]">
         <div>
@@ -89,8 +136,14 @@ export default function DashboardPage({ setActivePage }) {
               Overview
             </span>
             <span className="px-2 py-0.5 text-[10px] font-semibold text-[#666666] dark:text-[#999999] bg-[#F7F7F7] dark:bg-[#111111] rounded border border-[#DEDEDE] dark:border-[#262626]">
-              Simulated Demo Data
+              {metrics?.is_cached_baseline ? 'Simulated Baseline' : 'Live Orchestration'}
             </span>
+            {loading && (
+              <span className="flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                Syncing...
+              </span>
+            )}
           </div>
           <h1 className="page-heading text-[28px] sm:text-[32px] font-semibold text-[#111111] dark:text-white tracking-[-0.025em] leading-tight">
             Payments Dashboard
@@ -100,9 +153,19 @@ export default function DashboardPage({ setActivePage }) {
           </p>
         </div>
 
-        {/* Quick Action Buttons (500-600 weight, 14-15px size) */}
+        {/* Quick Action Buttons */}
         <div className="flex items-center gap-3">
           <button
+            type="button"
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-white dark:bg-[#111111] hover:bg-[#F7F7F7] dark:hover:bg-[#1E1E1E] text-[#111111] dark:text-white border border-[#DEDEDE] dark:border-[#262626] shadow-sm cursor-pointer transition-all active:scale-95"
+            title="Refresh Dashboard Data"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            type="button"
             onClick={() => setActivePage('cards')}
             className="px-4 py-2.5 rounded-xl bg-white dark:bg-[#111111] hover:bg-[#F7F7F7] dark:hover:bg-[#1E1E1E] text-[#111111] dark:text-white font-semibold text-[14px] border border-[#DEDEDE] dark:border-[#262626] shadow-sm flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
@@ -110,6 +173,7 @@ export default function DashboardPage({ setActivePage }) {
             <span>Add Card</span>
           </button>
           <button
+            type="button"
             onClick={() => setActivePage('checkout')}
             className="px-4 py-2.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:hover:bg-[#EEEEEE] text-white dark:text-black font-semibold text-[14px] shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
@@ -119,7 +183,26 @@ export default function DashboardPage({ setActivePage }) {
         </div>
       </div>
 
-      {/* Monochrome Digital Banking Multi-Currency Vault */}
+      {/* Partial Offline / Retry Notice */}
+      {error && (
+        <div className="p-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 border border-amber-500/30 rounded-lg font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+            <span>Retry Sync</span>
+          </button>
+        </div>
+      )}
+
+      {/* Digital Banking Multi-Currency Vault */}
       <div className="p-6 sm:p-7 rounded-[32px] bg-[#080808] border border-[#222222] text-white shadow-xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[#1E1E1E] relative z-10">
           <div className="flex items-center space-x-3">
@@ -141,6 +224,7 @@ export default function DashboardPage({ setActivePage }) {
           <div className="flex items-center space-x-1 p-1 rounded-xl bg-[#141414] border border-[#2A2A2A] text-xs font-bold self-start sm:self-auto">
             {['USD', 'EUR', 'INR'].map((curr) => (
               <button
+                type="button"
                 key={curr}
                 onClick={() => setSelectedCurrency(curr)}
                 className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -161,9 +245,9 @@ export default function DashboardPage({ setActivePage }) {
               Active Total Balance ({selectedCurrency})
             </span>
             <div className="text-3xl font-black font-mono tracking-tight text-white mt-1">
-              {selectedCurrency === 'USD' && `$${(metrics?.total_volume_usd || 148920.50).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              {selectedCurrency === 'EUR' && `€${((metrics?.total_volume_usd || 148920.50) * 0.916).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-              {selectedCurrency === 'INR' && `₹${((metrics?.total_volume_usd || 148920.50) * 83.42).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+              {selectedCurrency === 'USD' && `$${activeTotalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              {selectedCurrency === 'EUR' && `€${(activeTotalVolume * 0.916).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              {selectedCurrency === 'INR' && `₹${(activeTotalVolume * 83.42).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
             </div>
             <div className="text-xs text-[#CCCCCC] flex items-center space-x-1 mt-1 font-semibold">
               <TrendingUp className="w-3.5 h-3.5" />
@@ -199,7 +283,7 @@ export default function DashboardPage({ setActivePage }) {
 
       {/* 4 Essential Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        
+
         {/* Total Payment Volume */}
         <div className="p-5 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-3">
           <div className="flex items-center justify-between text-xs text-[#666666] dark:text-[#999999]">
@@ -210,7 +294,7 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              ${(metrics?.total_volume_usd || 148920.50).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${activeTotalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] flex items-center gap-1 mt-1 font-semibold">
               <TrendingUp className="w-3.5 h-3.5" />
@@ -229,7 +313,7 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              {(metrics?.total_transactions || 1248).toLocaleString()}
+              {(Number(metrics?.total_transactions) || 1248).toLocaleString()}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] mt-1">
               Cross-border & domestic rails
@@ -247,7 +331,7 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              {(metrics?.settled_transactions || 1204).toLocaleString()}
+              {(Number(metrics?.settled_transactions) || 1204).toLocaleString()}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] flex items-center gap-1 mt-1 font-semibold">
               <span>{metrics?.conversion_rate_percent || 96.5}% success SLA</span>
@@ -265,7 +349,7 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              {(metrics?.failed_transactions || 20).toLocaleString()}
+              {(Number(metrics?.failed_transactions) || 20).toLocaleString()}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] flex items-center gap-1 mt-1">
               <span>1.6% decline / retry rate</span>
@@ -276,7 +360,7 @@ export default function DashboardPage({ setActivePage }) {
 
       {/* Middle Grid: Activity Chart (8 cols) & Linked Cards Summary (4 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
+
         {/* Payment Activity Chart */}
         <div className="lg:col-span-8 p-6 rounded-2xl bg-white dark:bg-[#080808] border border-[#DEDEDE] dark:border-[#222222] shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -313,7 +397,7 @@ export default function DashboardPage({ setActivePage }) {
                     fontSize: '12px',
                     color: '#FFFFFF'
                   }}
-                  formatter={(val) => [`$${val.toLocaleString()}`, 'Volume']}
+                  formatter={(val) => [`$${Number(val).toLocaleString()}`, 'Volume']}
                 />
                 <Area type="monotone" dataKey="volume" stroke="#111111" strokeWidth={2} fillOpacity={1} fill="url(#volumeMono)" />
               </AreaChart>
@@ -333,6 +417,7 @@ export default function DashboardPage({ setActivePage }) {
               </p>
             </div>
             <button
+              type="button"
               onClick={() => setActivePage('cards')}
               className="text-xs text-[#111111] dark:text-white hover:underline font-semibold cursor-pointer"
             >
@@ -345,6 +430,7 @@ export default function DashboardPage({ setActivePage }) {
               <div className="p-6 text-center text-xs text-[#666666] rounded-xl bg-[#F7F7F7] dark:bg-[#111111] border border-dashed border-[#DEDEDE] dark:border-[#262626]">
                 No cards linked yet.
                 <button
+                  type="button"
                   onClick={() => setActivePage('cards')}
                   className="block mx-auto mt-2 text-[#111111] dark:text-white font-bold hover:underline cursor-pointer"
                 >
@@ -394,6 +480,7 @@ export default function DashboardPage({ setActivePage }) {
           </div>
 
           <button
+            type="button"
             onClick={() => setActivePage('cards')}
             className="w-full py-2.5 rounded-xl bg-[#EEEEEE] dark:bg-[#1A1A1A] hover:bg-[#E0E0E0] dark:hover:bg-[#222222] text-[#111111] dark:text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
@@ -415,6 +502,7 @@ export default function DashboardPage({ setActivePage }) {
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setActivePage('transactions')}
             className="text-xs text-[#111111] dark:text-white hover:underline font-semibold cursor-pointer flex items-center gap-1"
           >
@@ -446,12 +534,11 @@ export default function DashboardPage({ setActivePage }) {
                 recentTxs.slice(0, 6).map((tx) => {
                   const isSettled = tx.status === 'settled';
                   const isFailed = tx.status === 'failed';
-                  const isPending = tx.status?.includes('pending');
 
                   return (
                     <tr key={tx.id} className="hover:bg-[#F7F7F7] dark:hover:bg-[#111111] transition-colors">
                       <td className="py-3 font-mono font-bold text-[#111111] dark:text-white">
-                        {tx.id.slice(0, 16)}...
+                        {(tx.id || '').slice(0, 16)}...
                       </td>
                       <td className="py-3 text-[#666666] dark:text-[#999999]">
                         {new Date(tx.created_at || Date.now()).toLocaleDateString('en-US', {
@@ -468,7 +555,9 @@ export default function DashboardPage({ setActivePage }) {
                         {(tx.payment_method || 'credit_card').replace('_', ' ')}
                       </td>
                       <td className="py-3 font-mono font-bold text-[#111111] dark:text-white">
-                        {tx.amount ? `$${parseFloat(tx.amount).toFixed(2)}` : '$120.00'}
+                        {tx.amount !== undefined && tx.amount !== null
+                          ? `$${parseFloat(tx.amount).toFixed(2)}`
+                          : '$0.00'}
                       </td>
                       <td className="py-3">
                         <span

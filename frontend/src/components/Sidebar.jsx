@@ -86,7 +86,8 @@ export default function Sidebar({
         <div className="py-5 px-3 space-y-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activePage === item.id || (activePage === 'student' && item.id === 'student-payments');
+            const isActive = activePage === item.id ||
+              ((activePage === 'student' || activePage === 'guardian') && item.id === 'student-payments');
 
             return (
               <button
