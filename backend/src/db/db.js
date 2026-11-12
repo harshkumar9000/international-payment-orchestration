@@ -43,6 +43,7 @@ const ALLOWED_TABLES = new Set([
   'agentic_audit_logs',
   'saved_cards',
   'bank_accounts',
+  'processed_webhooks',
   'schema_migrations'
 ]);
 

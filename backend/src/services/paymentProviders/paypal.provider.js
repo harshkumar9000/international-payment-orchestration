@@ -1,96 +1,103 @@
 /**
  * PayPal Provider Integration
- * Communicates with official PayPal Sandbox REST API when credentials exist;
+ * Communicates with official PayPal REST API v2 service when credentials exist;
  * otherwise uses intelligent high-fidelity sandbox simulator.
  */
 const BasePaymentProvider = require('./base.provider');
+const paypalService = require('../paypal.service');
 
 class PayPalProvider extends BasePaymentProvider {
   constructor() {
     super('paypal', 'PayPal Sandbox / Enterprise');
-    this.clientId = process.env.PAYPAL_CLIENT_ID || '';
-    this.clientSecret = process.env.PAYPAL_CLIENT_SECRET || '';
-    this.isLiveCredentials = Boolean(this.clientId && this.clientSecret);
-    this.sandboxBase = 'https://api-m.sandbox.paypal.com';
+  }
+
+  get isConfigured() {
+    return paypalService.isConfigured();
   }
 
   calculateFee(amount, currency) {
-    // 3.49% + $0.49
+    // Standard PayPal Merchant Fee: 3.49% + $0.49
     return Math.round(((amount * 0.0349) + 0.49) * 100) / 100;
-  }
-
-  async getAccessToken() {
-    if (!this.isLiveCredentials) return null;
-    try {
-      const auth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
-      const response = await fetch(`${this.sandboxBase}/v1/oauth2/token`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: 'grant_type=client_credentials'
-      });
-      if (!response.ok) {
-        throw new Error(`PayPal auth failed with status ${response.status}`);
-      }
-      const data = await response.json();
-      return data.access_token;
-    } catch (err) {
-      console.warn('[PayPal Provider] Live sandbox auth error, using simulated sandbox:', err.message);
-      return null;
-    }
   }
 
   async processPayment(details) {
     const startTime = Date.now();
-    const token = await this.getAccessToken();
 
-    // If actual PayPal credentials present, attempt real Sandbox REST API
-    if (token) {
+    // Check corridor compatibility
+    const corridorCheck = paypalService.checkCorridorEligibility({
+      customerCountry: details.customer_country || 'US',
+      currency: details.currency || 'USD'
+    });
+
+    if (!corridorCheck.eligible) {
+      return {
+        success: false,
+        status: 'declined',
+        decline_code: 'corridor_ineligible',
+        decline_reason: corridorCheck.reason,
+        fee_charged: 0.0,
+        latency_ms: Date.now() - startTime,
+        provider_id: this.id,
+        provider_name: this.name
+      };
+    }
+
+    // If actual PayPal credentials present or mock mode active, use PayPal service
+    if (paypalService.isConfigured() || process.env.PAYPAL_MOCK === 'true') {
       try {
-        const orderRes = await fetch(`${this.sandboxBase}/v2/checkout/orders`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            intent: 'CAPTURE',
-            purchase_units: [{
-              amount: {
-                currency_code: details.currency || 'USD',
-                value: details.amount.toFixed(2)
-              },
-              description: `Orchestration Platform Order ${details.order_id || 'DEMO'}`
-            }]
-          })
+        const order = await paypalService.createOrder({
+          transactionId: details.transaction_id || details.order_id,
+          amount: details.amount,
+          currency: details.currency || 'USD',
+          customerCountry: details.customer_country || 'US',
+          customerEmail: details.customer_email || 'customer@example.com',
+          merchantName: details.merchant_name || 'ATLAS.PAY Merchant',
+          description: details.description || 'International Payment'
         });
 
-        const orderData = await orderRes.json();
         const latency = Date.now() - startTime;
+        const approveLink = order.links?.find(l => l.rel === 'approve')?.href;
 
-        if (orderRes.ok && (orderData.status === 'CREATED' || orderData.status === 'COMPLETED')) {
-          return {
-            success: true,
-            status: orderData.status === 'COMPLETED' ? 'settled' : 'requires_action',
-            gateway_reference: orderData.id,
-            fee_charged: this.calculateFee(details.amount, details.currency),
-            latency_ms: latency,
-            provider_id: this.id,
-            provider_name: this.name,
-            requires_action: orderData.links ? {
-              type: 'paypal_redirect',
-              redirect_url: orderData.links.find(l => l.rel === 'approve')?.href
-            } : null
-          };
-        }
+        return {
+          success: true,
+          status: 'requires_action',
+          gateway_reference: order.id,
+          fee_charged: this.calculateFee(details.amount, details.currency),
+          latency_ms: latency,
+          provider_id: this.id,
+          provider_name: this.name,
+          requires_action: approveLink ? {
+            type: 'paypal_redirect',
+            redirect_url: approveLink
+          } : null,
+          metadata: {
+            paypal_order_id: order.id,
+            paypal_status: order.status,
+            paypal_mode: paypalService.isConfigured() ? 'live_rest' : 'mock_rest'
+          }
+        };
       } catch (err) {
-        console.warn('[PayPal REST Error]:', err.message);
+        console.warn('[PayPal Provider Error]:', err.message);
+        // If simulation or decline requested, continue to fallback below
+        if (!details.simulate_decline) {
+          // If error was corridor or invalid amount, return failure
+          if (err.code === 'CORRIDOR_INELIGIBLE' || err.code === 'INVALID_AMOUNT') {
+            return {
+              success: false,
+              status: 'declined',
+              decline_code: err.code.toLowerCase(),
+              decline_reason: err.message,
+              fee_charged: 0.0,
+              latency_ms: Date.now() - startTime,
+              provider_id: this.id,
+              provider_name: this.name
+            };
+          }
+        }
       }
     }
 
-    // High-Fidelity Sandbox Simulator (Instant, reliable, tests all flows)
+    // High-Fidelity Sandbox Simulator (Instant, reliable fallback for unconfigured environments)
     const latency = Math.floor(Math.random() * 80) + 480; // ~500ms
     const fee = this.calculateFee(details.amount, details.currency);
     const mockPaypalId = `PAYID-SANDBOX-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
@@ -119,7 +126,7 @@ class PayPalProvider extends BasePaymentProvider {
       provider_id: this.id,
       provider_name: this.name,
       metadata: {
-        paypal_mode: this.isLiveCredentials ? 'live_sandbox_rest' : 'simulated_sandbox',
+        paypal_mode: 'simulated_sandbox',
         payer_email: details.customer_email || 'sandbox-buyer@personal.example.com',
         capture_id: `CAP-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
       }
@@ -128,4 +135,3 @@ class PayPalProvider extends BasePaymentProvider {
 }
 
 module.exports = new PayPalProvider();
-

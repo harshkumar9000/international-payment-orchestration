@@ -1,8 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AnimatedPaymentModal from '../components/AnimatedPaymentModal';
 import { AddCardModal } from '../components/LinkInstrumentModals';
+import {
+  parseFxRate,
+  parseMarkupAmount,
+  parseConvertedAmount,
+  formatFxRateDisplay,
+  formatMarkupDisplay,
+  formatTotalPayableDisplay
+} from '../utils/fxUtils';
 import {
   CreditCard,
   Globe2,
@@ -74,6 +83,28 @@ export default function CheckoutPage({ setActivePage }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showAddCardModal, setShowAddCardModal] = useState(false);
 
+  // PayPal Integration State
+  const [paypalConfig, setPaypalConfig] = useState(null);
+  const [loadingPaypalConfig, setLoadingPaypalConfig] = useState(false);
+  const [paypalButtonProcessing, setPaypalButtonProcessing] = useState(false);
+  const lastPaypalErrorRef = useRef('');
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoadingPaypalConfig(true);
+    api.paypal.getConfig()
+      .then(cfg => {
+        if (isMounted) setPaypalConfig(cfg);
+      })
+      .catch(err => {
+        console.warn('[PayPal] Failed to fetch PayPal gateway config:', err.message);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingPaypalConfig(false);
+      });
+    return () => { isMounted = false; };
+  }, []);
+
   function handleLoadDemoData() {
     setCheckoutError('');
     setMerchantName('Coursera Inc.');
@@ -133,13 +164,7 @@ export default function CheckoutPage({ setActivePage }) {
   useEffect(() => {
     const parsedAmount = parseFloat(amount);
     if (!selectedCurrency || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      const fallbackRates = { USD: 83.45, EUR: 90.80, GBP: 106.20, SGD: 62.10, AED: 22.72, CAD: 61.30, AUD: 54.80, JPY: 0.55 };
-      setConversion({
-        exchange_rate: selectedCurrency ? (fallbackRates[selectedCurrency] || 83.45) : 0,
-        converted_amount: 0,
-        markup_fee: 0,
-        original_amount: 0
-      });
+      setConversion(null);
       setLoadingRates(false);
       return;
     }
@@ -157,18 +182,9 @@ export default function CheckoutPage({ setActivePage }) {
           setConversion(res);
         }
       } catch (err) {
-        console.warn('[FX Convert Fallback]:', err.message);
+        console.warn('[FX Convert API Error]:', err.message);
         if (!isCancelled) {
-          const fallbackRates = { USD: 83.45, EUR: 90.80, GBP: 106.20, SGD: 62.10, AED: 22.72, CAD: 61.30, AUD: 54.80, JPY: 0.55 };
-          const baseRate = fallbackRates[selectedCurrency] || 83.45;
-          const grossInr = parsedAmount * baseRate;
-          const markupInr = grossInr * 0.0125;
-          setConversion({
-            exchange_rate: baseRate,
-            converted_amount: Math.round((grossInr + markupInr) * 100) / 100,
-            markup_fee: Math.round(markupInr * 100) / 100,
-            original_amount: parsedAmount
-          });
+          setConversion(null);
         }
       } finally {
         if (!isCancelled) setLoadingRates(false);
@@ -201,6 +217,12 @@ export default function CheckoutPage({ setActivePage }) {
   } else if (selectedMethodType === 'upi') {
     if (activeCountry && !activeCountry.upiSupported) {
       methodIneligibleReason = `UPI International is not supported for payments to ${activeCountry.name}. Active bilateral corridors include Singapore (PayNow), UAE (NeoPay), and France (Lyra).`;
+    }
+  } else if (selectedMethodType === 'paypal') {
+    if (selectedCountry === 'IN') {
+      methodIneligibleReason = 'PayPal India does not support domestic payments within India (RBI regulations). For domestic transactions, please select UPI or RuPay.';
+    } else if (selectedCurrency === 'INR') {
+      methodIneligibleReason = 'PayPal cross-border transactions require an international foreign currency (e.g. USD, EUR, GBP). Please select an international currency.';
     }
   }
 
@@ -317,6 +339,48 @@ export default function CheckoutPage({ setActivePage }) {
     }
 
     const parsedAmount = parsedCheckoutAmount;
+
+    // Handle PayPal Payment Flow
+    if (selectedMethodType === 'paypal') {
+      if (!paypalConfig?.is_configured) {
+        throw new Error('PayPal Gateway credentials are missing. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in .env.');
+      }
+
+      const createRes = await api.paypal.createOrder({
+        amount: parsedAmount,
+        currency: selectedCurrency,
+        customer_country: selectedCountry,
+        customer_email: merchant?.email || 'customer@atlaspay.demo',
+        merchant_name: merchantName.trim(),
+        description: description || `Payment to ${merchantName.trim()}`
+      });
+
+      const captureRes = await api.paypal.captureOrder({
+        order_id: createRes.order_id,
+        transaction_id: createRes.transaction_id
+      });
+
+      if (captureRes.status !== 'settled' && captureRes.status !== 'COMPLETED') {
+        throw new Error(`PayPal payment status is '${captureRes.status}'. Settlement not confirmed.`);
+      }
+
+      const inrTotal = parseConvertedAmount(conversion);
+      const txInfo = {
+        id: captureRes.transaction_id || `tx_pp_${captureRes.capture_id || createRes.order_id}`,
+        status: 'settled',
+        amount: parsedAmount,
+        currency: selectedCurrency,
+        amount_inr: inrTotal,
+        merchant: merchantName,
+        payment_method: 'PayPal Sandbox (Verified)',
+        capture_id: captureRes.capture_id,
+        fee_charged: captureRes.fee_charged,
+        timestamp: new Date().toISOString()
+      };
+
+      setTransactionReceipt(txInfo);
+      return { success: true, transaction: txInfo };
+    }
 
     // Initiate transaction with payment provider
     const initiateRes = await api.checkout.initiate({
@@ -753,13 +817,144 @@ export default function CheckoutPage({ setActivePage }) {
 
               {/* PayPal Option */}
               {selectedMethodType === 'paypal' && (
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] space-y-2 text-xs">
-                  <div className="font-bold text-slate-800 dark:text-slate-200">
-                    PayPal Sandbox Integration
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] space-y-4 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        PayPal REST API v2
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-500 dark:text-amber-400 border border-amber-500/30">
+                        {paypalConfig?.env === 'live' ? 'LIVE GATEWAY' : 'SANDBOX ACTIVE'}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-mono">
+                      Orders API v2
+                    </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Processes transaction through PayPal's sandbox gateway supporting cross-border buyer protection.
-                  </p>
+
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-1">
+                    <p className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>RBI Compliant Cross-Border Export: Billed directly in {selectedCurrency || 'USD'}.</span>
+                    </p>
+                    <p>
+                      PayPal Buyer Protection, Seller Protection and cryptographic webhook reconciliation active.
+                    </p>
+                  </div>
+
+                  {/* PayPal Credentials Status or Smart Buttons */}
+                  <div className="pt-2">
+                    {!paypalConfig?.is_configured ? (
+                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-2">
+                        <div className="flex items-center gap-1.5 font-bold text-amber-400">
+                          <AlertTriangle className="w-4 h-4 shrink-0" />
+                          <span>PayPal Sandbox Credentials Required</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          To activate live PayPal Sandbox checkout, configure your sandbox API credentials in your server <code className="px-1.5 py-0.5 rounded bg-black/40 text-amber-200">.env</code> file:
+                        </p>
+                        <div className="p-2.5 rounded-lg bg-black/50 border border-amber-500/20 font-mono text-[10px] text-slate-300 space-y-1">
+                          <div>PAYPAL_ENV=sandbox</div>
+                          <div className={paypalConfig?.client_id ? 'text-emerald-400' : 'text-rose-400'}>
+                            PAYPAL_CLIENT_ID={paypalConfig?.client_id ? '[CONFIGURED]' : '[MISSING]'}
+                          </div>
+                          <div className="text-rose-400">
+                            PAYPAL_CLIENT_SECRET=[MISSING]
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                          Get your credentials from the <a href="https://developer.paypal.com/dashboard/applications/sandbox" target="_blank" rel="noreferrer" className="underline hover:text-white">PayPal Developer Dashboard</a> under Apps &amp; Credentials.
+                        </p>
+                      </div>
+                    ) : isCheckoutReady && !methodIneligibleReason ? (
+                      <PayPalScriptProvider
+                        key={`${paypalConfig.client_id}-${selectedCurrency || 'USD'}`}
+                        options={{
+                          clientId: paypalConfig.client_id,
+                          currency: (selectedCurrency || 'USD').toUpperCase(),
+                          intent: 'capture'
+                        }}
+                      >
+                        <PayPalButtons
+                          style={{
+                            layout: 'vertical',
+                            color: 'gold',
+                            shape: 'rect',
+                            label: 'paypal',
+                            height: 42
+                          }}
+                          disabled={paypalButtonProcessing}
+                          createOrder={async () => {
+                            setCheckoutError('');
+                            lastPaypalErrorRef.current = '';
+                            try {
+                              const res = await api.paypal.createOrder({
+                                amount: parsedCheckoutAmount,
+                                currency: selectedCurrency,
+                                customer_country: selectedCountry,
+                                customer_email: merchant?.email || 'customer@atlaspay.demo',
+                                merchant_name: merchantName.trim(),
+                                description: description || `Payment to ${merchantName.trim()}`
+                              });
+                              return res.order_id;
+                            } catch (err) {
+                              const errorMsg = err.message || 'PayPal order creation failed.';
+                              lastPaypalErrorRef.current = errorMsg;
+                              setCheckoutError(errorMsg);
+                              throw err;
+                            }
+                          }}
+                          onApprove={async (data) => {
+                            setCheckoutError('');
+                            setPaypalButtonProcessing(true);
+                            try {
+                              const captureRes = await api.paypal.captureOrder({
+                                order_id: data.orderID,
+                                transaction_id: data.orderID
+                              });
+
+                              if (captureRes.status === 'settled' || captureRes.status === 'COMPLETED') {
+                                const inrTotal = parseConvertedAmount(conversion);
+                                const txInfo = {
+                                  id: captureRes.transaction_id || `tx_pp_${captureRes.capture_id || data.orderID}`,
+                                  status: 'settled',
+                                  amount: parseFloat(captureRes.amount || parsedCheckoutAmount),
+                                  currency: captureRes.currency || selectedCurrency,
+                                  amount_inr: inrTotal,
+                                  merchant: merchantName,
+                                  payment_method: 'PayPal Sandbox (Verified)',
+                                  capture_id: captureRes.capture_id,
+                                  fee_charged: captureRes.fee_charged,
+                                  timestamp: new Date().toISOString()
+                                };
+                                setTransactionReceipt(txInfo);
+                                setShowPaymentModal(true);
+                              } else {
+                                throw new Error(`PayPal payment status: ${captureRes.status}`);
+                              }
+                            } catch (err) {
+                              const captureMsg = err.message || 'PayPal capture verification failed.';
+                              setCheckoutError(captureMsg);
+                            } finally {
+                              setPaypalButtonProcessing(false);
+                            }
+                          }}
+                          onCancel={() => {
+                            setCheckoutError('PayPal payment was cancelled. No charges were made.');
+                          }}
+                          onError={(err) => {
+                            console.error('[PayPal SDK Error]:', err);
+                            const failureReason = lastPaypalErrorRef.current || err?.message || 'PayPal Checkout encountered an error.';
+                            setCheckoutError(failureReason);
+                          }}
+                        />
+                      </PayPalScriptProvider>
+                    ) : (
+                      <div className="p-3 text-center rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+                        Fill in merchant name, destination country, and amount (or click Demo Data) to activate PayPal checkout buttons.
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -799,16 +994,14 @@ export default function CheckoutPage({ setActivePage }) {
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500 dark:text-slate-400">Mid-Market FX Rate:</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">
-                    {selectedCurrency
-                      ? `1 ${selectedCurrency} = ₹${(conversion?.exchange_rate ?? 0).toFixed(2)} INR`
-                      : 'Select destination country'}
+                    {formatFxRateDisplay(conversion, selectedCurrency, loadingRates)}
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500 dark:text-slate-400">Conversion Spread (1.25%):</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">
-                    ₹{(conversion?.markup_fee ?? 0).toFixed(2)} INR
+                    {formatMarkupDisplay(conversion, loadingRates)}
                   </span>
                 </div>
 
@@ -826,7 +1019,7 @@ export default function CheckoutPage({ setActivePage }) {
                   </div>
                   <div className="text-right">
                     <span className="text-xl font-black font-mono text-[#111111] dark:text-white">
-                      ₹{(conversion?.converted_amount ?? 0).toLocaleString()}
+                      {formatTotalPayableDisplay(conversion, loadingRates)}
                     </span>
                   </div>
                 </div>
@@ -850,15 +1043,25 @@ export default function CheckoutPage({ setActivePage }) {
                     setCheckoutError(methodIneligibleReason);
                     return;
                   }
+                  if (selectedMethodType === 'paypal' && !paypalConfig?.is_configured) {
+                    setCheckoutError('PayPal Gateway credentials are missing. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET in .env.');
+                    return;
+                  }
+                  if (!parseFxRate(conversion)) {
+                    setCheckoutError('Live foreign exchange rate is currently unavailable. Please verify connectivity.');
+                    return;
+                  }
                   setShowPaymentModal(true);
                 }}
-                disabled={!isCheckoutReady || Boolean(methodIneligibleReason)}
+                disabled={!isCheckoutReady || Boolean(methodIneligibleReason) || (selectedMethodType === 'paypal' && !paypalConfig?.is_configured) || !parseFxRate(conversion)}
                 className="w-full py-3.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 <Lock className="w-4 h-4" />
                 <span>
                   {isCheckoutReady
-                    ? `Pay Now — ₹${(conversion?.converted_amount ?? 0).toLocaleString()}`
+                    ? parseConvertedAmount(conversion)
+                      ? `Pay Now — ${formatTotalPayableDisplay(conversion, loadingRates)}`
+                      : 'Pay Now — FX rate unavailable'
                     : 'Enter payment details or click Demo Data'}
                 </span>
               </button>

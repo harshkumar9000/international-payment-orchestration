@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const db = require('../db/db');
+const paypalService = require('../services/paypal.service');
 
 // In-memory webhooks log
 let webhooksLog = [];
@@ -28,7 +29,7 @@ router.post('/stripe', async (req, res) => {
 // POST /api/webhooks/paypal
 router.post('/paypal', async (req, res) => {
   const event = req.body || {};
-  const eventId = `wh_paypal_${Date.now()}`;
+  const eventId = event.id || `wh_paypal_${Date.now()}`;
   console.log(`📥 [Webhook] Received PayPal event: ${event.event_type || 'PAYMENT.CAPTURE.COMPLETED'}`);
 
   const logEntry = {
@@ -41,7 +42,16 @@ router.post('/paypal', async (req, res) => {
   webhooksLog.unshift(logEntry);
   if (webhooksLog.length > 50) webhooksLog.pop();
 
-  res.json({ received: true, event_id: eventId });
+  let processResult = null;
+  try {
+    if (event.id && event.event_type) {
+      processResult = await paypalService.processWebhookEvent(event);
+    }
+  } catch (err) {
+    console.warn('[PayPal Webhook Log Route]:', err.message);
+  }
+
+  res.json({ received: true, event_id: eventId, result: processResult });
 });
 
 // POST /api/webhooks/adyen

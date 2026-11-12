@@ -97,9 +97,11 @@ function convertAmount(amount, fromCurrency, toCurrency, markupPercentage = 1.25
     original_amount: amount,
     converted_amount: roundedAmount,
     mid_market_rate: Number(midMarketRate.toFixed(6)),
+    exchange_rate: Number(midMarketRate.toFixed(6)),
     effective_rate: Number(effectiveExchangeRate.toFixed(6)),
     markup_percentage: markupPercentage,
     markup_amount: markupAmount,
+    markup_fee: markupAmount,
     symbol: CURRENCY_SYMBOLS[toCurrency] || toCurrency,
     decimals: decimals,
     timestamp: new Date().toISOString()

@@ -2349,5 +2349,564 @@ describe('International Payment Orchestration API Suite', () => {
       assert.strictEqual(finalStu.profile.guardian_name, 'Vikram Verma');
     });
   });
+
+  // =========================================================================
+  // Official PayPal Payment Gateway Integration Regression Suite
+  // =========================================================================
+  describe('Official PayPal Payment Gateway Integration Regression Suite', () => {
+    const origMock = process.env.PAYPAL_MOCK;
+    const origEnv = process.env.PAYPAL_ENV;
+
+    before(() => {
+      process.env.PAYPAL_MOCK = 'true';
+      process.env.PAYPAL_ENV = 'sandbox';
+    });
+
+    after(() => {
+      if (origMock !== undefined) process.env.PAYPAL_MOCK = origMock;
+      else delete process.env.PAYPAL_MOCK;
+
+      if (origEnv !== undefined) process.env.PAYPAL_ENV = origEnv;
+      else delete process.env.PAYPAL_ENV;
+    });
+
+    test('1. GET /api/paypal/config returns safe public config and never exposes client secret', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/config`);
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+
+      assert.strictEqual(data.env, 'sandbox');
+      assert.strictEqual(data.is_sandbox, true);
+      assert.ok(Array.isArray(data.supported_currencies));
+      assert.ok(data.supported_currencies.includes('USD'));
+      assert.ok(data.supported_currencies.includes('EUR'));
+      assert.ok(data.supported_currencies.includes('GBP'));
+      assert.ok(data.cross_border_rules);
+      assert.strictEqual(data.cross_border_rules.india_domestic_allowed, false);
+
+      // Secret must NEVER be present anywhere in public config
+      assert.strictEqual(data.client_secret, undefined);
+      assert.strictEqual(data.PAYPAL_CLIENT_SECRET, undefined);
+      assert.strictEqual(JSON.stringify(data).includes('client_secret'), false);
+    });
+
+    test('2. POST /api/paypal/check-corridor allows valid international export corridor', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/check-corridor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_country: 'US',
+          merchant_country: 'IN',
+          currency: 'USD'
+        })
+      });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.eligible, true);
+    });
+
+    test('3. POST /api/paypal/check-corridor rejects domestic India-to-India payments (RBI regulation)', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/check-corridor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_country: 'IN',
+          merchant_country: 'IN',
+          currency: 'USD'
+        })
+      });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.eligible, false);
+      assert.ok(data.reason.includes('domestic India-to-India'));
+      assert.ok(data.reason.includes('UPI or RuPay'));
+    });
+
+    test('4. POST /api/paypal/check-corridor rejects INR currency for PayPal export orders', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/check-corridor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_country: 'US',
+          merchant_country: 'IN',
+          currency: 'INR'
+        })
+      });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.eligible, false);
+      assert.ok(data.reason.includes('international settlement currency'));
+    });
+
+    test('5. POST /api/paypal/check-corridor rejects unsupported currency (e.g. XYZ)', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/check-corridor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_country: 'US',
+          merchant_country: 'IN',
+          currency: 'XYZ'
+        })
+      });
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.eligible, false);
+      assert.ok(data.reason.includes('XYZ'));
+    });
+
+    test('6. POST /api/paypal/create-order strictly rejects negative, zero or non-numeric amount', async () => {
+      for (const badAmount of [0, -49.99, 'invalid_amount', null]) {
+        const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: badAmount,
+            currency: 'USD',
+            customer_country: 'US'
+          })
+        });
+        assert.strictEqual(res.status, 400);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'INVALID_AMOUNT');
+      }
+    });
+
+    test('7. POST /api/paypal/create-order rejects domestic corridor at order creation', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: 99.00,
+          currency: 'USD',
+          customer_country: 'IN'
+        })
+      });
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'CORRIDOR_INELIGIBLE');
+    });
+
+    test('8. POST /api/paypal/create-order creates order with valid USD amount and persists initiated transaction', async () => {
+      const customTxId = `tx_test_pp_${Date.now()}`;
+      const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_id: customTxId,
+          amount: 149.00,
+          currency: 'USD',
+          customer_country: 'US',
+          customer_email: 'buyer@example.com',
+          merchant_name: 'Coursera Inc.',
+          description: 'Deep Learning Specialization'
+        })
+      });
+
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.success, true);
+      assert.strictEqual(data.status, 'CREATED');
+      assert.strictEqual(data.transaction_id, customTxId);
+      assert.strictEqual(data.amount, '149.00');
+      assert.strictEqual(data.currency, 'USD');
+      assert.ok(data.order_id);
+      assert.ok(data.links.some(l => l.rel === 'approve'));
+
+      // Check DB persistence
+      const savedTx = await db.table('transactions').findById(customTxId);
+      assert.ok(savedTx);
+      assert.strictEqual(savedTx.status, 'initiated');
+      assert.strictEqual(savedTx.payment_method, 'paypal');
+      assert.strictEqual(savedTx.primary_provider, 'paypal');
+      assert.ok(savedTx.metadata_json.includes(data.order_id));
+    });
+
+    test('9. POST /api/paypal/capture-order rejects missing order_id with 400 Bad Request', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'MISSING_ORDER_ID');
+    });
+
+    test('10. POST /api/paypal/capture-order captures approved order and marks transaction settled with fees', async () => {
+      const txId = `tx_capture_test_${Date.now()}`;
+
+      // 1. Create order
+      const createRes = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_id: txId,
+          amount: 149.00,
+          currency: 'USD',
+          customer_country: 'US'
+        })
+      });
+      const createData = await createRes.json();
+      assert.strictEqual(createData.success, true);
+
+      // 2. Capture order
+      const capRes = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: createData.order_id,
+          transaction_id: txId
+        })
+      });
+
+      assert.strictEqual(capRes.status, 200);
+      const capData = await capRes.json();
+      assert.strictEqual(capData.success, true);
+      assert.strictEqual(capData.status, 'settled');
+      assert.ok(capData.capture_id);
+      assert.strictEqual(capData.amount, '149.00');
+      assert.strictEqual(capData.currency, 'USD');
+      assert.ok(capData.fee_charged > 0);
+      assert.strictEqual(capData.seller_protection, 'ELIGIBLE');
+
+      // 3. Verify DB update
+      const settledTx = await db.table('transactions').findById(txId);
+      assert.strictEqual(settledTx.status, 'settled');
+      assert.strictEqual(settledTx.executed_provider, 'paypal');
+      assert.strictEqual(settledTx.fee_charged, capData.fee_charged);
+      assert.ok(settledTx.metadata_json.includes(capData.capture_id));
+    });
+
+    test('11. GET /api/paypal/order/:orderId returns full order details from PayPal Orders API', async () => {
+      const orderId = `PAYID-TEST-${Date.now()}`;
+      const res = await fetch(`${BASE_URL}/api/paypal/order/${orderId}`);
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.success, true);
+      assert.strictEqual(data.order.id, orderId);
+      assert.strictEqual(data.order.status, 'COMPLETED');
+    });
+
+    test('12. POST /api/paypal/webhook verifies signature and rejects when invalid', async () => {
+      const origMockVal = process.env.PAYPAL_MOCK;
+      const origWebhookId = process.env.PAYPAL_WEBHOOK_ID;
+      try {
+        process.env.PAYPAL_MOCK = 'false';
+        process.env.PAYPAL_WEBHOOK_ID = 'wh_test_id_123';
+
+        const res = await fetch(`${BASE_URL}/api/paypal/webhook`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'paypal-auth-algo': 'SHA256withRSA',
+            'paypal-cert-url': 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT-123',
+            'paypal-transmission-id': 'trans-123',
+            'paypal-transmission-sig': 'bad_signature_abc',
+            'paypal-transmission-time': new Date().toISOString()
+          },
+          body: JSON.stringify({ id: 'WH-EVT-BAD', event_type: 'PAYMENT.CAPTURE.COMPLETED' })
+        });
+
+        assert.strictEqual(res.status, 400);
+        const data = await res.json();
+        assert.ok(data.error.includes('signature'));
+      } finally {
+        process.env.PAYPAL_MOCK = origMockVal;
+        if (origWebhookId !== undefined) process.env.PAYPAL_WEBHOOK_ID = origWebhookId;
+        else delete process.env.PAYPAL_WEBHOOK_ID;
+      }
+    });
+
+    test('13. POST /api/paypal/webhook reconciles PAYMENT.CAPTURE.COMPLETED into transactions table', async () => {
+      const webhookTxId = `tx_wh_reconcile_${Date.now()}`;
+      await db.table('transactions').insert({
+        id: webhookTxId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 89.00,
+        currency: 'USD',
+        customer_amount: 89.00,
+        customer_currency: 'USD',
+        exchange_rate: 1.0,
+        customer_email: 'buyer@test.org',
+        customer_country: 'US',
+        payment_method: 'paypal',
+        primary_provider: 'paypal',
+        executed_provider: 'paypal',
+        status: 'initiated',
+        metadata_json: JSON.stringify({ paypal_order_id: 'PAYID-WH-ORDER-01' }),
+        created_at: new Date().toISOString()
+      });
+
+      const eventPayload = {
+        id: `WH-EVENT-${Date.now()}-1`,
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource: {
+          id: `CAP-WH-${Date.now()}`,
+          custom_id: webhookTxId,
+          seller_receivable_breakdown: {
+            paypal_fee: { value: '3.60', currency_code: 'USD' },
+            net_amount: { value: '85.40', currency_code: 'USD' }
+          }
+        }
+      };
+
+      const res = await fetch(`${BASE_URL}/api/paypal/webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventPayload)
+      });
+
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.status, 'PROCESSED');
+      assert.strictEqual(data.transaction_id, webhookTxId);
+
+      // Verify transaction status changed to settled
+      const updatedTx = await db.table('transactions').findById(webhookTxId);
+      assert.strictEqual(updatedTx.status, 'settled');
+      assert.strictEqual(updatedTx.fee_charged, 3.60);
+      assert.ok(updatedTx.metadata_json.includes('webhook_reconciled'));
+    });
+
+    test('14. POST /api/paypal/webhook deduplicates identical event IDs idempotently', async () => {
+      const eventId = `WH-DEDUP-${Date.now()}`;
+      const payload = {
+        id: eventId,
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource: {
+          id: `CAP-DEDUP-${Date.now()}`,
+          custom_id: 'non_existent_tx'
+        }
+      };
+
+      // First delivery -> PROCESSED
+      const res1 = await fetch(`${BASE_URL}/api/paypal/webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      assert.strictEqual(res1.status, 200);
+      const data1 = await res1.json();
+      assert.strictEqual(data1.status, 'PROCESSED');
+
+      // Second delivery with duplicate event id -> ALREADY_PROCESSED
+      const res2 = await fetch(`${BASE_URL}/api/paypal/webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      assert.strictEqual(res2.status, 200);
+      const data2 = await res2.json();
+      assert.strictEqual(data2.status, 'ALREADY_PROCESSED');
+      assert.strictEqual(data2.event_id, eventId);
+    });
+
+    test('15. Webhooks accurately update transactions on PAYMENT.CAPTURE.DENIED and REFUNDED', async () => {
+      const deniedTxId = `tx_denied_${Date.now()}`;
+      await db.table('transactions').insert({
+        id: deniedTxId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 120.00,
+        currency: 'USD',
+        payment_method: 'paypal',
+        executed_provider: 'paypal',
+        status: 'initiated',
+        created_at: new Date().toISOString()
+      });
+
+      // Send DENIED event
+      await fetch(`${BASE_URL}/api/paypal/webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `WH-DENIED-${Date.now()}`,
+          event_type: 'PAYMENT.CAPTURE.DENIED',
+          resource: { custom_id: deniedTxId }
+        })
+      });
+
+      const txAfterDenial = await db.table('transactions').findById(deniedTxId);
+      assert.strictEqual(txAfterDenial.status, 'failed');
+      assert.strictEqual(txAfterDenial.decline_code, 'paypal_capture_denied');
+
+      // Send REFUNDED event
+      await fetch(`${BASE_URL}/api/paypal/webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `WH-REFUND-${Date.now()}`,
+          event_type: 'PAYMENT.CAPTURE.REFUNDED',
+          resource: { custom_id: deniedTxId }
+        })
+      });
+
+      const txAfterRefund = await db.table('transactions').findById(deniedTxId);
+      assert.strictEqual(txAfterRefund.status, 'refunded');
+    });
+
+    test('16. When credentials are missing and mock mode is disabled, create-order returns HTTP 503 with PAYPAL_CREDENTIALS_MISSING', async () => {
+      const origMockVal = process.env.PAYPAL_MOCK;
+      try {
+        process.env.PAYPAL_MOCK = 'false';
+        const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 2344.37,
+            currency: 'USD',
+            customer_country: 'US'
+          })
+        });
+
+        assert.strictEqual(res.status, 503);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'PAYPAL_CREDENTIALS_MISSING');
+        assert.ok(data.error.includes('PayPal Gateway credentials are missing'));
+      } finally {
+        process.env.PAYPAL_MOCK = origMockVal;
+      }
+    });
+
+    test('17. For $2,344.37 USD payment, order creation strictly sends intended USD amount (never INR)', async () => {
+      const txId = `tx_usd_integrity_${Date.now()}`;
+      const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transaction_id: txId,
+          amount: 2344.37,
+          currency: 'USD',
+          customer_country: 'US',
+          merchant_name: 'Coursera Inc.',
+          description: 'Global AI & Data Science Specialization'
+        })
+      });
+
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.amount, '2344.37');
+      assert.strictEqual(data.currency, 'USD');
+      // Assert that the amount is NOT the converted INR amount (e.g. 205204.17)
+      assert.notStrictEqual(data.amount, '205204.17');
+    });
+  });
+
+  // =========================================================================
+  // FX Calculation, Rate Parsing and Mathematical Integrity Regression Suite
+  // =========================================================================
+  describe('FX Calculation, Rate Parsing and Mathematical Integrity Regression Suite', () => {
+    let fxUtils;
+
+    before(async () => {
+      fxUtils = await import('../../frontend/src/utils/fxUtils.js');
+    });
+
+    test('1. parseFxRate parses valid numeric rate (e.g. 86.45)', () => {
+      const rate = fxUtils.parseFxRate({ mid_market_rate: 86.45 });
+      assert.strictEqual(rate, 86.45);
+    });
+
+    test('2. parseFxRate parses valid string rate ("86.45")', () => {
+      const rate = fxUtils.parseFxRate({ mid_market_rate: '86.45' });
+      assert.strictEqual(rate, 86.45);
+    });
+
+    test('3. parseFxRate strictly rejects zero (0) and string zero ("0", "0.00")', () => {
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: 0 }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: '0' }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: '0.00' }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ exchange_rate: 0 }), null);
+    });
+
+    test('4. parseFxRate strictly rejects negative rates', () => {
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: -86.45 }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ exchange_rate: '-1.00' }), null);
+    });
+
+    test('5. parseFxRate strictly rejects null, undefined, empty object and invalid strings', () => {
+      assert.strictEqual(fxUtils.parseFxRate(null), null);
+      assert.strictEqual(fxUtils.parseFxRate(undefined), null);
+      assert.strictEqual(fxUtils.parseFxRate({}), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: null }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: undefined }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: 'abc' }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: 'NaN' }), null);
+      assert.strictEqual(fxUtils.parseFxRate({ mid_market_rate: Infinity }), null);
+    });
+
+    test('6. formatFxRateDisplay displays "FX rate unavailable" instead of ₹0.00 when rate is missing or invalid', () => {
+      assert.strictEqual(fxUtils.formatFxRateDisplay(null, 'USD'), 'FX rate unavailable');
+      assert.strictEqual(fxUtils.formatFxRateDisplay({}, 'USD'), 'FX rate unavailable');
+      assert.strictEqual(fxUtils.formatFxRateDisplay({ mid_market_rate: 0 }, 'USD'), 'FX rate unavailable');
+      assert.strictEqual(fxUtils.formatFxRateDisplay({ exchange_rate: '0.00' }, 'USD'), 'FX rate unavailable');
+      assert.strictEqual(fxUtils.formatFxRateDisplay({ exchange_rate: -5 }, 'USD'), 'FX rate unavailable');
+
+      // Never contains ₹0.00
+      const display = fxUtils.formatFxRateDisplay({ mid_market_rate: 0 }, 'USD');
+      assert.strictEqual(display.includes('₹0.00'), false);
+    });
+
+    test('7. formatFxRateDisplay displays correct rate when valid', () => {
+      const display = fxUtils.formatFxRateDisplay({ mid_market_rate: 86.45 }, 'USD');
+      assert.strictEqual(display, '1 USD = ₹86.45 INR');
+    });
+
+    test('8. formatFxRateDisplay indicates loading when loading=true', () => {
+      const display = fxUtils.formatFxRateDisplay({ mid_market_rate: 86.45 }, 'USD', true);
+      assert.strictEqual(display, 'Updating FX rate...');
+    });
+
+    test('9. formatMarkupDisplay formats conversion spread correctly and handles failures', () => {
+      assert.strictEqual(fxUtils.formatMarkupDisplay({ markup_amount: 2533.38 }), '₹2533.38 INR');
+      assert.strictEqual(fxUtils.formatMarkupDisplay({ markup_fee: 2533.38 }), '₹2533.38 INR');
+      assert.strictEqual(fxUtils.formatMarkupDisplay(null), 'Unavailable');
+      assert.strictEqual(fxUtils.formatMarkupDisplay({ markup_amount: 'invalid' }), 'Unavailable');
+      assert.strictEqual(fxUtils.formatMarkupDisplay({}, true), 'Calculating...');
+    });
+
+    test('10. formatTotalPayableDisplay formats converted total INR and handles failures', () => {
+      assert.strictEqual(fxUtils.formatTotalPayableDisplay({ converted_amount: 205204.17 }), '₹2,05,204.17');
+      assert.strictEqual(fxUtils.formatTotalPayableDisplay(null), 'Unavailable');
+      assert.strictEqual(fxUtils.formatTotalPayableDisplay({ converted_amount: 0 }), 'Unavailable');
+      assert.strictEqual(fxUtils.formatTotalPayableDisplay({}, true), 'Calculating...');
+    });
+
+    test('11. Mathematical agreement: $2,344.37 USD matches exactly ₹205,204.17 with 1.25% spread', async () => {
+      const res = await fetch(`${BASE_URL}/api/currency/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: 2344.37,
+          from_currency: 'USD',
+          to_currency: 'INR'
+        })
+      });
+
+      assert.strictEqual(res.status, 200);
+      const conversion = await res.json();
+
+      // Verify mid-market rate is finite positive
+      const rate = fxUtils.parseFxRate(conversion);
+      assert.ok(rate > 0);
+      assert.strictEqual(rate, 86.45);
+
+      // Verify markup fee is 1.25% of gross INR
+      const expectedBaseInr = 2344.37 * 86.45;
+      const expectedMarkup = Number((expectedBaseInr * 0.0125).toFixed(2));
+      const expectedTotal = Number((expectedBaseInr + expectedMarkup).toFixed(2));
+
+      const parsedMarkup = fxUtils.parseMarkupAmount(conversion);
+      const parsedTotal = fxUtils.parseConvertedAmount(conversion);
+
+      assert.strictEqual(parsedMarkup, expectedMarkup);
+      assert.strictEqual(parsedTotal, expectedTotal);
+      assert.strictEqual(parsedTotal, 205204.17);
+
+      // Verify formatted output
+      assert.strictEqual(fxUtils.formatFxRateDisplay(conversion, 'USD'), '1 USD = ₹86.45 INR');
+      assert.strictEqual(fxUtils.formatMarkupDisplay(conversion), '₹2533.38 INR');
+      assert.strictEqual(fxUtils.formatTotalPayableDisplay(conversion), '₹2,05,204.17');
+    });
+  });
 });
 

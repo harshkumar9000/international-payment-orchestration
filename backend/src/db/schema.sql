@@ -255,6 +255,15 @@ CREATE TABLE IF NOT EXISTS bank_accounts (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Processed Webhooks Ledger (Idempotency and deduplication)
+CREATE TABLE IF NOT EXISTS processed_webhooks (
+    id VARCHAR(128) PRIMARY KEY,
+    provider VARCHAR(32) NOT NULL,
+    event_type VARCHAR(128) NOT NULL,
+    resource_id VARCHAR(128),
+    processed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- High-Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_tx_merchant_created ON transactions(merchant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);

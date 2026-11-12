@@ -243,6 +243,15 @@ export const api = {
     toggle: (id) => request(`/providers/toggle/${id}`, { method: 'POST' })
   },
 
+  // PayPal Official REST API Integration
+  paypal: {
+    getConfig: () => request('/paypal/config'),
+    checkCorridor: (payload) => request('/paypal/check-corridor', { method: 'POST', body: payload }),
+    createOrder: (payload) => request('/paypal/create-order', { method: 'POST', body: payload }),
+    captureOrder: (payload) => request('/paypal/capture-order', { method: 'POST', body: payload }),
+    getOrder: (orderId) => request(`/paypal/order/${orderId}`)
+  },
+
   // Health
   health: () => request('/health')
 };

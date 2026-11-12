@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  parseFxRate,
+  parseMarkupAmount,
+  parseConvertedAmount
+} from '../utils/fxUtils';
+import {
   ShieldCheck,
   Lock,
   CheckCircle2,
@@ -88,9 +93,9 @@ export default function AnimatedPaymentModal({
   } = paymentData || {};
 
   const numAmount = parseFloat(amount || 0);
-  const fxRate = conversion?.exchange_rate ?? 83.45;
-  const totalInr = conversion?.converted_amount ?? Math.round(numAmount * fxRate);
-  const markupFee = conversion?.markup_fee ?? (totalInr * 0.0125);
+  const fxRate = parseFxRate(conversion);
+  const markupFee = parseMarkupAmount(conversion);
+  const totalInr = parseConvertedAmount(conversion);
 
   // Start Payment Processing Sequence
   async function triggerPaymentExecution() {
@@ -290,7 +295,9 @@ export default function AnimatedPaymentModal({
                 Total Payable Amount
               </span>
               <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
-                ₹{totalInr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {totalInr !== null
+                  ? `₹${totalInr.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : 'FX rate unavailable'}
               </div>
               <p className="text-xs text-slate-400 pt-0.5">
                 Original amount: <span className="font-semibold text-slate-200">${numAmount.toFixed(2)} {currency}</span>
@@ -302,13 +309,13 @@ export default function AnimatedPaymentModal({
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">Exchange Rate:</span>
                 <span className="font-mono text-slate-200">
-                  1 {currency} = ₹{fxRate.toFixed(2)} INR
+                  {fxRate !== null ? `1 ${currency} = ₹${fxRate.toFixed(2)} INR` : 'FX rate unavailable'}
                 </span>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">Conversion Spread (1.25%):</span>
                 <span className="font-mono text-slate-300">
-                  ₹{markupFee.toFixed(2)} INR
+                  {markupFee !== null ? `₹${markupFee.toFixed(2)} INR` : 'Unavailable'}
                 </span>
               </div>
               <div className="flex justify-between py-2">
@@ -326,6 +333,8 @@ export default function AnimatedPaymentModal({
                       ? `${selectedMethod.card?.issuing_bank || 'HDFC Bank'} •••• ${selectedMethod.card?.last_four || '1234'}`
                       : selectedMethod.type === 'upi'
                       ? `UPI (${selectedMethod.upiVpa || 'student@upi'})`
+                      : selectedMethod.type === 'paypal'
+                      ? 'PayPal Sandbox Gateway'
                       : 'International Payment Card'}
                   </span>
                 </span>
@@ -343,7 +352,7 @@ export default function AnimatedPaymentModal({
                 {/* Shimmer light bar */}
                 <div className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 animate-shimmer pointer-events-none" />
                 <Lock className="w-4 h-4 text-teal-100" />
-                <span>Confirm & Pay ₹{totalInr.toLocaleString('en-IN')}</span>
+                <span>Confirm & Pay {totalInr !== null ? `₹${totalInr.toLocaleString('en-IN')}` : ''}</span>
                 <ArrowRight className="w-4 h-4 text-teal-100 group-hover:translate-x-1 transition-transform" />
               </button>
 
@@ -658,7 +667,9 @@ export default function AnimatedPaymentModal({
                 Payment Successful!
               </h2>
               <p className="text-2xl sm:text-3xl font-extrabold font-mono text-white pt-1">
-                ₹{totalInr.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {totalInr !== null
+                  ? `₹${totalInr.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                  : `₹${(transactionResult?.amount_inr || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
               </p>
               <p className="text-xs text-slate-400">
                 Paid to <strong className="text-slate-200">{merchantName}</strong> (${numAmount.toFixed(2)} {currency})
@@ -683,7 +694,9 @@ export default function AnimatedPaymentModal({
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">Clearing Rail:</span>
                 <span className="font-semibold text-slate-200">
-                  Atlas Cross-Border Settlement (Sandbox)
+                  {transactionResult?.payment_method?.includes('PayPal') || selectedMethod.type === 'paypal'
+                    ? 'PayPal Orders API v2 (Sandbox Clearing)'
+                    : 'Atlas Cross-Border Settlement (Sandbox)'}
                 </span>
               </div>
 
@@ -694,9 +707,20 @@ export default function AnimatedPaymentModal({
                     ? `${selectedMethod.card?.issuing_bank || 'HDFC Bank'} •••• ${selectedMethod.card?.last_four || '1234'}`
                     : selectedMethod.type === 'upi'
                     ? 'UPI International'
+                    : selectedMethod.type === 'paypal'
+                    ? 'PayPal Sandbox'
                     : 'International Card'}
                 </span>
               </div>
+
+              {transactionResult?.capture_id && (
+                <div className="flex justify-between py-2">
+                  <span className="text-slate-400">Capture ID:</span>
+                  <span className="font-mono text-xs text-white">
+                    {transactionResult.capture_id}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons: View Transaction + Done */}
