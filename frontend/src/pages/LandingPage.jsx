@@ -34,6 +34,7 @@ export default function LandingPage({ setActivePage }) {
   const heroDescRef = useRef(null);
   const heroButtonsRef = useRef(null);
   const heroCardsWrapRef = useRef(null);
+  const heroSquiggleRef = useRef(null);
   const rearCardRef = useRef(null);
   const frontCardRef = useRef(null);
   const heroMetricsRef = useRef(null);
@@ -143,6 +144,41 @@ export default function LandingPage({ setActivePage }) {
           rotation: 6,
           duration: 0.5
         }, '-=0.35');
+      }
+
+      // Step 7b: Squiggly line & card geometric accents fade in along with the cards
+      if (heroSquiggleRef.current) {
+        const squigglePath = heroSquiggleRef.current.querySelector('path');
+        const pathLen = squigglePath?.getTotalLength ? squigglePath.getTotalLength() : 140;
+        if (squigglePath) {
+          gsap.set(squigglePath, {
+            strokeDasharray: pathLen,
+            strokeDashoffset: pathLen
+          });
+        }
+        heroTl.fromTo(
+          heroSquiggleRef.current,
+          { opacity: 0, y: 18, scale: 0.92 },
+          { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: 'power2.out', clearProps: 'transform' },
+          '-=0.45'
+        );
+        if (squigglePath) {
+          heroTl.to(
+            squigglePath,
+            { strokeDashoffset: 0, duration: 0.65, ease: 'power2.out' },
+            '<'
+          );
+        }
+      }
+
+      const cardAccents = heroRef.current?.querySelectorAll('.hero-card-accent');
+      if (cardAccents && cardAccents.length > 0) {
+        heroTl.fromTo(
+          cardAccents,
+          { opacity: 0, scale: 0.85 },
+          { opacity: 1, scale: 1, duration: 0.5, stagger: 0.1, ease: 'power2.out', clearProps: 'transform' },
+          '<'
+        );
       }
 
       // Step 8 & 9: Bottom indicators and metrics appear
@@ -444,6 +480,7 @@ export default function LandingPage({ setActivePage }) {
             
             {/* Background Hand-drawn Squiggly Line SVG matching the reference */}
             <svg
+              ref={heroSquiggleRef}
               className="absolute -bottom-4 left-6 w-36 h-20 text-white/40 pointer-events-none hidden sm:block"
               viewBox="0 0 120 60"
               fill="none"

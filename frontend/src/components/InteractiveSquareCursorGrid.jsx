@@ -137,7 +137,7 @@ export default function InteractiveSquareCursorGrid({ targetContainerRef }) {
       {/* 3. Reference Geometric Accents (Directly matching reference image with gentle opacity) */}
       {/* 3-Ray Burst `\ | /` above cards at top right */}
       <svg
-        className="absolute top-[16%] right-[12%] w-12 h-12 text-white pointer-events-none hidden lg:block"
+        className="hero-card-accent absolute top-[16%] right-[12%] w-12 h-12 text-white pointer-events-none hidden lg:block"
         viewBox="0 0 40 40"
         fill="none"
         stroke="currentColor"
@@ -151,7 +151,7 @@ export default function InteractiveSquareCursorGrid({ targetContainerRef }) {
 
       {/* Curved Arc `)` on left */}
       <svg
-        className="absolute bottom-[22%] left-[46%] w-10 h-10 text-white pointer-events-none hidden lg:block"
+        className="hero-card-accent absolute bottom-[22%] left-[46%] w-10 h-10 text-white pointer-events-none hidden lg:block"
         viewBox="0 0 30 30"
         fill="none"
         stroke="currentColor"
