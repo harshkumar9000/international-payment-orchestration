@@ -177,7 +177,7 @@ router.post('/create-order', optionalAuth, async (req, res) => {
  */
 router.post('/capture-order', async (req, res) => {
   try {
-    const { order_id, transaction_id } = req.body;
+    const { order_id, transaction_id, mock_amount, mock_currency } = req.body;
 
     if (!order_id) {
       return res.status(400).json({
@@ -186,10 +186,79 @@ router.post('/capture-order', async (req, res) => {
       });
     }
 
-    // Capture payment via official PayPal Service
+    // 1. Load original transaction from database (Priority 2, Req 1 & 7)
+    let tx = null;
+    if (transaction_id) {
+      tx = await db.table('transactions').findById(transaction_id);
+    }
+    if (!tx) {
+      tx = await db.table('transactions').findOne(t =>
+        t.metadata_json && t.metadata_json.includes(order_id)
+      );
+    }
+
+    // Never mark settled if the original transaction record cannot be verified
+    if (!tx) {
+      return res.status(404).json({
+        error: 'Original transaction not found for this PayPal order.',
+        code: 'TRANSACTION_NOT_FOUND'
+      });
+    }
+
+    const targetTxId = tx.id;
+    const existingMeta = typeof tx.metadata_json === 'string'
+      ? JSON.parse(tx.metadata_json || '{}')
+      : (tx.metadata_json || {});
+
+    // 2. Verify PayPal order ID is linked to that transaction (Req 2)
+    if (existingMeta.paypal_order_id && existingMeta.paypal_order_id !== order_id) {
+      return res.status(400).json({
+        error: `Order link mismatch: transaction ${targetTxId} is linked to PayPal order '${existingMeta.paypal_order_id}', not '${order_id}'.`,
+        code: 'ORDER_LINK_MISMATCH'
+      });
+    }
+
+    // 6. Handle already-captured orders safely and idempotently (Req 6)
+    if (tx.status === 'settled' && existingMeta.paypal_capture_id) {
+      return res.json({
+        success: true,
+        status: 'settled',
+        idempotent: true,
+        transaction_id: targetTxId,
+        order_id: existingMeta.paypal_order_id || order_id,
+        capture_id: existingMeta.paypal_capture_id,
+        amount: existingMeta.captured_amount || tx.amount,
+        currency: existingMeta.captured_currency || tx.currency,
+        fee_charged: tx.fee_charged || 0,
+        net_amount: existingMeta.net_amount || (tx.amount - (tx.fee_charged || 0)),
+        seller_protection: existingMeta.seller_protection || 'ELIGIBLE',
+        payer: existingMeta.payer || {}
+      });
+    }
+
+    // Prevent duplicate capture attempts when transaction is already marked reconciliation_required
+    if (tx.status === 'reconciliation_required' && existingMeta.paypal_capture_id) {
+      return res.status(409).json({
+        error: 'Payment capture discrepancy already recorded. Transaction is in reconciliation_required state. Duplicate capture prevented.',
+        code: 'RECONCILIATION_REQUIRED',
+        status: 'reconciliation_required',
+        customer_charged: true,
+        transaction_id: targetTxId,
+        order_id: existingMeta.paypal_order_id || order_id,
+        capture_id: existingMeta.paypal_capture_id,
+        expected_amount: existingMeta.expected_amount,
+        captured_amount: existingMeta.captured_amount,
+        expected_currency: existingMeta.expected_currency,
+        captured_currency: existingMeta.captured_currency
+      });
+    }
+
+    // Execute capture via official PayPal Service
     const captureResult = await paypalService.captureOrder({
       orderId: order_id,
-      transactionId: transaction_id
+      transactionId: targetTxId,
+      mockAmount: mock_amount,
+      mockCurrency: mock_currency
     });
 
     if (captureResult.status !== 'COMPLETED') {
@@ -201,48 +270,106 @@ router.post('/capture-order', async (req, res) => {
       });
     }
 
-    // Locate transaction record to update
-    let targetTxId = transaction_id;
-    let tx = null;
-    if (targetTxId) {
-      tx = await db.table('transactions').findById(targetTxId);
-    }
-    if (!tx) {
-      tx = await db.table('transactions').findOne(t =>
-        t.metadata_json && t.metadata_json.includes(order_id)
-      );
-      if (tx) {
-        targetTxId = tx.id;
+    // 3 & 4. Compare captured amount and currency with original order (Req 3, 4, 5)
+    const expectedAmount = parseFloat(tx.amount);
+    const capturedAmount = parseFloat(captureResult.amount);
+    const expectedCurrency = (tx.currency || 'USD').toUpperCase();
+    const capturedCurrency = (captureResult.currency || 'USD').toUpperCase();
+
+    const isAmountMismatch = isNaN(capturedAmount) || Math.abs(expectedAmount - capturedAmount) > 0.01;
+    const isCurrencyMismatch = expectedCurrency !== capturedCurrency;
+
+    if (isAmountMismatch || isCurrencyMismatch) {
+      const mismatchType = isAmountMismatch ? 'amount_mismatch' : 'currency_mismatch';
+      const mismatchReason = isAmountMismatch
+        ? `Captured amount (${captureResult.amount}) does not match original order amount (${expectedAmount}).`
+        : `Captured currency (${capturedCurrency}) does not match original order currency (${expectedCurrency}).`;
+
+      const discrepancyMeta = {
+        ...existingMeta,
+        paypal_order_id: order_id,
+        paypal_capture_id: captureResult.capture_id,
+        paypal_status: captureResult.status,
+        expected_amount: expectedAmount,
+        captured_amount: capturedAmount,
+        expected_currency: expectedCurrency,
+        captured_currency: capturedCurrency,
+        customer_charged: true,
+        reconciliation_required: true,
+        mismatch_type: mismatchType,
+        mismatch_reason: mismatchReason,
+        seller_protection: captureResult.seller_protection,
+        payer: captureResult.payer,
+        captured_at: new Date().toISOString()
+      };
+
+      // Do not mark transaction as an ordinary failed payment: mark as reconciliation_required
+      await db.table('transactions').update(targetTxId, {
+        status: 'reconciliation_required',
+        executed_provider: 'paypal',
+        decline_code: mismatchType,
+        decline_reason: mismatchReason,
+        metadata_json: JSON.stringify(discrepancyMeta),
+        updated_at: new Date().toISOString()
+      });
+
+      // Add audit log entry for manual investigation
+      try {
+        await db.table('agentic_audit_logs').insert({
+          id: `audit_${uuidv4().substring(0, 8)}`,
+          transaction_id: targetTxId,
+          action_type: 'PAYMENT_CAPTURE_DISCREPANCY',
+          provider: 'paypal',
+          provider_status_verified: captureResult.status || 'COMPLETED',
+          agent_reasoning: `Manual reconciliation required: ${mismatchReason} Order ID: ${order_id}, Capture ID: ${captureResult.capture_id}. Customer was charged, but amount/currency differed from original order. Automated refund withheld for manual safety review.`,
+          decision: 'FLAG_RECONCILIATION_REQUIRED',
+          requires_human_approval: true,
+          created_at: new Date().toISOString()
+        });
+      } catch (auditErr) {
+        console.error('⚠️ [Audit Log Warning]: Failed to insert audit log entry:', auditErr.message);
       }
+
+      return res.status(400).json({
+        error: `Capture discrepancy detected: ${mismatchReason} Transaction flagged as reconciliation_required for manual review. Customer card/account has been charged.`,
+        code: isAmountMismatch ? 'CAPTURE_AMOUNT_MISMATCH' : 'CAPTURE_CURRENCY_MISMATCH',
+        status: 'reconciliation_required',
+        customer_charged: true,
+        reconciliation_required: true,
+        transaction_id: targetTxId,
+        order_id,
+        capture_id: captureResult.capture_id,
+        expected_amount: expectedAmount,
+        captured_amount: capturedAmount,
+        expected_currency: expectedCurrency,
+        captured_currency: capturedCurrency
+      });
     }
 
     // Update database record to 'settled'
-    if (tx) {
-      const existingMeta = typeof tx.metadata_json === 'string'
-        ? JSON.parse(tx.metadata_json || '{}')
-        : (tx.metadata_json || {});
-
-      await db.table('transactions').update(targetTxId, {
-        status: 'settled',
-        executed_provider: 'paypal',
-        fee_charged: captureResult.fee_charged,
-        metadata_json: JSON.stringify({
-          ...existingMeta,
-          paypal_order_id: order_id,
-          paypal_capture_id: captureResult.capture_id,
-          paypal_status: captureResult.status,
-          seller_protection: captureResult.seller_protection,
-          payer: captureResult.payer,
-          captured_at: new Date().toISOString()
-        }),
-        updated_at: new Date().toISOString()
-      });
-    }
+    await db.table('transactions').update(targetTxId, {
+      status: 'settled',
+      executed_provider: 'paypal',
+      fee_charged: captureResult.fee_charged,
+      metadata_json: JSON.stringify({
+        ...existingMeta,
+        paypal_order_id: order_id,
+        paypal_capture_id: captureResult.capture_id,
+        paypal_status: captureResult.status,
+        captured_amount: capturedAmount,
+        captured_currency: capturedCurrency,
+        customer_charged: true,
+        seller_protection: captureResult.seller_protection,
+        payer: captureResult.payer,
+        captured_at: new Date().toISOString()
+      }),
+      updated_at: new Date().toISOString()
+    });
 
     res.json({
       success: true,
       status: 'settled',
-      transaction_id: targetTxId || null,
+      transaction_id: targetTxId,
       order_id: captureResult.id,
       capture_id: captureResult.capture_id,
       amount: captureResult.amount,
@@ -275,8 +402,11 @@ router.post('/webhook', async (req, res) => {
     });
 
     if (!isSignatureValid) {
-      console.warn('⚠️ [PayPal Webhook] Signature verification failed. Rejecting untrusted webhook event.');
-      return res.status(400).json({ error: 'Invalid PayPal webhook signature' });
+      console.warn('⚠️ [PayPal Webhook] Signature verification failed or missing PAYPAL_WEBHOOK_ID. Rejecting untrusted webhook event.');
+      return res.status(400).json({
+        error: 'Invalid PayPal webhook signature or unconfigured webhook ID',
+        code: 'INVALID_WEBHOOK_SIGNATURE'
+      });
     }
 
     const result = await paypalService.processWebhookEvent(req.body);

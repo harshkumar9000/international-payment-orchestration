@@ -15,6 +15,8 @@ const { app, startServer, ensureDbInitialized, _resetServerlessInitPromiseForTes
 const db = require('../src/db/db');
 const seed = require('../src/db/seed');
 const { calculateAge, parseAndCalculateAge } = require('../src/services/studentPayment.service');
+const currencyService = require('../src/services/currency.service');
+const paypalService = require('../src/services/paypal.service');
 
 let serverInstance;
 const TEST_PORT = 5099;
@@ -2618,6 +2620,7 @@ describe('International Payment Orchestration API Suite', () => {
     });
 
     test('13. POST /api/paypal/webhook reconciles PAYMENT.CAPTURE.COMPLETED into transactions table', async () => {
+      process.env.PAYPAL_WEBHOOK_ID = 'wh_test_id_123';
       const webhookTxId = `tx_wh_reconcile_${Date.now()}`;
       await db.table('transactions').insert({
         id: webhookTxId,
@@ -2652,7 +2655,14 @@ describe('International Payment Orchestration API Suite', () => {
 
       const res = await fetch(`${BASE_URL}/api/paypal/webhook`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'paypal-auth-algo': 'SHA256withRSA',
+          'paypal-cert-url': 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT-123',
+          'paypal-transmission-id': 'trans-123',
+          'paypal-transmission-sig': 'valid_sig_123',
+          'paypal-transmission-time': new Date().toISOString()
+        },
         body: JSON.stringify(eventPayload)
       });
 
@@ -2669,6 +2679,7 @@ describe('International Payment Orchestration API Suite', () => {
     });
 
     test('14. POST /api/paypal/webhook deduplicates identical event IDs idempotently', async () => {
+      process.env.PAYPAL_WEBHOOK_ID = 'wh_test_id_123';
       const eventId = `WH-DEDUP-${Date.now()}`;
       const payload = {
         id: eventId,
@@ -2679,10 +2690,19 @@ describe('International Payment Orchestration API Suite', () => {
         }
       };
 
+      const validHeaders = {
+        'Content-Type': 'application/json',
+        'paypal-auth-algo': 'SHA256withRSA',
+        'paypal-cert-url': 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT-123',
+        'paypal-transmission-id': 'trans-123',
+        'paypal-transmission-sig': 'valid_sig_123',
+        'paypal-transmission-time': new Date().toISOString()
+      };
+
       // First delivery -> PROCESSED
       const res1 = await fetch(`${BASE_URL}/api/paypal/webhook`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: validHeaders,
         body: JSON.stringify(payload)
       });
       assert.strictEqual(res1.status, 200);
@@ -2692,7 +2712,7 @@ describe('International Payment Orchestration API Suite', () => {
       // Second delivery with duplicate event id -> ALREADY_PROCESSED
       const res2 = await fetch(`${BASE_URL}/api/paypal/webhook`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: validHeaders,
         body: JSON.stringify(payload)
       });
       assert.strictEqual(res2.status, 200);
@@ -2702,6 +2722,7 @@ describe('International Payment Orchestration API Suite', () => {
     });
 
     test('15. Webhooks accurately update transactions on PAYMENT.CAPTURE.DENIED and REFUNDED', async () => {
+      process.env.PAYPAL_WEBHOOK_ID = 'wh_test_id_123';
       const deniedTxId = `tx_denied_${Date.now()}`;
       await db.table('transactions').insert({
         id: deniedTxId,
@@ -2714,10 +2735,19 @@ describe('International Payment Orchestration API Suite', () => {
         created_at: new Date().toISOString()
       });
 
+      const validHeaders = {
+        'Content-Type': 'application/json',
+        'paypal-auth-algo': 'SHA256withRSA',
+        'paypal-cert-url': 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT-123',
+        'paypal-transmission-id': 'trans-123',
+        'paypal-transmission-sig': 'valid_sig_123',
+        'paypal-transmission-time': new Date().toISOString()
+      };
+
       // Send DENIED event
       await fetch(`${BASE_URL}/api/paypal/webhook`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: validHeaders,
         body: JSON.stringify({
           id: `WH-DENIED-${Date.now()}`,
           event_type: 'PAYMENT.CAPTURE.DENIED',
@@ -2732,7 +2762,7 @@ describe('International Payment Orchestration API Suite', () => {
       // Send REFUNDED event
       await fetch(`${BASE_URL}/api/paypal/webhook`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: validHeaders,
         body: JSON.stringify({
           id: `WH-REFUND-${Date.now()}`,
           event_type: 'PAYMENT.CAPTURE.REFUNDED',
@@ -2746,8 +2776,14 @@ describe('International Payment Orchestration API Suite', () => {
 
     test('16. When credentials are missing and mock mode is disabled, create-order returns HTTP 503 with PAYPAL_CREDENTIALS_MISSING', async () => {
       const origMockVal = process.env.PAYPAL_MOCK;
+      const origClientId = process.env.PAYPAL_CLIENT_ID;
+      const origClientSecret = process.env.PAYPAL_CLIENT_SECRET;
+      const origViteClientId = process.env.VITE_PAYPAL_CLIENT_ID;
       try {
         process.env.PAYPAL_MOCK = 'false';
+        delete process.env.PAYPAL_CLIENT_ID;
+        delete process.env.PAYPAL_CLIENT_SECRET;
+        delete process.env.VITE_PAYPAL_CLIENT_ID;
         const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2764,6 +2800,9 @@ describe('International Payment Orchestration API Suite', () => {
         assert.ok(data.error.includes('PayPal Gateway credentials are missing'));
       } finally {
         process.env.PAYPAL_MOCK = origMockVal;
+        if (origClientId !== undefined) process.env.PAYPAL_CLIENT_ID = origClientId; else delete process.env.PAYPAL_CLIENT_ID;
+        if (origClientSecret !== undefined) process.env.PAYPAL_CLIENT_SECRET = origClientSecret; else delete process.env.PAYPAL_CLIENT_SECRET;
+        if (origViteClientId !== undefined) process.env.VITE_PAYPAL_CLIENT_ID = origViteClientId; else delete process.env.VITE_PAYPAL_CLIENT_ID;
       }
     });
 
@@ -2906,6 +2945,586 @@ describe('International Payment Orchestration API Suite', () => {
       assert.strictEqual(fxUtils.formatFxRateDisplay(conversion, 'USD'), '1 USD = ₹86.45 INR');
       assert.strictEqual(fxUtils.formatMarkupDisplay(conversion), '₹2533.38 INR');
       assert.strictEqual(fxUtils.formatTotalPayableDisplay(conversion), '₹2,05,204.17');
+    });
+  });
+
+  describe('ATLAS.PAY — Production Safety & Hardening Regression Suite', () => {
+    const origMockSuite = process.env.PAYPAL_MOCK;
+    const origEnvSuite = process.env.PAYPAL_ENV;
+    const origWebhookSuite = process.env.PAYPAL_WEBHOOK_ID;
+
+    before(() => {
+      process.env.PAYPAL_MOCK = 'true';
+      process.env.PAYPAL_ENV = 'sandbox';
+      process.env.PAYPAL_WEBHOOK_ID = 'wh_test_valid_id';
+    });
+
+    after(() => {
+      if (origMockSuite !== undefined) process.env.PAYPAL_MOCK = origMockSuite; else delete process.env.PAYPAL_MOCK;
+      if (origEnvSuite !== undefined) process.env.PAYPAL_ENV = origEnvSuite; else delete process.env.PAYPAL_ENV;
+      if (origWebhookSuite !== undefined) process.env.PAYPAL_WEBHOOK_ID = origWebhookSuite; else delete process.env.PAYPAL_WEBHOOK_ID;
+    });
+
+    const VALID_TEST_HEADERS = {
+      'Content-Type': 'application/json',
+      'paypal-auth-algo': 'SHA256withRSA',
+      'paypal-cert-url': 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT-123',
+      'paypal-transmission-id': 'trans-sec-01',
+      'paypal-transmission-sig': 'sig_valid_safe_01',
+      'paypal-transmission-time': new Date().toISOString()
+    };
+
+    // Priority 1 — PayPal Webhook Security
+    test('1. Webhook rejection when PAYPAL_WEBHOOK_ID is missing (returns HTTP 400)', async () => {
+      const origWebhookId = process.env.PAYPAL_WEBHOOK_ID;
+      try {
+        delete process.env.PAYPAL_WEBHOOK_ID;
+        const res = await fetch(`${BASE_URL}/api/paypal/webhook`, {
+          method: 'POST',
+          headers: VALID_TEST_HEADERS,
+          body: JSON.stringify({ id: `WH-NO-ID-${Date.now()}`, event_type: 'PAYMENT.CAPTURE.COMPLETED' })
+        });
+
+        assert.strictEqual(res.status, 400);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'INVALID_WEBHOOK_SIGNATURE');
+        assert.ok(data.error.includes('unconfigured webhook ID') || data.error.includes('signature'));
+      } finally {
+        if (origWebhookId !== undefined) process.env.PAYPAL_WEBHOOK_ID = origWebhookId;
+      }
+    });
+
+    test('2. Webhook rejection when cryptographic signature is forged or invalid (returns HTTP 400)', async () => {
+      const origWebhookId = process.env.PAYPAL_WEBHOOK_ID;
+      try {
+        process.env.PAYPAL_WEBHOOK_ID = 'wh_test_valid_id';
+        const res = await fetch(`${BASE_URL}/api/paypal/webhook`, {
+          method: 'POST',
+          headers: {
+            ...VALID_TEST_HEADERS,
+            'paypal-transmission-sig': 'bad_signature_abc'
+          },
+          body: JSON.stringify({ id: `WH-BAD-SIG-${Date.now()}`, event_type: 'PAYMENT.CAPTURE.COMPLETED' })
+        });
+
+        assert.strictEqual(res.status, 400);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'INVALID_WEBHOOK_SIGNATURE');
+      } finally {
+        if (origWebhookId !== undefined) process.env.PAYPAL_WEBHOOK_ID = origWebhookId;
+      }
+    });
+
+    test('3. Older /api/webhooks/paypal route strictly rejects unsigned events and never modifies DB', async () => {
+      const probeTxId = `tx_probe_${Date.now()}`;
+      await db.table('transactions').insert({
+        id: probeTxId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 199.00,
+        currency: 'USD',
+        status: 'initiated',
+        payment_method: 'paypal',
+        created_at: new Date().toISOString()
+      });
+
+      // Send unsigned event to older webhooks route
+      const res = await fetch(`${BASE_URL}/api/webhooks/paypal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: `WH-FORGED-${Date.now()}`,
+          event_type: 'PAYMENT.CAPTURE.COMPLETED',
+          resource: { custom_id: probeTxId }
+        })
+      });
+
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'INVALID_WEBHOOK_SIGNATURE');
+
+      // Verify transaction status was NOT modified
+      const tx = await db.table('transactions').findById(probeTxId);
+      assert.strictEqual(tx.status, 'initiated');
+    });
+
+    // Priority 2 — Capture Amount & Currency Verification
+    test('4. Capture rejection when transaction is unlinked / not found (returns HTTP 404)', async () => {
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: `PAYID-UNLINKED-${Date.now()}`,
+          transaction_id: 'tx_nonexistent_order_999'
+        })
+      });
+
+      assert.strictEqual(res.status, 404);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'TRANSACTION_NOT_FOUND');
+    });
+
+    test('5. Capture rejection when order ID does not match linked transaction (returns HTTP 400)', async () => {
+      const txId = `tx_link_mismatch_${Date.now()}`;
+      await db.table('transactions').insert({
+        id: txId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 75.00,
+        currency: 'USD',
+        status: 'initiated',
+        metadata_json: JSON.stringify({ paypal_order_id: 'PAYID-ORIGINAL-ORDER-A' }),
+        created_at: new Date().toISOString()
+      });
+
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: 'PAYID-DIFFERENT-ORDER-B',
+          transaction_id: txId
+        })
+      });
+
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'ORDER_LINK_MISMATCH');
+    });
+
+    test('6. Completed capture with amount mismatch flags reconciliation_required (not failed), customer_charged: true, and logs audit', async () => {
+      const txId = `tx_amt_mismatch_${Date.now()}`;
+      const orderId = `PAYID-AMT-${Date.now()}`;
+      await db.table('transactions').insert({
+        id: txId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 250.00,
+        currency: 'USD',
+        status: 'initiated',
+        metadata_json: JSON.stringify({ paypal_order_id: orderId }),
+        created_at: new Date().toISOString()
+      });
+
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          transaction_id: txId,
+          mock_amount: '150.00' // Captured amount is 150.00 but expected was 250.00
+        })
+      });
+
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'CAPTURE_AMOUNT_MISMATCH');
+      assert.strictEqual(data.status, 'reconciliation_required');
+      assert.strictEqual(data.customer_charged, true);
+      assert.strictEqual(data.reconciliation_required, true);
+      assert.strictEqual(data.expected_amount, 250);
+      assert.strictEqual(data.captured_amount, 150);
+
+      // Verify transaction marked reconciliation_required and NOT ordinary failed
+      const tx = await db.table('transactions').findById(txId);
+      assert.strictEqual(tx.status, 'reconciliation_required');
+      assert.notStrictEqual(tx.status, 'failed');
+      assert.strictEqual(tx.decline_code, 'amount_mismatch');
+
+      const meta = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json) : tx.metadata_json;
+      assert.strictEqual(meta.customer_charged, true);
+      assert.strictEqual(meta.reconciliation_required, true);
+      assert.strictEqual(meta.expected_amount, 250);
+      assert.strictEqual(meta.captured_amount, 150);
+      assert.ok(meta.paypal_capture_id);
+
+      // Verify audit log entry was written
+      const auditLogs = await db.table('agentic_audit_logs').find();
+      const entry = auditLogs.find(l => l.transaction_id === txId && l.action_type === 'PAYMENT_CAPTURE_DISCREPANCY');
+      assert.ok(entry, 'Audit log entry must exist for manual reconciliation investigation');
+      assert.strictEqual(entry.decision, 'FLAG_RECONCILIATION_REQUIRED');
+      assert.strictEqual(entry.requires_human_approval, true);
+    });
+
+    test('7. Completed capture with currency mismatch flags reconciliation_required (not failed), customer_charged: true, and logs audit', async () => {
+      const txId = `tx_curr_mismatch_${Date.now()}`;
+      const orderId = `PAYID-CURR-${Date.now()}`;
+      await db.table('transactions').insert({
+        id: txId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 100.00,
+        currency: 'USD',
+        status: 'initiated',
+        metadata_json: JSON.stringify({ paypal_order_id: orderId }),
+        created_at: new Date().toISOString()
+      });
+
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          transaction_id: txId,
+          mock_amount: '100.00',
+          mock_currency: 'GBP' // Captured currency is GBP but expected was USD
+        })
+      });
+
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'CAPTURE_CURRENCY_MISMATCH');
+      assert.strictEqual(data.status, 'reconciliation_required');
+      assert.strictEqual(data.customer_charged, true);
+      assert.strictEqual(data.reconciliation_required, true);
+      assert.strictEqual(data.expected_currency, 'USD');
+      assert.strictEqual(data.captured_currency, 'GBP');
+
+      // Verify transaction marked reconciliation_required and NOT ordinary failed
+      const tx = await db.table('transactions').findById(txId);
+      assert.strictEqual(tx.status, 'reconciliation_required');
+      assert.notStrictEqual(tx.status, 'failed');
+      assert.strictEqual(tx.decline_code, 'currency_mismatch');
+
+      const meta = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json) : tx.metadata_json;
+      assert.strictEqual(meta.customer_charged, true);
+      assert.strictEqual(meta.reconciliation_required, true);
+      assert.strictEqual(meta.expected_currency, 'USD');
+      assert.strictEqual(meta.captured_currency, 'GBP');
+      assert.ok(meta.paypal_capture_id);
+
+      // Verify audit log entry was written
+      const auditLogs = await db.table('agentic_audit_logs').find();
+      const entry = auditLogs.find(l => l.transaction_id === txId && l.action_type === 'PAYMENT_CAPTURE_DISCREPANCY');
+      assert.ok(entry, 'Audit log entry must exist for currency discrepancy');
+      assert.strictEqual(entry.decision, 'FLAG_RECONCILIATION_REQUIRED');
+      assert.strictEqual(entry.requires_human_approval, true);
+    });
+
+    test('8. Duplicate capture attempt on transaction in reconciliation_required is safely blocked (HTTP 409)', async () => {
+      const txId = `tx_recon_dup_${Date.now()}`;
+      const orderId = `PAYID-RECON-DUP-${Date.now()}`;
+      const captureId = `CAP-RECON-${Date.now()}`;
+      await db.table('transactions').insert({
+        id: txId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 200.00,
+        currency: 'USD',
+        status: 'reconciliation_required',
+        decline_code: 'amount_mismatch',
+        metadata_json: JSON.stringify({
+          paypal_order_id: orderId,
+          paypal_capture_id: captureId,
+          expected_amount: 200.00,
+          captured_amount: 100.00,
+          customer_charged: true,
+          reconciliation_required: true
+        }),
+        created_at: new Date().toISOString()
+      });
+
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          transaction_id: txId
+        })
+      });
+
+      assert.strictEqual(res.status, 409);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'RECONCILIATION_REQUIRED');
+      assert.strictEqual(data.status, 'reconciliation_required');
+      assert.strictEqual(data.customer_charged, true);
+      assert.strictEqual(data.capture_id, captureId);
+    });
+
+    test('9. Idempotent capture of already-settled transactions without double-charging', async () => {
+      const txId = `tx_already_settled_${Date.now()}`;
+      const orderId = `PAYID-SETTLED-${Date.now()}`;
+      const captureId = `CAP-PREV-${Date.now()}`;
+      await db.table('transactions').insert({
+        id: txId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 99.00,
+        currency: 'USD',
+        status: 'settled',
+        fee_charged: 3.50,
+        metadata_json: JSON.stringify({
+          paypal_order_id: orderId,
+          paypal_capture_id: captureId,
+          captured_amount: 99.00,
+          captured_currency: 'USD'
+        }),
+        created_at: new Date().toISOString()
+      });
+
+      const res = await fetch(`${BASE_URL}/api/paypal/capture-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          transaction_id: txId
+        })
+      });
+
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.status, 'settled');
+      assert.strictEqual(data.idempotent, true);
+      assert.strictEqual(data.capture_id, captureId);
+    });
+
+    // Priority 3 — Atomic Webhook Deduplication & Retries
+    test('10. Concurrent duplicate webhook deliveries with same event ID are safely deduplicated', async () => {
+      process.env.PAYPAL_WEBHOOK_ID = 'wh_test_valid_id';
+      const eventId = `WH-CONCURRENT-${Date.now()}`;
+      const payload = {
+        id: eventId,
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource: { id: `CAP-CONC-${Date.now()}`, custom_id: 'tx_conc_target' }
+      };
+
+      const [res1, res2] = await Promise.all([
+        fetch(`${BASE_URL}/api/paypal/webhook`, {
+          method: 'POST',
+          headers: VALID_TEST_HEADERS,
+          body: JSON.stringify(payload)
+        }),
+        fetch(`${BASE_URL}/api/paypal/webhook`, {
+          method: 'POST',
+          headers: VALID_TEST_HEADERS,
+          body: JSON.stringify(payload)
+        })
+      ]);
+
+      assert.strictEqual(res1.status, 200);
+      assert.strictEqual(res2.status, 200);
+      const data1 = await res1.json();
+      const data2 = await res2.json();
+
+      const statuses = [data1.status, data2.status];
+      assert.ok(statuses.includes('PROCESSED'));
+      assert.ok(statuses.includes('ALREADY_PROCESSED'));
+    });
+
+    test('11. Webhook deliveries across separate service instances are deduplicated atomically via database', async () => {
+      const { PayPalService } = require('../src/services/paypal.service');
+      const serviceA = new PayPalService();
+      const serviceB = new PayPalService();
+
+      const eventId = `WH-CROSS-INSTANCE-${Date.now()}`;
+      const crossTxId = `tx_cross_inst_${Date.now()}`;
+      await db.table('transactions').insert({
+        id: crossTxId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 75.00,
+        currency: 'USD',
+        status: 'initiated',
+        created_at: new Date().toISOString()
+      });
+
+      const eventPayload = {
+        id: eventId,
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource: {
+          id: `CAP-CROSS-${Date.now()}`,
+          custom_id: crossTxId,
+          seller_receivable_breakdown: { paypal_fee: { value: '2.50' } }
+        }
+      };
+
+      // Service instance A processes event
+      const resA = await serviceA.processWebhookEvent(eventPayload);
+      assert.strictEqual(resA.status, 'PROCESSED');
+
+      // Separate service instance B attempts to process exact same event
+      const resB = await serviceB.processWebhookEvent(eventPayload);
+      assert.strictEqual(resB.status, 'ALREADY_PROCESSED');
+      assert.strictEqual(resB.event_id, eventId);
+
+      // Verify transaction was settled exactly once
+      const tx = await db.table('transactions').findById(crossTxId);
+      assert.strictEqual(tx.status, 'settled');
+    });
+
+    test('12. Webhook reservation rollback after database update failure preserves subsequent retry', async () => {
+      const eventId = `WH-FAIL-CLEANUP-${Date.now()}`;
+      const failTxId = `tx_fail_sim_${Date.now()}`;
+      await db.table('transactions').insert({
+        id: failTxId,
+        merchant_id: 'mer_demo_orchestration_01',
+        amount: 50.00,
+        currency: 'USD',
+        status: 'initiated',
+        created_at: new Date().toISOString()
+      });
+
+      const eventPayload = {
+        id: eventId,
+        event_type: 'PAYMENT.CAPTURE.COMPLETED',
+        resource: {
+          id: `CAP-FAIL-SIM-${Date.now()}`,
+          custom_id: failTxId,
+          seller_receivable_breakdown: { paypal_fee: { value: '1.75' } }
+        }
+      };
+
+      // Mock db.table to simulate database failure during transaction status update
+      const origTable = db.table;
+      db.table = (tableName) => {
+        const tbl = origTable.call(db, tableName);
+        if (tableName === 'transactions') {
+          return {
+            ...tbl,
+            update: async () => {
+              throw new Error('Simulated database deadlock during webhook processing');
+            }
+          };
+        }
+        return tbl;
+      };
+
+      try {
+        await assert.rejects(async () => {
+          await paypalService.processWebhookEvent(eventPayload);
+        }, /Simulated database deadlock during webhook processing/);
+
+        // Verify that reservation was cleaned up so PayPal retry is accepted
+        const recorded = await db.table('processed_webhooks').findById(eventId);
+        assert.strictEqual(recorded, null);
+      } finally {
+        db.table = origTable;
+      }
+
+      // Retry delivery succeeds now that rollback cleaned up the reservation
+      const retryResult = await paypalService.processWebhookEvent(eventPayload);
+      assert.strictEqual(retryResult.status, 'PROCESSED');
+
+      // Verify transaction is now settled
+      const settledTx = await db.table('transactions').findById(failTxId);
+      assert.strictEqual(settledTx.status, 'settled');
+    });
+
+    // Priority 4 — FX Rate Integrity
+    test('13. FX metadata clearly identifies simulated mode during dev/testing (is_live: false)', () => {
+      const data = currencyService.getRates();
+      assert.strictEqual(data.is_live, false);
+      assert.strictEqual(data.mode, 'simulated');
+      assert.strictEqual(data.source, 'simulated_market_feed');
+      assert.ok(data.provider.includes('Simulated'));
+      assert.ok(data.last_updated);
+    });
+
+    test('14. Payment checkout strictly blocked when FX rates are stale (HTTP 503 FX_RATES_STALE)', async () => {
+      try {
+        currencyService.setMockStaleForTesting(true);
+        const res = await fetch(`${BASE_URL}/api/checkout/initiate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 50,
+            currency: 'USD',
+            customer_country: 'US'
+          })
+        });
+
+        assert.strictEqual(res.status, 503);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'FX_RATES_STALE');
+        assert.ok(data.error.includes('stale'));
+      } finally {
+        currencyService.setMockStaleForTesting(false);
+      }
+    });
+
+    test('15. Payment checkout strictly blocked when FX provider is unavailable (HTTP 503 FX_RATES_UNAVAILABLE)', async () => {
+      try {
+        currencyService.setMockUnavailableForTesting(true);
+        const res = await fetch(`${BASE_URL}/api/checkout/initiate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 50,
+            currency: 'USD',
+            customer_country: 'US'
+          })
+        });
+
+        assert.strictEqual(res.status, 503);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'FX_RATES_UNAVAILABLE');
+      } finally {
+        currencyService.setMockUnavailableForTesting(false);
+      }
+    });
+
+    test('16. Unsupported currency conversion rejected without fabricated fallback rates (HTTP 400)', async () => {
+      const res = await fetch(`${BASE_URL}/api/currency/convert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: 100,
+          from_currency: 'UNKNOWN_CURR_XYZ',
+          to_currency: 'USD'
+        })
+      });
+
+      assert.strictEqual(res.status, 400);
+      const data = await res.json();
+      assert.strictEqual(data.code, 'FX_CURRENCY_UNAVAILABLE');
+    });
+
+    test('17. Production payment blocked when FX mode is simulated (HTTP 503 FX_SIMULATED_IN_PRODUCTION_BLOCKED)', async () => {
+      const origEnv = process.env.NODE_ENV;
+      const origLive = process.env.FX_IS_LIVE;
+      try {
+        process.env.NODE_ENV = 'production';
+        process.env.FX_IS_LIVE = 'false';
+
+        // 1. Direct conversion endpoint in production
+        const convertRes = await fetch(`${BASE_URL}/api/currency/convert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 100,
+            from_currency: 'USD',
+            to_currency: 'EUR'
+          })
+        });
+        assert.strictEqual(convertRes.status, 503);
+        const convertData = await convertRes.json();
+        assert.strictEqual(convertData.code, 'FX_SIMULATED_IN_PRODUCTION_BLOCKED');
+        assert.ok(convertData.error.includes('simulated mode'));
+
+        // 2. Checkout session initiation in production
+        const checkoutRes = await fetch(`${BASE_URL}/api/checkout/initiate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 50,
+            currency: 'USD',
+            customer_country: 'US'
+          })
+        });
+        assert.strictEqual(checkoutRes.status, 503);
+        const checkoutData = await checkoutRes.json();
+        assert.strictEqual(checkoutData.code, 'FX_SIMULATED_IN_PRODUCTION_BLOCKED');
+      } finally {
+        if (origEnv !== undefined) process.env.NODE_ENV = origEnv;
+        else delete process.env.NODE_ENV;
+        if (origLive !== undefined) process.env.FX_IS_LIVE = origLive;
+        else delete process.env.FX_IS_LIVE;
+      }
+    });
+
+    // Priority 5 — Supabase Migration Idempotency
+    test('18. Migration 003_add_processed_webhooks.sql exists and defines idempotent schema', () => {
+      const migrationPath = path.join(__dirname, '..', 'src', 'db', 'migrations', '003_add_processed_webhooks.sql');
+      assert.ok(fs.existsSync(migrationPath), 'Migration 003 file must exist');
+
+      const sql = fs.readFileSync(migrationPath, 'utf8');
+      assert.ok(sql.includes('CREATE TABLE IF NOT EXISTS processed_webhooks'));
+      assert.ok(sql.includes('id VARCHAR(128) PRIMARY KEY'));
+      assert.ok(sql.includes('CREATE INDEX IF NOT EXISTS idx_processed_webhooks_resource_id'));
+      assert.ok(sql.includes('CREATE INDEX IF NOT EXISTS idx_processed_webhooks_provider_event'));
+      assert.ok(sql.includes('CREATE INDEX IF NOT EXISTS idx_processed_webhooks_processed_at'));
     });
   });
 });

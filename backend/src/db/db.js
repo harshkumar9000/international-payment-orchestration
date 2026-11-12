@@ -95,7 +95,8 @@ let fallbackStore = {
   refund_records: [],
   agentic_audit_logs: [],
   saved_cards: [],
-  bank_accounts: []
+  bank_accounts: [],
+  processed_webhooks: []
 };
 
 // Load existing local store if present
@@ -116,6 +117,9 @@ function loadFallbackStore() {
       }
       if (!Array.isArray(fallbackStore.saved_cards)) {
         fallbackStore.saved_cards = [];
+      }
+      if (!Array.isArray(fallbackStore.processed_webhooks)) {
+        fallbackStore.processed_webhooks = [];
       }
     }
   } catch (err) {
@@ -401,6 +405,185 @@ async function query(sql, params = []) {
   }
 }
 
+/**
+ * Universal table CRUD operations.
+ * When queryClient is provided (e.g. inside an active transaction), operations are bound to that client.
+ */
+function getTableOperations(tableName, queryClient = null) {
+  validateTableName(tableName);
+
+  if (process.env.VERCEL && currentProvider !== 'postgres') {
+    throw new Error(`[DB Security Error] Table operation on '${tableName}' blocked: PostgreSQL is required in Vercel production.`);
+  }
+
+  const getClient = () => {
+    if (queryClient) return queryClient;
+    if (dbStatus !== 'postgresql_connected' || !pool) {
+      throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
+    }
+    return pool;
+  };
+
+  return {
+    find: async (predicate = null) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        const res = await client.query(`SELECT * FROM ${tableName}`);
+        const rows = res.rows;
+        return predicate ? rows.filter(predicate) : rows;
+      }
+
+      loadFallbackStore();
+      const collection = fallbackStore[tableName] || [];
+      return predicate ? collection.filter(predicate) : [...collection];
+    },
+
+    findOne: async (predicate = null) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        const res = await client.query(`SELECT * FROM ${tableName}`);
+        const rows = res.rows;
+        return predicate ? (rows.find(predicate) || null) : (rows[0] || null);
+      }
+
+      loadFallbackStore();
+      const collection = fallbackStore[tableName] || [];
+      return predicate ? (collection.find(predicate) || null) : (collection[0] || null);
+    },
+
+    findById: async (id) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        const res = await client.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [id]);
+        return res.rows[0] || null;
+      }
+
+      loadFallbackStore();
+      const collection = fallbackStore[tableName] || [];
+      return collection.find(item => item.id === id) || null;
+    },
+
+    insert: async (item) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        const keys = Object.keys(item);
+        for (const k of keys) {
+          validateIdentifier(k);
+        }
+        const cols = keys.join(', ');
+        const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
+        const values = keys.map(k => {
+          const v = item[k];
+          return (typeof v === 'object' && v !== null) ? JSON.stringify(v) : v;
+        });
+
+        const sql = `INSERT INTO ${tableName} (${cols}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING RETURNING *`;
+        const res = await client.query(sql, values);
+        if (res.rows && res.rows.length > 0) {
+          return res.rows[0];
+        }
+
+        // If record already existed, return the existing database record
+        if (item.id) {
+          const existing = await client.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [item.id]);
+          if (existing.rows && existing.rows.length > 0) {
+            return existing.rows[0];
+          }
+        }
+        return item;
+      }
+
+      // Local JSON mode
+      loadFallbackStore();
+      if (!fallbackStore[tableName]) {
+        fallbackStore[tableName] = [];
+      }
+      if (item.id) {
+        const existing = fallbackStore[tableName].find(i => i.id === item.id);
+        if (existing) {
+          return existing;
+        }
+      }
+      fallbackStore[tableName].push(item);
+      saveFallbackStore();
+      return item;
+    },
+
+    update: async (id, updates) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        const keys = Object.keys(updates);
+        if (keys.length === 0) {
+          const res = await client.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [id]);
+          return res.rows[0] || null;
+        }
+        for (const k of keys) {
+          validateIdentifier(k);
+        }
+        const setClauses = keys.map((k, i) => `${k} = $${i + 1}`);
+        if (TABLES_WITH_UPDATED_AT.has(tableName) && !keys.includes('updated_at')) {
+          setClauses.push('updated_at = NOW()');
+        }
+        const values = keys.map(k => {
+          const v = updates[k];
+          return (typeof v === 'object' && v !== null) ? JSON.stringify(v) : v;
+        });
+        values.push(id);
+
+        const sql = `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`;
+        const res = await client.query(sql, values);
+        return res.rows[0] || null;
+      }
+
+      // Local JSON mode
+      loadFallbackStore();
+      const collection = fallbackStore[tableName] || [];
+      const index = collection.findIndex(item => item.id === id);
+      let updatedItem = null;
+
+      if (index !== -1) {
+        collection[index] = { ...collection[index], ...updates, updated_at: new Date().toISOString() };
+        updatedItem = collection[index];
+        saveFallbackStore();
+      }
+
+      return updatedItem;
+    },
+
+    delete: async (id) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        await client.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
+        return true;
+      }
+
+      // Local JSON mode
+      loadFallbackStore();
+      if (fallbackStore[tableName]) {
+        fallbackStore[tableName] = fallbackStore[tableName].filter(item => item.id !== id);
+        saveFallbackStore();
+      }
+      return true;
+    },
+
+    count: async (predicate = null) => {
+      if (currentProvider === 'postgres') {
+        const client = getClient();
+        if (!predicate) {
+          const res = await client.query(`SELECT COUNT(*)::int AS count FROM ${tableName}`);
+          return parseInt(res.rows[0].count, 10);
+        }
+        const res = await client.query(`SELECT * FROM ${tableName}`);
+        return res.rows.filter(predicate).length;
+      }
+
+      loadFallbackStore();
+      const collection = fallbackStore[tableName] || [];
+      return predicate ? collection.filter(predicate).length : collection.length;
+    }
+  };
+}
+
 // Collection-based unified CRUD operations
 const db = {
   init: initDb,
@@ -416,180 +599,106 @@ const db = {
   getLastError: () => lastDbError,
 
   // Table operations
-  table: (tableName) => {
-    validateTableName(tableName);
+  table: (tableName) => getTableOperations(tableName),
 
-    if (process.env.VERCEL && currentProvider !== 'postgres') {
-      throw new Error(`[DB Security Error] Table operation on '${tableName}' blocked: PostgreSQL is required in Vercel production.`);
+  /**
+   * Database-Atomic Webhook Event Claim.
+   * Uses INSERT ... ON CONFLICT (id) DO NOTHING RETURNING id.
+   * Returns { claimed: true } if newly claimed, or { claimed: false } if already present.
+   */
+  claimWebhook: async ({ id, provider = "paypal", event_type, resource_id }, queryClient = null) => {
+    if (!id) throw new Error("Webhook id is required for claim.");
+
+    if (currentProvider === "postgres") {
+      const client = queryClient || pool;
+      if (!client || (client === pool && (dbStatus !== "postgresql_connected" || !pool))) {
+        throw new Error("Database unavailable: PostgreSQL connection is not active.");
+      }
+      const sql = `
+        INSERT INTO processed_webhooks (id, provider, event_type, resource_id, processed_at)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id;
+      `;
+      const res = await client.query(sql, [id, provider, event_type, resource_id || null]);
+      const newlyClaimed = Boolean(res.rows && res.rows.length > 0);
+      return { claimed: newlyClaimed, event_id: id };
     }
 
-    return {
-      find: async (predicate = null) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          const res = await pool.query(`SELECT * FROM ${tableName}`);
-          const rows = res.rows;
-          return predicate ? rows.filter(predicate) : rows;
-        }
+    // Local JSON development fallback mode
+    loadFallbackStore();
+    if (!Array.isArray(fallbackStore.processed_webhooks)) {
+      fallbackStore.processed_webhooks = [];
+    }
+    const existing = fallbackStore.processed_webhooks.find(w => w.id === id);
+    if (existing) {
+      return { claimed: false, event_id: id };
+    }
+    fallbackStore.processed_webhooks.push({
+      id,
+      provider,
+      event_type,
+      resource_id: resource_id || null,
+      processed_at: new Date().toISOString()
+    });
+    saveFallbackStore();
+    return { claimed: true, event_id: id };
+  },
 
-        loadFallbackStore();
-        const collection = fallbackStore[tableName] || [];
-        return predicate ? collection.filter(predicate) : [...collection];
-      },
-
-      findOne: async (predicate = null) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          const res = await pool.query(`SELECT * FROM ${tableName}`);
-          const rows = res.rows;
-          return predicate ? (rows.find(predicate) || null) : (rows[0] || null);
-        }
-
-        loadFallbackStore();
-        const collection = fallbackStore[tableName] || [];
-        return predicate ? (collection.find(predicate) || null) : (collection[0] || null);
-      },
-
-      findById: async (id) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          const res = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [id]);
-          return res.rows[0] || null;
-        }
-
-        loadFallbackStore();
-        const collection = fallbackStore[tableName] || [];
-        return collection.find(item => item.id === id) || null;
-      },
-
-      insert: async (item) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          const keys = Object.keys(item);
-          for (const k of keys) {
-            validateIdentifier(k);
-          }
-          const cols = keys.join(', ');
-          const placeholders = keys.map((_, i) => `$${i + 1}`).join(', ');
-          const values = keys.map(k => {
-            const v = item[k];
-            return (typeof v === 'object' && v !== null) ? JSON.stringify(v) : v;
-          });
-
-          const sql = `INSERT INTO ${tableName} (${cols}) VALUES (${placeholders}) ON CONFLICT (id) DO NOTHING RETURNING *`;
-          const res = await pool.query(sql, values);
-          if (res.rows && res.rows.length > 0) {
-            return res.rows[0];
-          }
-
-          // If record already existed, return the existing database record
-          if (item.id) {
-            const existing = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [item.id]);
-            if (existing.rows && existing.rows.length > 0) {
-              return existing.rows[0];
-            }
-          }
-          return item;
-        }
-
-        // Local JSON mode
-        loadFallbackStore();
-        if (!fallbackStore[tableName]) {
-          fallbackStore[tableName] = [];
-        }
-        fallbackStore[tableName].push(item);
-        saveFallbackStore();
-        return item;
-      },
-
-      update: async (id, updates) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          const keys = Object.keys(updates);
-          if (keys.length === 0) {
-            const res = await pool.query(`SELECT * FROM ${tableName} WHERE id = $1 LIMIT 1`, [id]);
-            return res.rows[0] || null;
-          }
-          for (const k of keys) {
-            validateIdentifier(k);
-          }
-          const setClauses = keys.map((k, i) => `${k} = $${i + 1}`);
-          if (TABLES_WITH_UPDATED_AT.has(tableName) && !keys.includes('updated_at')) {
-            setClauses.push('updated_at = NOW()');
-          }
-          const values = keys.map(k => {
-            const v = updates[k];
-            return (typeof v === 'object' && v !== null) ? JSON.stringify(v) : v;
-          });
-          values.push(id);
-
-          const sql = `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`;
-          const res = await pool.query(sql, values);
-          return res.rows[0] || null;
-        }
-
-        // Local JSON mode
-        loadFallbackStore();
-        const collection = fallbackStore[tableName] || [];
-        const index = collection.findIndex(item => item.id === id);
-        let updatedItem = null;
-
-        if (index !== -1) {
-          collection[index] = { ...collection[index], ...updates, updated_at: new Date().toISOString() };
-          updatedItem = collection[index];
-          saveFallbackStore();
-        }
-
-        return updatedItem;
-      },
-
-      delete: async (id) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
-          return true;
-        }
-
-        // Local JSON mode
-        loadFallbackStore();
-        if (fallbackStore[tableName]) {
-          fallbackStore[tableName] = fallbackStore[tableName].filter(item => item.id !== id);
-          saveFallbackStore();
-        }
-        return true;
-      },
-
-      count: async (predicate = null) => {
-        if (currentProvider === 'postgres') {
-          if (dbStatus !== 'postgresql_connected' || !pool) {
-            throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : 'Database offline'}).`);
-          }
-          if (!predicate) {
-            const res = await pool.query(`SELECT COUNT(*)::int AS count FROM ${tableName}`);
-            return parseInt(res.rows[0].count, 10);
-          }
-          const res = await pool.query(`SELECT * FROM ${tableName}`);
-          return res.rows.filter(predicate).length;
-        }
-
-        // Local JSON mode
-        loadFallbackStore();
-        const collection = fallbackStore[tableName] || [];
-        return predicate ? collection.filter(predicate).length : collection.length;
+  /**
+   * Execute operations within an atomic database transaction.
+   * - In PostgreSQL mode: runs BEGIN, COMMIT, or ROLLBACK on a dedicated client from the pool.
+   * - In Local JSON mode: snapshots fallbackStore before execution and rolls back to snapshot on error.
+   *
+   * Concurrency Notice:
+   * Local JSON mode operates in-memory with single-process file persistence.
+   * True cross-serverless / multi-instance ACID atomic transaction guarantees require PostgreSQL (DB_PROVIDER=postgres).
+   */
+  transaction: async (workFn) => {
+    if (currentProvider === "postgres") {
+      if (dbStatus !== "postgresql_connected" || !pool) {
+        throw new Error(`Database unavailable: PostgreSQL is configured but connection is not active (${lastDbError ? lastDbError.message : "Database offline"}).`);
       }
-    };
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const txScopedDb = {
+          ...db,
+          query: (sql, params = []) => client.query(sql, params).then(r => r.rows),
+          table: (tableName) => getTableOperations(tableName, client),
+          claimWebhook: (webhookData) => db.claimWebhook(webhookData, client)
+        };
+        const result = await workFn(txScopedDb);
+        await client.query("COMMIT");
+        return result;
+      } catch (err) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rbErr) {
+          console.warn("[DB Transaction Rollback Warning]:", rbErr.message);
+        }
+        throw err;
+      } finally {
+        client.release();
+      }
+    }
+
+    // Local JSON development fallback
+    loadFallbackStore();
+    const snapshot = JSON.stringify(fallbackStore);
+    try {
+      const txScopedDb = {
+        ...db,
+        claimWebhook: (webhookData) => db.claimWebhook(webhookData)
+      };
+      const result = await workFn(txScopedDb);
+      saveFallbackStore();
+      return result;
+    } catch (err) {
+      fallbackStore = JSON.parse(snapshot);
+      saveFallbackStore();
+      throw err;
+    }
   },
 
   resetStore: () => {
@@ -610,7 +719,8 @@ const db = {
       refund_records: [],
       agentic_audit_logs: [],
       saved_cards: [],
-      bank_accounts: []
+      bank_accounts: [],
+      processed_webhooks: []
     };
     saveFallbackStore();
   },

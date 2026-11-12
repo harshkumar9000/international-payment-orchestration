@@ -16,6 +16,8 @@ class PayPalService {
   constructor() {
     this.cachedToken = null;
     this.tokenExpiresAt = 0;
+    this.mockOrders = new Map();
+    this.activeWebhookLocks = new Set();
 
     // Standard currencies supported for PayPal cross-border international checkout
     this.SUPPORTED_CURRENCIES = new Set([
@@ -201,6 +203,12 @@ class PayPalService {
     // Handle Mock Mode for unit tests
     if (process.env.PAYPAL_MOCK === 'true') {
       const mockOrderId = `PAYID-ORDER-${uuidv4().substring(0, 8).toUpperCase()}`;
+      if (!this.mockOrders) this.mockOrders = new Map();
+      this.mockOrders.set(mockOrderId, {
+        amount: formattedAmount,
+        currency: currency.toUpperCase(),
+        transaction_id: internalTxId
+      });
       return {
         id: mockOrderId,
         status: 'CREATED',
@@ -279,7 +287,7 @@ class PayPalService {
   /**
    * Capture an approved PayPal Order using PayPal Orders API v2
    */
-  async captureOrder({ orderId, transactionId }) {
+  async captureOrder({ orderId, transactionId, mockAmount, mockCurrency }) {
     if (!orderId) {
       const err = new Error('PayPal Order ID is required for capture.');
       err.status = 400;
@@ -289,15 +297,21 @@ class PayPalService {
     // Handle Mock Mode for unit tests
     if (process.env.PAYPAL_MOCK === 'true') {
       const mockCaptureId = `CAP-${uuidv4().substring(0, 10).toUpperCase()}`;
+      const mockOrder = this.mockOrders?.get(orderId);
+      const capAmount = mockAmount !== undefined ? String(mockAmount) : (mockOrder?.amount || '149.00');
+      const capCurrency = mockCurrency !== undefined ? String(mockCurrency).toUpperCase() : (mockOrder?.currency || 'USD');
+      const parsedCapAmount = parseFloat(capAmount) || 0;
+      const fee = 5.69;
+      const net = parsedCapAmount > fee ? parseFloat((parsedCapAmount - fee).toFixed(2)) : 0;
       return {
         id: orderId,
         status: 'COMPLETED',
         capture_id: mockCaptureId,
-        amount: '149.00',
-        currency: 'USD',
+        amount: capAmount,
+        currency: capCurrency,
         seller_protection: 'ELIGIBLE',
-        fee_charged: 5.69,
-        net_amount: 143.31,
+        fee_charged: fee,
+        net_amount: net,
         payer: {
           email_address: 'sandbox-buyer@personal.example.com',
           payer_id: 'PAYER123456789'
@@ -400,19 +414,15 @@ class PayPalService {
 
   /**
    * Verify Webhook Signature with PayPal REST API
+   * Priority 1 requirements:
+   * 1. Never accept a PayPal webhook when PAYPAL_WEBHOOK_ID is missing.
+   * 2. Never bypass cryptographic signature verification in Sandbox or Live mode.
    */
   async verifyWebhookSignature({ headers = {}, body }) {
-    if (process.env.PAYPAL_MOCK === 'true') {
-      if (headers['paypal-transmission-sig'] === 'bad_signature_abc' || headers['x-mock-signature-valid'] === 'false') {
-        return false;
-      }
-      return true;
-    }
-
     const webhookId = this.getWebhookId();
     if (!webhookId) {
-      console.warn('[PayPal Webhook] PAYPAL_WEBHOOK_ID is not set in server configuration. Skipping cryptographic signature verification in sandbox.');
-      return true;
+      console.warn('[PayPal Webhook Security] PAYPAL_WEBHOOK_ID is not configured. Webhook signature verification rejected.');
+      return false;
     }
 
     const authAlgo = headers['paypal-auth-algo'];
@@ -421,8 +431,18 @@ class PayPalService {
     const transmissionSig = headers['paypal-transmission-sig'];
     const transmissionTime = headers['paypal-transmission-time'];
 
+    // All 5 signature headers are cryptographically required
     if (!authAlgo || !certUrl || !transmissionId || !transmissionSig || !transmissionTime) {
+      console.warn('[PayPal Webhook Security] Missing required PayPal signature verification headers.');
       return false;
+    }
+
+    // Mock Mode for automated tests
+    if (process.env.PAYPAL_MOCK === 'true') {
+      if (transmissionSig === 'bad_signature_abc' || headers['x-mock-signature-valid'] === 'false' || transmissionSig === 'invalid') {
+        return false;
+      }
+      return true;
     }
 
     try {
@@ -459,7 +479,12 @@ class PayPalService {
   }
 
   /**
-   * Process incoming Webhook Event idempotently
+   * Process incoming Webhook Event with database-atomic transaction guarantees
+   * - Uses a database transaction for event reservation and transaction mutation.
+   * - Uses INSERT ... ON CONFLICT DO NOTHING RETURNING to identify whether the event was newly claimed.
+   * - Does not rely on an in-memory Set as the primary protection.
+   * - If transaction processing fails, rolls back the event reservation so PayPal can retry.
+   * - Ensures a server crash cannot leave an event permanently marked processed without applying its transaction update.
    */
   async processWebhookEvent(event) {
     if (!event || !event.id) {
@@ -470,70 +495,71 @@ class PayPalService {
     const eventType = event.event_type;
     const resource = event.resource || {};
 
-    // 1. Check if event was already processed (deduplication)
-    const existing = await db.table('processed_webhooks').findById(eventId);
-    if (existing) {
-      return { status: 'ALREADY_PROCESSED', event_id: eventId };
-    }
+    return await db.transaction(async (txDb) => {
+      // 1. Database-atomic claim via INSERT ... ON CONFLICT DO NOTHING RETURNING
+      const claimResult = await txDb.claimWebhook({
+        id: eventId,
+        provider: 'paypal',
+        event_type: eventType,
+        resource_id: resource.id || null
+      });
 
-    // 2. Identify linked internal transaction
-    const customId = resource.custom_id || resource.invoice_id?.replace(/^INV-/, '') || null;
-    const paypalOrderId = resource.supplementary_data?.related_ids?.order_id || resource.id;
-
-    let tx = null;
-    if (customId) {
-      tx = await db.table('transactions').findById(customId);
-    }
-    if (!tx && paypalOrderId) {
-      tx = await db.table('transactions').findOne(t =>
-        t.metadata_json && t.metadata_json.includes(paypalOrderId)
-      );
-    }
-
-    // 3. Handle event types
-    if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
-      if (tx) {
-        const existingMeta = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json || '{}') : (tx.metadata_json || {});
-        await db.table('transactions').update(tx.id, {
-          status: 'settled',
-          executed_provider: 'paypal',
-          fee_charged: parseFloat(resource.seller_receivable_breakdown?.paypal_fee?.value || tx.fee_charged || '0.00'),
-          metadata_json: JSON.stringify({
-            ...existingMeta,
-            paypal_capture_id: resource.id,
-            paypal_status: 'COMPLETED',
-            webhook_reconciled: true,
-            reconciled_at: new Date().toISOString()
-          })
-        });
+      if (!claimResult.claimed) {
+        return { status: 'ALREADY_PROCESSED', event_id: eventId };
       }
-    } else if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.DECLINED') {
-      if (tx) {
-        await db.table('transactions').update(tx.id, {
-          status: 'failed',
-          decline_code: 'paypal_capture_denied',
-          decline_reason: 'Payment capture denied by PayPal buyer funding source.'
-        });
-      }
-    } else if (eventType === 'PAYMENT.CAPTURE.REFUNDED') {
-      if (tx) {
-        await db.table('transactions').update(tx.id, {
-          status: 'refunded'
-        });
-      }
-    }
 
-    // 4. Record event as processed
-    await db.table('processed_webhooks').insert({
-      id: eventId,
-      provider: 'paypal',
-      event_type: eventType,
-      resource_id: resource.id || null,
-      processed_at: new Date().toISOString()
+      // 2. Identify linked internal transaction
+      const customId = resource.custom_id || resource.invoice_id?.replace(/^INV-/, '') || null;
+      const paypalOrderId = resource.supplementary_data?.related_ids?.order_id || resource.id;
+
+      let tx = null;
+      if (customId) {
+        tx = await txDb.table('transactions').findById(customId);
+      }
+      if (!tx && paypalOrderId) {
+        tx = await txDb.table('transactions').findOne(t =>
+          t.metadata_json && t.metadata_json.includes(paypalOrderId)
+        );
+      }
+
+      // 3. Handle event types within the atomic transaction
+      if (eventType === 'PAYMENT.CAPTURE.COMPLETED') {
+        if (tx) {
+          const existingMeta = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json || '{}') : (tx.metadata_json || {});
+          await txDb.table('transactions').update(tx.id, {
+            status: 'settled',
+            executed_provider: 'paypal',
+            fee_charged: parseFloat(resource.seller_receivable_breakdown?.paypal_fee?.value || tx.fee_charged || '0.00'),
+            metadata_json: JSON.stringify({
+              ...existingMeta,
+              paypal_capture_id: resource.id,
+              paypal_status: 'COMPLETED',
+              webhook_reconciled: true,
+              reconciled_at: new Date().toISOString()
+            })
+          });
+        }
+      } else if (eventType === 'PAYMENT.CAPTURE.DENIED' || eventType === 'PAYMENT.CAPTURE.DECLINED') {
+        if (tx) {
+          await txDb.table('transactions').update(tx.id, {
+            status: 'failed',
+            decline_code: 'paypal_capture_denied',
+            decline_reason: 'Payment capture denied by PayPal buyer funding source.'
+          });
+        }
+      } else if (eventType === 'PAYMENT.CAPTURE.REFUNDED') {
+        if (tx) {
+          await txDb.table('transactions').update(tx.id, {
+            status: 'refunded'
+          });
+        }
+      }
+
+      return { status: 'PROCESSED', event_id: eventId, event_type: eventType, transaction_id: tx?.id || null };
     });
-
-    return { status: 'PROCESSED', event_id: eventId, event_type: eventType, transaction_id: tx?.id || null };
   }
 }
 
-module.exports = new PayPalService();
+const paypalServiceInstance = new PayPalService();
+paypalServiceInstance.PayPalService = PayPalService;
+module.exports = paypalServiceInstance;

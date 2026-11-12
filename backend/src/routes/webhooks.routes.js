@@ -27,10 +27,26 @@ router.post('/stripe', async (req, res) => {
 });
 
 // POST /api/webhooks/paypal
+// Priority 1 requirement: Secure or remove older route so unsigned events cannot modify transactions
 router.post('/paypal', async (req, res) => {
   const event = req.body || {};
   const eventId = event.id || `wh_paypal_${Date.now()}`;
-  console.log(`📥 [Webhook] Received PayPal event: ${event.event_type || 'PAYMENT.CAPTURE.COMPLETED'}`);
+
+  // 1. Verify cryptographic signature before processing any event
+  const isSignatureValid = await paypalService.verifyWebhookSignature({
+    headers: req.headers,
+    body: req.body
+  });
+
+  if (!isSignatureValid) {
+    console.warn('⚠️ [Webhooks Route] Untrusted PayPal webhook rejected: invalid signature or missing PAYPAL_WEBHOOK_ID');
+    return res.status(400).json({
+      error: 'Invalid PayPal webhook signature or unconfigured webhook ID',
+      code: 'INVALID_WEBHOOK_SIGNATURE'
+    });
+  }
+
+  console.log(`📥 [Webhook] Received verified PayPal event: ${event.event_type || 'PAYMENT.CAPTURE.COMPLETED'}`);
 
   const logEntry = {
     id: eventId,
@@ -49,6 +65,7 @@ router.post('/paypal', async (req, res) => {
     }
   } catch (err) {
     console.warn('[PayPal Webhook Log Route]:', err.message);
+    return res.status(500).json({ error: err.message || 'Webhook processing failed' });
   }
 
   res.json({ received: true, event_id: eventId, result: processResult });

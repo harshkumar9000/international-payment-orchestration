@@ -87,7 +87,15 @@ router.post('/initiate', optionalAuth, async (req, res) => {
 
     // 2. Real-time Currency Conversion & Markup
     const targetCurrency = compCheck.default_currency || currency;
-    const conversion = currencyService.convertAmount(amount, currency, targetCurrency, 1.25);
+    let conversion;
+    try {
+      conversion = currencyService.convertAmount(amount, currency, targetCurrency, 1.25);
+    } catch (fxErr) {
+      return res.status(fxErr.status || 503).json({
+        error: fxErr.message || 'Payment processing blocked: FX rates are stale or unavailable.',
+        code: fxErr.code || 'FX_RATES_UNAVAILABLE'
+      });
+    }
 
     // 3. AI Fraud Assessment
     const fraudAssessment = await pythonBridge.assessFraud({
@@ -250,6 +258,14 @@ router.post('/process', optionalAuth, async (req, res) => {
     const tx = await db.table('transactions').findById(transaction_id);
     if (!tx) {
       return res.status(404).json({ error: 'Transaction not found or session expired.' });
+    }
+
+    // Guard against executing live payment processing when FX is simulated in production
+    if (currencyService.isProductionOrLivePayment() && !currencyService.isLiveFx()) {
+      return res.status(503).json({
+        error: 'Production payment blocked: FX service is running in simulated mode. Live payment processing requires a verified live FX market feed.',
+        code: 'FX_SIMULATED_IN_PRODUCTION_BLOCKED'
+      });
     }
 
     const metadata = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json || '{}') : (tx.metadata_json || {});

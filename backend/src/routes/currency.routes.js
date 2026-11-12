@@ -29,7 +29,7 @@ router.post('/convert', optionalAuth, async (req, res) => {
     const conversion = currencyService.convertAmount(amount, from_currency, to_currency, markup ?? 1.25);
     res.json(conversion);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message, code: err.code });
   }
 });
 
