@@ -187,6 +187,7 @@ export const api = {
   // Student & Under-18 Management
   student: {
     getProfile: (studentId) => request(`/student/profile${studentId ? `?student_id=${studentId}` : ''}`),
+    createProfile: (payload) => request('/student/profile', { method: 'POST', body: payload }),
     verifyIntent: (payload) => request('/student/verify-intent', { method: 'POST', body: payload }),
     createPaymentIntent: (data) => request('/student/create-intent', { method: 'POST', body: data }),
     listApprovals: (studentId) => request(`/student/approvals${studentId ? `?student_id=${studentId}` : ''}`),
@@ -204,6 +205,7 @@ export const api = {
   guardian: {
     getPending: (guardianId) => request(`/guardian/pending-approvals${guardianId ? `?guardian_id=${guardianId}` : ''}`),
     getPendingApprovals: (guardianId) => request(`/guardian/pending-approvals${guardianId ? `?guardian_id=${guardianId}` : ''}`),
+    createProfile: (payload) => request('/guardian/profile', { method: 'POST', body: payload }),
     approve: (id, reason) => request(`/guardian/approve/${id}`, { method: 'POST', body: { reason } }),
     reject: (id, reason) => request(`/guardian/reject/${id}`, { method: 'POST', body: { reason } }),
     updateLimits: (studentIdOrPayload, maybeLimits) => {

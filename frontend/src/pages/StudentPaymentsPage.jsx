@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import {
+  AddStudentProfileModal,
+  AddParentProfileModal,
+  FamilyProfileSetupCard
+} from '../components/FamilyProfileModals';
 import {
   GraduationCap,
   ShieldCheck,
@@ -22,26 +28,33 @@ import {
 } from 'lucide-react';
 
 export default function StudentPaymentsPage({ setActivePage }) {
+  const { merchant } = useAuth();
+  const isDemoMerchant = !merchant || merchant.id === 'mer_demo_orchestration_01';
+
   const [profile, setProfile] = useState(null);
+  const [guardianProfile, setGuardianProfile] = useState(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const [approvals, setApprovals] = useState([]);
   const [recentTxs, setRecentTxs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [showParentModal, setShowParentModal] = useState(false);
 
   // New course payment form state
-  const [courseName, setCourseName] = useState('Coursera Deep Learning Specialization');
+  const [courseName, setCourseName] = useState(isDemoMerchant ? 'Coursera Deep Learning Specialization' : '');
   const [merchantCategory, setMerchantCategory] = useState('education');
-  const [amount, setAmount] = useState('79.00');
+  const [amount, setAmount] = useState(isDemoMerchant ? '79.00' : '');
   const [currency, setCurrency] = useState('USD');
   const [submitting, setSubmitting] = useState(false);
   const [intentResult, setIntentResult] = useState(null);
   const submittingRef = React.useRef(false);
 
-  async function loadStudentData() {
-    setLoading(true);
+  const loadStudentData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setProfileError(null);
     try {
-      const studentId = 'stu_aarav_sharma_01';
+      const studentId = isDemoMerchant ? 'stu_aarav_sharma_01' : undefined;
       const [pRes, aRes, tRes] = await Promise.all([
         (typeof api.student?.getProfile === 'function'
           ? api.student.getProfile(studentId)
@@ -57,10 +70,20 @@ export default function StudentPaymentsPage({ setActivePage }) {
         ).catch(() => ({ transactions: [] }))
       ]);
 
-      const stuProfile = pRes?.student || pRes?.profile || pRes;
-      if (!stuProfile) {
-        throw new Error('Student profile not found.');
+      if (pRes?.guardian_profile) {
+        setGuardianProfile(pRes.guardian_profile);
       }
+
+      const stuProfile = pRes?.student || pRes?.profile || null;
+      if (pRes?.needs_setup || !stuProfile) {
+        setNeedsSetup(true);
+        setProfile(null);
+        setApprovals([]);
+        setRecentTxs([]);
+        return;
+      }
+
+      setNeedsSetup(false);
       setProfile(stuProfile);
       const rawApprovals = aRes?.approvals || [];
       const uniqueApprovals = [];
@@ -78,19 +101,19 @@ export default function StudentPaymentsPage({ setActivePage }) {
       setProfileError(err.message || 'Unable to load verified student profile.');
       setProfile(null);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  }
+  }, [isDemoMerchant]);
 
   useEffect(() => {
-    loadStudentData();
+    loadStudentData(false);
 
     // Auto-sync every 4 seconds so approval changes reflect immediately
     const interval = setInterval(() => {
-      loadStudentData();
+      loadStudentData(true);
     }, 4000);
 
-    const handleSync = () => loadStudentData();
+    const handleSync = () => loadStudentData(true);
     window.addEventListener('focus', handleSync);
     window.addEventListener('guardian_approval_updated', handleSync);
 
@@ -99,7 +122,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
       window.removeEventListener('focus', handleSync);
       window.removeEventListener('guardian_approval_updated', handleSync);
     };
-  }, []);
+  }, [loadStudentData]);
 
   async function handleCreatePaymentIntent(e) {
     e.preventDefault();
@@ -162,7 +185,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
             amount: parseFloat(tx.amount || 0).toFixed(2),
             currency: tx.currency || 'USD',
             provider: tx.executed_provider || meta.provider_channel || 'Stripe',
-            approved_by: 'Priya Sharma',
+            approved_by: profile?.guardian_name || 'Parent / Guardian',
             date: tx.created_at,
             is_sandbox: true
           });
@@ -183,7 +206,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
             amount: parseFloat(appr.amount || 0).toFixed(2),
             currency: appr.currency || 'USD',
             provider: 'Stripe',
-            approved_by: 'Priya Sharma',
+            approved_by: profile?.guardian_name || 'Parent / Guardian',
             date: appr.decided_at || appr.requested_at,
             is_sandbox: true
           });
@@ -192,7 +215,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
     }
 
     return list;
-  }, [recentTxs, approvals]);
+  }, [recentTxs, approvals, profile]);
 
   const monthlyLimit = parseFloat(profile?.spending_limits?.monthly_limit || 500);
   const calculatedSpend = recentTxs
@@ -225,10 +248,27 @@ export default function StudentPaymentsPage({ setActivePage }) {
         </div>
       )}
 
+      {/* New Account Empty Setup State */}
+      {!loading && needsSetup && (
+        <FamilyProfileSetupCard
+          currentPortal="student"
+          hasStudent={false}
+          hasGuardian={Boolean(guardianProfile)}
+          guardianProfile={guardianProfile}
+          studentProfile={null}
+          onOpenStudentModal={() => setShowStudentModal(true)}
+          onOpenParentModal={() => setShowParentModal(true)}
+          onSwitchPortal={() => setActivePage('guardian')}
+        />
+      )}
+
+      {/* Student Dashboard Content (shown once a student profile exists) */}
+      {!needsSetup && (
+        <>
       {/* Student Banner */}
       <div className="bg-gradient-to-r from-indigo-950 via-slate-900 to-teal-950 p-6 rounded-2xl border border-indigo-500/20 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {profile?.age !== null && profile?.age !== undefined ? (
               profile?.is_minor ? (
                 <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 flex items-center gap-1.5">
@@ -248,7 +288,11 @@ export default function StudentPaymentsPage({ setActivePage }) {
               </span>
             )}
             <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-              Parent Linked: {profile?.guardian_email || 'priya.sharma@parent.in'}
+              {profile?.guardian_email
+                ? `Parent Linked: ${profile.guardian_email}`
+                : guardianProfile?.guardian_email
+                ? `Parent Linked: ${guardianProfile.guardian_email}`
+                : 'No Parent Linked Yet'}
             </span>
           </div>
           <h1 className="page-heading text-[26px] sm:text-[30px] font-semibold tracking-[-0.025em] text-white leading-tight">
@@ -259,7 +303,16 @@ export default function StudentPaymentsPage({ setActivePage }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {!isDemoMerchant && !guardianProfile && !profile?.guardian_id && (
+            <button
+              type="button"
+              onClick={() => setShowParentModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-black font-semibold text-[13px] rounded-xl transition-all cursor-pointer"
+            >
+              + Add Parent Profile
+            </button>
+          )}
           <button
             onClick={() => setActivePage('guardian')}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-[14px] rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
@@ -268,7 +321,7 @@ export default function StudentPaymentsPage({ setActivePage }) {
             Open Parent Approval Portal
           </button>
           <button
-            onClick={loadStudentData}
+            onClick={() => loadStudentData(false)}
             disabled={loading}
             className="p-2 bg-white/10 hover:bg-white/15 text-white rounded-xl border border-white/10 transition-all cursor-pointer"
             title="Refresh Student Data"
@@ -673,6 +726,25 @@ export default function StudentPaymentsPage({ setActivePage }) {
         </div>
 
       </div>
+        </>
+      )}
+
+      <AddStudentProfileModal
+        isOpen={showStudentModal}
+        onClose={() => setShowStudentModal(false)}
+        existingGuardian={guardianProfile}
+        onSuccess={() => {
+          loadStudentData(false);
+        }}
+      />
+
+      <AddParentProfileModal
+        isOpen={showParentModal}
+        onClose={() => setShowParentModal(false)}
+        onSuccess={() => {
+          loadStudentData(false);
+        }}
+      />
     </div>
   );
 }

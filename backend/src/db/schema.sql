@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS fraud_assessments (
 -- Under-18 and Student Account Profiles
 CREATE TABLE IF NOT EXISTS student_profiles (
     id VARCHAR(64) PRIMARY KEY,
+    merchant_id VARCHAR(64) DEFAULT 'mer_demo_orchestration_01',
     user_id VARCHAR(64) NOT NULL,
     email VARCHAR(255) NOT NULL,
     student_name VARCHAR(255) NOT NULL,
@@ -139,6 +140,21 @@ CREATE TABLE IF NOT EXISTS student_profiles (
     single_tx_limit NUMERIC(10, 2) DEFAULT 250.00,
     auto_approval_threshold NUMERIC(10, 2) DEFAULT 50.00,
     whitelisted_mccs TEXT, -- JSON array of allowed category tags
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Parent / Guardian Profiles
+CREATE TABLE IF NOT EXISTS guardian_profiles (
+    id VARCHAR(64) PRIMARY KEY,
+    merchant_id VARCHAR(64) NOT NULL,
+    guardian_name VARCHAR(255) NOT NULL,
+    guardian_email VARCHAR(255) NOT NULL,
+    relationship VARCHAR(64) DEFAULT 'Parent',
+    default_daily_limit NUMERIC(10, 2) DEFAULT 100.00,
+    default_weekly_limit NUMERIC(10, 2) DEFAULT 400.00,
+    default_monthly_limit NUMERIC(10, 2) DEFAULT 1200.00,
+    auto_approval_threshold NUMERIC(10, 2) DEFAULT 50.00,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

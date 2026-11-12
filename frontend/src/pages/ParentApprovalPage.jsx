@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import {
+  AddStudentProfileModal,
+  AddParentProfileModal,
+  FamilyProfileSetupCard
+} from '../components/FamilyProfileModals';
 import {
   filterValidPendingApprovals,
   formatApprovalTimestamp,
@@ -16,13 +22,20 @@ import {
   RefreshCw,
   Save,
   Check,
-  X
+  X,
+  UserPlus
 } from 'lucide-react';
 
 export default function ParentApprovalPage({ setActivePage }) {
-  // Use exact production IDs for student and guardian
-  const [guardianId] = useState('guard_priya_sharma_01');
-  const [studentId] = useState('stu_aarav_sharma_01');
+  const { merchant } = useAuth();
+  const isDemoMerchant = !merchant || merchant.id === 'mer_demo_orchestration_01';
+
+  const [guardianId, setGuardianId] = useState(isDemoMerchant ? 'guard_priya_sharma_01' : '');
+  const [studentId, setStudentId] = useState(isDemoMerchant ? 'stu_aarav_sharma_01' : '');
+  const [guardianProfile, setGuardianProfile] = useState(null);
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [showParentModal, setShowParentModal] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,23 +70,29 @@ export default function ParentApprovalPage({ setActivePage }) {
     }
     setError(null);
 
-    const pendingEndpoint = `/api/guardian/pending-approvals?guardian_id=${guardianId}`;
-    const profileEndpoint = `/api/student/profile?student_id=${studentId}`;
+    const queryGuardianId = isDemoMerchant ? (guardianId || 'guard_priya_sharma_01') : undefined;
+    const queryStudentId = isDemoMerchant ? (studentId || 'stu_aarav_sharma_01') : undefined;
+    const pendingEndpoint = queryGuardianId
+      ? `/api/guardian/pending-approvals?guardian_id=${queryGuardianId}`
+      : '/api/guardian/pending-approvals';
+    const profileEndpoint = queryStudentId
+      ? `/api/student/profile?student_id=${queryStudentId}`
+      : '/api/student/profile';
 
     try {
-      // 1. Fetch pending approvals - do NOT silently swallow errors with .catch(() => ({ pending: [] }))
+      // 1. Fetch pending approvals and guardian context
       const pendResPromise = (
         typeof api.guardian?.getPending === 'function'
-          ? api.guardian.getPending(guardianId)
+          ? api.guardian.getPending(queryGuardianId)
           : typeof api.guardian?.getPendingApprovals === 'function'
-          ? api.guardian.getPendingApprovals(guardianId)
+          ? api.guardian.getPendingApprovals(queryGuardianId)
           : Promise.reject(new Error(`Guardian API client is not configured for ${pendingEndpoint}`))
       );
 
       // 2. Fetch student profile for limits and verified student details
       const profResPromise = (
         typeof api.student?.getProfile === 'function'
-          ? api.student.getProfile(studentId)
+          ? api.student.getProfile(queryStudentId)
           : Promise.resolve(null)
       ).catch(err => {
         console.warn(`[ParentApprovalPortal] Student profile fetch failed on ${profileEndpoint}:`, err.message);
@@ -86,18 +105,39 @@ export default function ParentApprovalPage({ setActivePage }) {
         throw new Error(`Invalid response received from ${pendingEndpoint}`);
       }
 
-      // Filter and deduplicate valid pending approvals
-      const rawPending = Array.isArray(pendRes.pending) ? pendRes.pending : [];
-      const validPending = filterValidPendingApprovals(rawPending, guardianId, studentId);
+      const resolvedGuardian = pendRes.guardian || profRes?.guardian_profile || null;
+      const resolvedStudent = profRes?.student || profRes?.profile || pendRes?.students?.[0] || null;
+      const isSetupMissing = Boolean(pendRes.needs_setup || (!isDemoMerchant && !resolvedGuardian));
 
-      setPendingApprovals(validPending);
+      setGuardianProfile(resolvedGuardian);
+      setNeedsSetup(isSetupMissing);
 
-      const stuProfile = profRes?.student || profRes?.profile || profRes;
-      if (stuProfile) {
-        setProfile(stuProfile);
-        setDailyLimit(stuProfile.spending_limits?.daily_limit || stuProfile.daily_limit || 100);
-        setWeeklyLimit(stuProfile.spending_limits?.weekly_limit || stuProfile.weekly_limit || 250);
-        setMonthlyLimit(stuProfile.spending_limits?.monthly_limit || stuProfile.monthly_limit || 500);
+      if (resolvedGuardian?.id) {
+        setGuardianId(resolvedGuardian.id);
+      } else if (!isDemoMerchant) {
+        setGuardianId('');
+      }
+
+      if (resolvedStudent) {
+        setProfile(resolvedStudent);
+        setStudentId(resolvedStudent.id || '');
+        setDailyLimit(resolvedStudent.spending_limits?.daily_limit || resolvedStudent.daily_limit || 100);
+        setWeeklyLimit(resolvedStudent.spending_limits?.weekly_limit || resolvedStudent.weekly_limit || 250);
+        setMonthlyLimit(resolvedStudent.spending_limits?.monthly_limit || resolvedStudent.monthly_limit || 500);
+      } else {
+        setProfile(null);
+        if (!isDemoMerchant) {
+          setStudentId('');
+        }
+      }
+
+      if (isSetupMissing) {
+        setPendingApprovals([]);
+      } else {
+        const resolvedGuardianId = resolvedGuardian?.id || queryGuardianId || '';
+        const rawPending = Array.isArray(pendRes.pending) ? pendRes.pending : [];
+        const validPending = filterValidPendingApprovals(rawPending, resolvedGuardianId, '');
+        setPendingApprovals(validPending);
       }
     } catch (err) {
       console.error(`[ParentApprovalPortal] Failed to fetch from endpoint ${pendingEndpoint}:`, err);
@@ -107,7 +147,7 @@ export default function ParentApprovalPage({ setActivePage }) {
       setLoading(false);
       isFetchingRef.current = false;
     }
-  }, [guardianId, studentId]);
+  }, [isDemoMerchant, guardianId, studentId]);
 
   useEffect(() => {
     loadData(false);
@@ -131,7 +171,8 @@ export default function ParentApprovalPage({ setActivePage }) {
     setActionLoading(approvalId);
     setFeedback(null);
     try {
-      const res = await api.guardian.approve(approvalId, 'Approved by Priya Sharma for educational advancement.');
+      const approverName = guardianProfile?.guardian_name || profile?.guardian_name || 'Parent/Guardian';
+      const res = await api.guardian.approve(approvalId, `Approved by ${approverName} for educational advancement.`);
       setFeedback({ type: 'success', message: res?.message || 'Payment approved! Authorized by parent in portal.' });
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('guardian_approval_updated'));
@@ -169,6 +210,10 @@ export default function ParentApprovalPage({ setActivePage }) {
 
   async function handleSaveLimits(e) {
     e.preventDefault();
+    if (!studentId) {
+      setFeedback({ type: 'error', message: 'Please add a student profile before configuring spending limits.' });
+      return;
+    }
     setSavingLimits(true);
     setFeedback(null);
     try {
@@ -210,21 +255,57 @@ export default function ParentApprovalPage({ setActivePage }) {
               Parent & Legal Guardian Portal
             </span>
             <span className="text-xs text-slate-300">
-              Logged in as: {profile?.guardian_name || 'Priya Sharma (Parent/Guardian)'} ({profile?.guardian_email || 'priya.sharma@parent.in'})
+              {guardianProfile || profile?.guardian_name ? (
+                <>
+                  Logged in as: {guardianProfile?.guardian_name || profile?.guardian_name} (
+                  {guardianProfile?.guardian_email || profile?.guardian_email || 'Guardian Linked'})
+                </>
+              ) : (
+                'No parent / guardian profile linked yet'
+              )}
             </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Supervising Student: {profile?.student_name || 'Aarav Sharma'} ({profile?.age !== null && profile?.age !== undefined ? `Age ${profile.age}` : 'Age Unverified'})
+            {profile ? (
+              <>
+                Supervising Student: {profile.student_name} (
+                {profile.age !== null && profile.age !== undefined ? `Age ${profile.age}` : 'Age Unverified'})
+              </>
+            ) : needsSetup ? (
+              'Parent & Student Family Setup'
+            ) : (
+              'Supervising Student: No Student Linked Yet'
+            )}
           </h1>
           <p className="text-xs text-slate-300 max-w-2xl">
             Review and approve your student's online learning course payments, adjust daily and monthly spending allowances, and manage allowed purchase categories.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {!profile && (
+            <button
+              type="button"
+              onClick={() => setShowStudentModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white text-black hover:bg-neutral-200 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Add Student Profile
+            </button>
+          )}
+          {needsSetup && (
+            <button
+              type="button"
+              onClick={() => setShowParentModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/15 text-white font-semibold text-xs rounded-xl border border-white/15 transition-all cursor-pointer"
+            >
+              <Users2 className="w-3.5 h-3.5" />
+              Add Parent Profile
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setActivePage('student')}
+            onClick={() => setActivePage('student-payments')}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-white/10 hover:bg-white/15 text-white font-semibold text-xs rounded-xl border border-white/10 transition-all cursor-pointer"
           >
             <GraduationCap className="w-4 h-4 text-indigo-400" />
@@ -258,8 +339,20 @@ export default function ParentApprovalPage({ setActivePage }) {
         </div>
       )}
 
-      {/* Main Grid: Pending Approvals (7 cols) + Spending Controls (5 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {!loading && needsSetup ? (
+        <FamilyProfileSetupCard
+          currentPortal="guardian"
+          hasStudent={Boolean(profile)}
+          hasGuardian={Boolean(guardianProfile)}
+          studentProfile={profile}
+          guardianProfile={guardianProfile}
+          onOpenStudentModal={() => setShowStudentModal(true)}
+          onOpenParentModal={() => setShowParentModal(true)}
+          onSwitchPortal={() => setActivePage('student-payments')}
+        />
+      ) : (
+        /* Main Grid: Pending Approvals (7 cols) + Spending Controls (5 cols) */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* Left: Pending Approval Requests */}
         <div className="lg:col-span-7 bg-white dark:bg-[#111827] rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
@@ -386,7 +479,7 @@ export default function ParentApprovalPage({ setActivePage }) {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Settings className="w-4 h-4 text-teal-500" />
-                Configure Spending Limits for {profile?.student_name ? profile.student_name.split(' ')[0] : 'Aarav'}
+                Configure Spending Limits for {profile?.student_name ? profile.student_name.split(' ')[0] : 'Student'}
               </h2>
               {limitsSaved && (
                 <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
@@ -492,6 +585,28 @@ export default function ParentApprovalPage({ setActivePage }) {
         </div>
 
       </div>
+      )}
+
+      <AddStudentProfileModal
+        isOpen={showStudentModal}
+        onClose={() => setShowStudentModal(false)}
+        existingGuardian={guardianProfile}
+        onSuccess={async () => {
+          setShowStudentModal(false);
+          setFeedback({ type: 'success', message: 'Student profile created and linked to your account.' });
+          await loadData(false);
+        }}
+      />
+
+      <AddParentProfileModal
+        isOpen={showParentModal}
+        onClose={() => setShowParentModal(false)}
+        onSuccess={async () => {
+          setShowParentModal(false);
+          setFeedback({ type: 'success', message: 'Parent / guardian profile created and linked to your account.' });
+          await loadData(false);
+        }}
+      />
     </div>
   );
 }

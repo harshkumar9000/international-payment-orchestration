@@ -55,11 +55,21 @@ function AppContent() {
 
   // Synchronize browser history and URL when activePage changes
   const setActivePage = useCallback((page) => {
-    setActivePageState(page);
+    const PAGE_ALIASES = {
+      student: 'student-payments',
+      'parent-approval': 'guardian',
+      parent: 'guardian',
+      'my-cards': 'cards',
+      history: 'transactions',
+      compatibility: 'rupay-upi',
+      register: 'signup'
+    };
+    const resolvedPage = PAGE_ALIASES[page] || page;
+    setActivePageState(resolvedPage);
     if (typeof window !== 'undefined') {
-      const targetPath = getPathFromPage(page);
+      const targetPath = getPathFromPage(resolvedPage);
       if (window.location.pathname !== targetPath) {
-        window.history.pushState({ page }, '', targetPath);
+        window.history.pushState({ page: resolvedPage }, '', targetPath);
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }

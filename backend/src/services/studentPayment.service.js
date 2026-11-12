@@ -273,9 +273,10 @@ async function decideGuardianApproval(approvalId, decision, reason = '') {
         updated_at: new Date().toISOString()
       });
     } else if (updatedStatus === 'APPROVED') {
-      // Find student profile for customer email
+      // Find student profile for customer email & merchant ownership
       const studentProfile = await getStudentProfile(approval.student_id);
       const studentEmail = studentProfile?.email || 'aarav.student@delhiuniversity.ac.in';
+      const ownerMerchantId = studentProfile?.merchant_id || 'mer_demo_orchestration_01';
 
       // Check if duplicate transaction already exists for this approval ID
       const dupTx = await db.table('transactions').findOne(t =>
@@ -286,7 +287,7 @@ async function decideGuardianApproval(approvalId, decision, reason = '') {
       if (!dupTx) {
         await db.table('transactions').insert({
           id: approval.transaction_id,
-          merchant_id: 'mer_demo_orchestration_01',
+          merchant_id: ownerMerchantId,
           amount: parseFloat(approval.amount),
           currency: approval.currency || 'USD',
           customer_amount: parseFloat(approval.amount),

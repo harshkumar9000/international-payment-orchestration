@@ -2197,6 +2197,157 @@ describe('International Payment Orchestration API Suite', () => {
       });
       assert.strictEqual(delBankRes.status, 200);
     });
+
+    test('9. Newly registered merchant starts with empty student/parent portals and can add Parent Profile first then Student Profile', async () => {
+      const uniqueEmail = `parent_first_${Date.now()}@atlaspay.test`;
+      const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: uniqueEmail,
+          password: 'Password123!',
+          company_name: 'Parent First Family'
+        })
+      });
+      assert.strictEqual(regRes.status, 201);
+      const regData = await regRes.json();
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${regData.token}`
+      };
+
+      // Both portals should indicate needs_setup without leaking demo Aarav/Priya data
+      const [stuInitRes, guardPendingRes, guardOverviewRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/student/profile`, { headers: authHeaders }),
+        fetch(`${BASE_URL}/api/guardian/pending-approvals`, { headers: authHeaders }),
+        fetch(`${BASE_URL}/api/guardian/overview`, { headers: authHeaders })
+      ]);
+      const stuInit = await stuInitRes.json();
+      const guardPending = await guardPendingRes.json();
+      const guardOverview = await guardOverviewRes.json();
+
+      assert.strictEqual(stuInit.needs_setup, true);
+      assert.strictEqual(stuInit.profile, null);
+      assert.strictEqual(stuInit.guardian_profile, null);
+      assert.strictEqual(guardPending.needs_setup, true);
+      assert.strictEqual(guardPending.guardian, null);
+      assert.deepStrictEqual(guardPending.pending, []);
+      assert.strictEqual(guardOverview.needs_setup, true);
+      assert.strictEqual(guardOverview.guardian, null);
+
+      // Step 1: Add Parent / Guardian profile first
+      const createParentRes = await fetch(`${BASE_URL}/api/guardian/profile`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          guardian_name: 'Meera Nair',
+          guardian_email: 'meera.nair@family.test',
+          relationship: 'Mother',
+          daily_limit: 120,
+          weekly_limit: 300,
+          monthly_limit: 700
+        })
+      });
+      assert.strictEqual(createParentRes.status, 201);
+      const createdParent = await createParentRes.json();
+      assert.strictEqual(createdParent.success, true);
+      assert.strictEqual(createdParent.guardian.guardian_name, 'Meera Nair');
+
+      // Student profile is still empty, but guardian_profile is now visible
+      const stuMidRes = await fetch(`${BASE_URL}/api/student/profile`, { headers: authHeaders });
+      const stuMid = await stuMidRes.json();
+      assert.strictEqual(stuMid.needs_setup, true);
+      assert.strictEqual(stuMid.profile, null);
+      assert.strictEqual(stuMid.guardian_profile.guardian_email, 'meera.nair@family.test');
+
+      // Step 2: Add Student profile next -> should auto-link Meera Nair
+      const createStudentRes = await fetch(`${BASE_URL}/api/student/profile`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          student_name: 'Rohan Nair',
+          email: 'rohan.nair@student.test',
+          date_of_birth: '2009-04-12',
+          institution_name: 'IIT Madras BS',
+          daily_limit: 100,
+          weekly_limit: 250,
+          monthly_limit: 600
+        })
+      });
+      assert.strictEqual(createStudentRes.status, 201);
+      const createdStudent = await createStudentRes.json();
+      assert.strictEqual(createdStudent.success, true);
+      assert.strictEqual(createdStudent.profile.student_name, 'Rohan Nair');
+      assert.strictEqual(createdStudent.profile.guardian_id, createdParent.guardian.id);
+      assert.strictEqual(createdStudent.profile.guardian_email, 'meera.nair@family.test');
+
+      // Demo Aarav data remains completely untouched
+      const demoStuRes = await fetch(`${BASE_URL}/api/student/profile?student_id=stu_aarav_sharma_01`);
+      const demoStu = await demoStuRes.json();
+      assert.strictEqual(demoStu.profile.student_name, 'Aarav Sharma');
+    });
+
+    test('10. Newly registered merchant can add Student Profile first and then link Parent Profile', async () => {
+      const uniqueEmail = `student_first_${Date.now()}@atlaspay.test`;
+      const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: uniqueEmail,
+          password: 'Password123!',
+          company_name: 'Student First Family'
+        })
+      });
+      assert.strictEqual(regRes.status, 201);
+      const regData = await regRes.json();
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${regData.token}`
+      };
+
+      // Step 1: Add Student profile first (without optional parent fields)
+      const createStuRes = await fetch(`${BASE_URL}/api/student/profile`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          student_name: 'Ananya Verma',
+          email: 'ananya.verma@student.test',
+          date_of_birth: '2010-08-20',
+          institution_name: 'Coursera Youth Track'
+        })
+      });
+      assert.strictEqual(createStuRes.status, 201);
+      const createdStu = await createStuRes.json();
+      assert.strictEqual(createdStu.profile.student_name, 'Ananya Verma');
+      assert.strictEqual(createdStu.profile.guardian_id, null);
+
+      // Guardian portal still needs guardian setup, though students list shows Ananya
+      const guardInitRes = await fetch(`${BASE_URL}/api/guardian/overview`, { headers: authHeaders });
+      const guardInit = await guardInitRes.json();
+      assert.strictEqual(guardInit.needs_setup, true);
+      assert.strictEqual(guardInit.guardian, null);
+      assert.strictEqual(guardInit.students.length, 1);
+      assert.strictEqual(guardInit.students[0].student_name, 'Ananya Verma');
+
+      // Step 2: Add Parent profile -> auto-links onto Ananya Verma
+      const createGuardRes = await fetch(`${BASE_URL}/api/guardian/profile`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          guardian_name: 'Vikram Verma',
+          guardian_email: 'vikram.verma@parent.test'
+        })
+      });
+      assert.strictEqual(createGuardRes.status, 201);
+      const createdGuard = await createGuardRes.json();
+      assert.strictEqual(createdGuard.linked_students.length, 1);
+
+      const finalStuRes = await fetch(`${BASE_URL}/api/student/profile`, { headers: authHeaders });
+      const finalStu = await finalStuRes.json();
+      assert.strictEqual(finalStu.needs_setup, false);
+      assert.strictEqual(finalStu.profile.guardian_id, createdGuard.guardian.id);
+      assert.strictEqual(finalStu.profile.guardian_name, 'Vikram Verma');
+    });
   });
 });
 

@@ -37,6 +37,7 @@ const ALLOWED_TABLES = new Set([
   'recovery_logs',
   'fraud_assessments',
   'student_profiles',
+  'guardian_profiles',
   'guardian_approvals',
   'refund_records',
   'agentic_audit_logs',
@@ -51,6 +52,7 @@ const TABLES_WITH_UPDATED_AT = new Set([
   'routing_rules',
   'transactions',
   'student_profiles',
+  'guardian_profiles',
   'guardian_approvals',
   'refund_records',
   'saved_cards',
@@ -87,6 +89,7 @@ let fallbackStore = {
   recovery_logs: [],
   fraud_assessments: [],
   student_profiles: [],
+  guardian_profiles: [],
   guardian_approvals: [],
   refund_records: [],
   agentic_audit_logs: [],
@@ -104,6 +107,9 @@ function loadFallbackStore() {
     if (fs.existsSync(storeFile)) {
       const data = fs.readFileSync(storeFile, 'utf8');
       fallbackStore = JSON.parse(data);
+      if (!Array.isArray(fallbackStore.guardian_profiles)) {
+        fallbackStore.guardian_profiles = [];
+      }
       if (!Array.isArray(fallbackStore.bank_accounts)) {
         fallbackStore.bank_accounts = [];
       }
@@ -598,6 +604,7 @@ const db = {
       recovery_logs: [],
       fraud_assessments: [],
       student_profiles: [],
+      guardian_profiles: [],
       guardian_approvals: [],
       refund_records: [],
       agentic_audit_logs: [],

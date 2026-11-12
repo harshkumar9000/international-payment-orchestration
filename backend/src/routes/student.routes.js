@@ -1,19 +1,95 @@
 const express = require('express');
 const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
 const studentPaymentService = require('../services/studentPayment.service');
 const db = require('../db/db');
 const { optionalAuth, requireAuth } = require('../middleware/auth.middleware');
 
+function isDemoOrUnauth(req) {
+  return !req.merchant || req.merchant.id === 'mer_demo_orchestration_01';
+}
+
+function enrichStudentProfile(profile, txs = []) {
+  const ageInfo = studentPaymentService.parseAndCalculateAge(profile.date_of_birth);
+  const verifiedAge = ageInfo.status === 'VERIFIED' ? ageInfo.age : null;
+  const normalizedDob = ageInfo.status === 'VERIFIED'
+    ? ageInfo.date_of_birth
+    : (typeof profile.date_of_birth === 'string'
+        ? profile.date_of_birth
+        : (profile.date_of_birth instanceof Date ? profile.date_of_birth.toISOString().split('T')[0] : profile.date_of_birth));
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  return {
+    ...profile,
+    date_of_birth: normalizedDob,
+    age: verifiedAge,
+    is_minor: ageInfo.status === 'VERIFIED' ? ageInfo.is_minor : null,
+    age_verification_status: ageInfo.status,
+    spending_limits: {
+      daily_limit: parseFloat(profile.daily_limit || 100),
+      weekly_limit: parseFloat(profile.weekly_limit || 400),
+      monthly_limit: parseFloat(profile.monthly_limit || 1200),
+      single_tx_limit: parseFloat(profile.single_tx_limit || 250),
+      auto_approval_threshold: parseFloat(profile.auto_approval_threshold || 50),
+      current_daily_spend: parseFloat(txs.filter(t => new Date(t.created_at) >= todayMidnight && t.status === 'settled').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2)),
+      current_weekly_spend: parseFloat(txs.filter(t => t.status === 'settled').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2)),
+      current_monthly_spend: parseFloat(txs.filter(t => t.status === 'settled').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2))
+    },
+    whitelisted_mccs: typeof profile.whitelisted_mccs === 'string' ? JSON.parse(profile.whitelisted_mccs) : profile.whitelisted_mccs
+  };
+}
+
 // GET /api/student/profile
 router.get('/profile', optionalAuth, async (req, res) => {
   try {
+    if (!isDemoOrUnauth(req)) {
+      const merchantId = req.merchant.id;
+      const guardianProfile = await db.table('guardian_profiles').findOne(g => g.merchant_id === merchantId);
+      const requestedId = req.query.student_id;
+
+      let profile = null;
+      if (requestedId) {
+        profile = await db.table('student_profiles').findOne(
+          p => p.merchant_id === merchantId && (p.id === requestedId || p.email === requestedId)
+        );
+      } else {
+        profile = await db.table('student_profiles').findOne(p => p.merchant_id === merchantId);
+      }
+
+      if (!profile) {
+        return res.json({
+          profile: null,
+          student: null,
+          guardian_profile: guardianProfile || null,
+          transactions: [],
+          needs_setup: true
+        });
+      }
+
+      const txs = await db.table('transactions').find(t =>
+        t.merchant_id === merchantId &&
+        (t.customer_email === profile.email || t.metadata_json?.includes(profile.id))
+      );
+
+      const fullProfile = enrichStudentProfile(profile, txs);
+      return res.json({
+        profile: fullProfile,
+        student: fullProfile,
+        guardian_profile: guardianProfile || null,
+        transactions: txs.reverse(),
+        needs_setup: false
+      });
+    }
+
     const studentId = req.query.student_id || 'stu_aarav_sharma_01';
     let profile = await studentPaymentService.getStudentProfile(studentId);
-    
+
     // Default demo student profile if missing
     if (!profile) {
       profile = {
         id: 'stu_aarav_sharma_01',
+        merchant_id: 'mer_demo_orchestration_01',
         user_id: 'usr_aarav_01',
         email: 'aarav.student@delhiuniversity.ac.in',
         student_name: 'Aarav Sharma',
@@ -40,50 +116,138 @@ router.get('/profile', optionalAuth, async (req, res) => {
       t.customer_email === profile.email || t.metadata_json?.includes(profile.id)
     );
 
-    const ageInfo = studentPaymentService.parseAndCalculateAge(profile.date_of_birth);
-    const verifiedAge = ageInfo.status === 'VERIFIED' ? ageInfo.age : null;
-    const normalizedDob = ageInfo.status === 'VERIFIED'
-      ? ageInfo.date_of_birth
-      : (typeof profile.date_of_birth === 'string'
-          ? profile.date_of_birth
-          : (profile.date_of_birth instanceof Date ? profile.date_of_birth.toISOString().split('T')[0] : profile.date_of_birth));
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
-
-    const fullProfile = {
-      ...profile,
-      date_of_birth: normalizedDob,
-      age: verifiedAge,
-      is_minor: ageInfo.status === 'VERIFIED' ? ageInfo.is_minor : null,
-      age_verification_status: ageInfo.status,
-      spending_limits: {
-        daily_limit: parseFloat(profile.daily_limit || 100),
-        weekly_limit: parseFloat(profile.weekly_limit || 400),
-        monthly_limit: parseFloat(profile.monthly_limit || 1200),
-        single_tx_limit: parseFloat(profile.single_tx_limit || 250),
-        auto_approval_threshold: parseFloat(profile.auto_approval_threshold || 50),
-        current_daily_spend: parseFloat(txs.filter(t => new Date(t.created_at) >= todayMidnight && t.status === 'settled').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2)),
-        current_weekly_spend: parseFloat(txs.filter(t => t.status === 'settled').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2)),
-        current_monthly_spend: parseFloat(txs.filter(t => t.status === 'settled').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0).toFixed(2))
-      },
-      whitelisted_mccs: typeof profile.whitelisted_mccs === 'string' ? JSON.parse(profile.whitelisted_mccs) : profile.whitelisted_mccs
-    };
+    const fullProfile = enrichStudentProfile(profile, txs);
 
     res.json({
       profile: fullProfile,
       student: fullProfile,
-      transactions: txs.reverse()
+      transactions: txs.reverse(),
+      needs_setup: false
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/student/create-intent
-router.post('/create-intent', async (req, res) => {
+// POST /api/student/profile - Create a student profile for the authenticated merchant
+router.post('/profile', optionalAuth, async (req, res) => {
   try {
-    const studentId = req.body.student_id || 'stu_aarav_sharma_01';
-    const profile = await studentPaymentService.getStudentProfile(studentId);
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    const {
+      student_name,
+      email,
+      date_of_birth,
+      institution_name = 'University / Learning Institution',
+      student_id_number = '',
+      guardian_name = '',
+      guardian_email = '',
+      daily_limit,
+      weekly_limit,
+      monthly_limit,
+      single_tx_limit,
+      auto_approval_threshold
+    } = req.body;
+
+    if (!student_name || !student_name.trim()) {
+      return res.status(400).json({ error: 'Student full name is required' });
+    }
+    if (!email || !email.trim() || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid student email address is required' });
+    }
+
+    const ageInfo = studentPaymentService.parseAndCalculateAge(date_of_birth);
+    if (ageInfo.status !== 'VERIFIED') {
+      return res.status(400).json({ error: ageInfo.reason || 'Valid date of birth (YYYY-MM-DD) is required' });
+    }
+
+    // Link with merchant's existing guardian profile if present, or create one if guardian details provided
+    let guardianProfile = await db.table('guardian_profiles').findOne(g => g.merchant_id === merchantId);
+
+    if (!guardianProfile && guardian_name.trim() && guardian_email.trim()) {
+      guardianProfile = {
+        id: `guard_${uuidv4().substring(0, 10)}`,
+        merchant_id: merchantId,
+        guardian_name: guardian_name.trim(),
+        guardian_email: guardian_email.trim(),
+        relationship: 'Parent',
+        default_daily_limit: parseFloat(daily_limit ?? 100),
+        default_weekly_limit: parseFloat(weekly_limit ?? 400),
+        default_monthly_limit: parseFloat(monthly_limit ?? 1200),
+        auto_approval_threshold: parseFloat(auto_approval_threshold ?? 50),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      await db.table('guardian_profiles').insert(guardianProfile);
+    }
+
+    const resolvedGuardianId = guardianProfile ? guardianProfile.id : null;
+    const resolvedGuardianEmail = guardianProfile?.guardian_email || guardian_email.trim() || '';
+    const resolvedGuardianName = guardianProfile?.guardian_name || guardian_name.trim() || '';
+
+    const newProfile = {
+      id: `stu_${uuidv4().substring(0, 10)}`,
+      merchant_id: merchantId,
+      user_id: `usr_${uuidv4().substring(0, 8)}`,
+      email: email.trim().toLowerCase(),
+      student_name: student_name.trim(),
+      date_of_birth: ageInfo.date_of_birth,
+      is_minor: ageInfo.is_minor,
+      institution_name: institution_name.trim(),
+      student_id_number: student_id_number.trim() || `STU-${Date.now().toString(36).toUpperCase()}`,
+      guardian_id: resolvedGuardianId,
+      guardian_email: resolvedGuardianEmail,
+      guardian_name: resolvedGuardianName,
+      guardian_consent_status: resolvedGuardianId || resolvedGuardianEmail ? 'ACTIVE' : 'PENDING',
+      daily_limit: parseFloat(daily_limit ?? guardianProfile?.default_daily_limit ?? 100),
+      weekly_limit: parseFloat(weekly_limit ?? guardianProfile?.default_weekly_limit ?? 400),
+      monthly_limit: parseFloat(monthly_limit ?? guardianProfile?.default_monthly_limit ?? 1200),
+      single_tx_limit: parseFloat(single_tx_limit ?? 250),
+      auto_approval_threshold: parseFloat(auto_approval_threshold ?? guardianProfile?.auto_approval_threshold ?? 50),
+      whitelisted_mccs: JSON.stringify(['education_higher_ed', 'online_courses', 'books_study_materials', 'software_tools', 'standardized_testing']),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    await db.table('student_profiles').insert(newProfile);
+    const enriched = enrichStudentProfile(newProfile, []);
+
+    res.status(201).json({
+      success: true,
+      message: 'Student profile created successfully',
+      profile: enriched,
+      student: enriched,
+      guardian_profile: guardianProfile || null
+    });
+  } catch (err) {
+    console.error('[Student Create Profile Error]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/student/create-intent
+router.post('/create-intent', optionalAuth, async (req, res) => {
+  try {
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    let studentId = req.body.student_id;
+    let profile = null;
+
+    if (!isDemoOrUnauth(req)) {
+      if (studentId) {
+        profile = await db.table('student_profiles').findOne(p => p.merchant_id === merchantId && p.id === studentId);
+      } else {
+        profile = await db.table('student_profiles').findOne(p => p.merchant_id === merchantId);
+      }
+      if (!profile) {
+        return res.status(400).json({
+          success: false,
+          error: 'Please create a student profile before submitting a student payment.'
+        });
+      }
+      studentId = profile.id;
+    } else {
+      studentId = studentId || 'stu_aarav_sharma_01';
+      profile = await studentPaymentService.getStudentProfile(studentId);
+    }
     const paymentData = {
       amount: parseFloat(req.body.amount || req.body.payment_data?.amount || 50),
       currency: req.body.currency || req.body.payment_data?.currency || 'USD',
@@ -154,7 +318,7 @@ router.post('/create-intent', async (req, res) => {
       // Create linked pending transaction in ledger
       await db.table('transactions').insert({
         id: txId,
-        merchant_id: 'mer_demo_orchestration_01',
+        merchant_id: req.merchant?.id || profile?.merchant_id || 'mer_demo_orchestration_01',
         amount: paymentData.amount,
         currency: paymentData.currency,
         customer_amount: paymentData.amount,
@@ -195,7 +359,7 @@ router.post('/create-intent', async (req, res) => {
     const txId = `tx_stu_${Date.now().toString(36)}`;
     await db.table('transactions').insert({
       id: txId,
-      merchant_id: 'mer_demo_orchestration_01',
+      merchant_id: req.merchant?.id || profile?.merchant_id || 'mer_demo_orchestration_01',
       amount: paymentData.amount,
       currency: paymentData.currency,
       customer_amount: paymentData.amount,
@@ -230,6 +394,19 @@ router.post('/create-intent', async (req, res) => {
 // GET /api/student/approvals
 router.get('/approvals', optionalAuth, async (req, res) => {
   try {
+    if (!isDemoOrUnauth(req)) {
+      const merchantId = req.merchant.id;
+      const requestedId = req.query.student_id;
+      const profile = requestedId
+        ? await db.table('student_profiles').findOne(p => p.merchant_id === merchantId && p.id === requestedId)
+        : await db.table('student_profiles').findOne(p => p.merchant_id === merchantId);
+      if (!profile) {
+        return res.json({ approvals: [] });
+      }
+      const approvals = await db.table('guardian_approvals').find(a => a.student_id === profile.id);
+      return res.json({ approvals: approvals.reverse() });
+    }
+
     const studentId = req.query.student_id || 'stu_aarav_sharma_01';
     const profile = await studentPaymentService.getStudentProfile(studentId);
     const targetId = profile ? profile.id : studentId;
@@ -250,6 +427,22 @@ router.get('/approvals', optionalAuth, async (req, res) => {
 // GET /api/student/transactions
 router.get('/transactions', optionalAuth, async (req, res) => {
   try {
+    if (!isDemoOrUnauth(req)) {
+      const merchantId = req.merchant.id;
+      const requestedId = req.query.student_id;
+      const profile = requestedId
+        ? await db.table('student_profiles').findOne(p => p.merchant_id === merchantId && p.id === requestedId)
+        : await db.table('student_profiles').findOne(p => p.merchant_id === merchantId);
+      if (!profile) {
+        return res.json({ transactions: [] });
+      }
+      const txs = await db.table('transactions').find(t =>
+        t.merchant_id === merchantId &&
+        (t.customer_email === profile.email || t.metadata_json?.includes(profile.id))
+      );
+      return res.json({ transactions: txs.reverse() });
+    }
+
     const studentId = req.query.student_id || 'stu_aarav_sharma_01';
     const profile = await studentPaymentService.getStudentProfile(studentId);
     const email = profile ? profile.email : 'aarav.student@delhiuniversity.ac.in';
