@@ -219,6 +219,26 @@ CREATE TABLE IF NOT EXISTS saved_cards (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Saved Bank Accounts (Settlement & Payment Rails)
+-- IMPORTANT: Full account numbers are NEVER stored. Only masked numbers and tokenized references.
+CREATE TABLE IF NOT EXISTS bank_accounts (
+    id VARCHAR(64) PRIMARY KEY,
+    merchant_id VARCHAR(64) NOT NULL,
+    account_holder_name VARCHAR(255) NOT NULL,
+    bank_name VARCHAR(128) NOT NULL,
+    account_number_masked VARCHAR(64) NOT NULL,
+    last_four VARCHAR(4) NOT NULL,
+    routing_code VARCHAR(32) NOT NULL,
+    account_type VARCHAR(32) DEFAULT 'checking',
+    currency VARCHAR(8) DEFAULT 'USD',
+    country VARCHAR(8) DEFAULT 'US',
+    verification_status VARCHAR(32) DEFAULT 'VERIFIED',
+    is_default BOOLEAN DEFAULT FALSE,
+    token VARCHAR(128) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- High-Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_tx_merchant_created ON transactions(merchant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
@@ -231,3 +251,4 @@ CREATE INDEX IF NOT EXISTS idx_guardian_idempotency ON guardian_approvals(idempo
 CREATE INDEX IF NOT EXISTS idx_refund_tx ON refund_records(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_saved_cards_merchant ON saved_cards(merchant_id);
 CREATE INDEX IF NOT EXISTS idx_saved_cards_token ON saved_cards(token);
+CREATE INDEX IF NOT EXISTS idx_bank_accounts_merchant ON bank_accounts(merchant_id);

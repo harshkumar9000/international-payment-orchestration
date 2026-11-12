@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { AddCardModal, LinkBankAccountModal } from '../components/LinkInstrumentModals';
 import {
   TrendingUp,
   DollarSign,
@@ -11,7 +12,9 @@ import {
   RefreshCw,
   Globe2,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Building2,
+  Trash2
 } from 'lucide-react';
 import {
   AreaChart,
@@ -29,9 +32,13 @@ export default function DashboardPage({ setActivePage }) {
   const [volumeChart, setVolumeChart] = useState(null);
   const [recentTxs, setRecentTxs] = useState([]);
   const [savedCards, setSavedCards] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+  const [showLinkBankModal, setShowLinkBankModal] = useState(false);
+  const [inventoryNotice, setInventoryNotice] = useState('');
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -47,12 +54,12 @@ export default function DashboardPage({ setActivePage }) {
       console.warn('[Dashboard] Metrics endpoint offline, using baseline cached metrics:', mErr.message);
       partialFailures++;
       mRes = {
-        total_volume_usd: 148920.50,
-        total_transactions: 1248,
-        settled_transactions: 1204,
-        failed_transactions: 20,
-        conversion_rate_percent: 96.5,
-        is_cached_baseline: true
+        total_volume_usd: 0,
+        total_transactions: 0,
+        settled_transactions: 0,
+        failed_transactions: 0,
+        conversion_rate_percent: 0,
+        is_cached_baseline: false
       };
     }
 
@@ -65,9 +72,9 @@ export default function DashboardPage({ setActivePage }) {
       partialFailures++;
       vRes = {
         labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-        volumes: [14200, 18500, 24100, 19800, 31200, 28900, 36400],
-        transactions_count: [48, 65, 89, 74, 118, 102, 138],
-        is_cached_baseline: true
+        volumes: [0, 0, 0, 0, 0, 0, 0],
+        transactions_count: [0, 0, 0, 0, 0, 0, 0],
+        is_cached_baseline: false
       };
     }
 
@@ -91,13 +98,23 @@ export default function DashboardPage({ setActivePage }) {
       cRes = { cards: [] };
     }
 
+    // 5. Linked Bank Accounts
+    let bRes = null;
+    try {
+      bRes = await api.bankAccounts.list();
+    } catch (bErr) {
+      console.warn('[Dashboard] Bank accounts endpoint offline:', bErr.message);
+      bRes = { bank_accounts: [] };
+    }
+
     setMetrics(mRes);
     setVolumeChart(vRes);
     setRecentTxs(Array.isArray(tRes?.transactions) ? tRes.transactions : []);
     setSavedCards(Array.isArray(cRes?.cards) ? cRes.cards : []);
+    setBankAccounts(Array.isArray(bRes?.bank_accounts) ? bRes.bank_accounts : []);
 
     if (partialFailures >= 3) {
-      setError('Live payment analytics sync temporarily unavailable. Displaying cached treasury baseline.');
+      setError('Live payment analytics sync temporarily unavailable.');
     }
 
     setLoading(false);
@@ -123,7 +140,7 @@ export default function DashboardPage({ setActivePage }) {
       : 0
   }));
 
-  const activeTotalVolume = Number(metrics?.total_volume_usd) || 148920.50;
+  const activeTotalVolume = Number(metrics?.total_volume_usd ?? 0);
 
   return (
     <div className="space-y-8 max-w-7xl mx-auto text-left">
@@ -139,7 +156,7 @@ export default function DashboardPage({ setActivePage }) {
               {metrics?.is_cached_baseline ? 'Simulated Baseline' : 'Live Orchestration'}
             </span>
             {loading && (
-              <span className="flex items-center gap-1 text-[10px] text-teal-600 dark:text-teal-400 font-medium">
+              <span className="flex items-center gap-1 text-[10px] text-[#666666] dark:text-[#999999] font-medium">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 Syncing...
               </span>
@@ -166,11 +183,19 @@ export default function DashboardPage({ setActivePage }) {
           </button>
           <button
             type="button"
-            onClick={() => setActivePage('cards')}
+            onClick={() => setShowAddCardModal(true)}
             className="px-4 py-2.5 rounded-xl bg-white dark:bg-[#111111] hover:bg-[#F7F7F7] dark:hover:bg-[#1E1E1E] text-[#111111] dark:text-white font-semibold text-[14px] border border-[#DEDEDE] dark:border-[#262626] shadow-sm flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
             <Plus className="w-4 h-4 text-[#111111] dark:text-white" />
             <span>Add Card</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLinkBankModal(true)}
+            className="px-4 py-2.5 rounded-xl bg-white dark:bg-[#111111] hover:bg-[#F7F7F7] dark:hover:bg-[#1E1E1E] text-[#111111] dark:text-white font-semibold text-[14px] border border-[#DEDEDE] dark:border-[#262626] shadow-sm flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+          >
+            <Building2 className="w-4 h-4 text-[#111111] dark:text-white" />
+            <span>Link Bank Account</span>
           </button>
           <button
             type="button"
@@ -199,6 +224,56 @@ export default function DashboardPage({ setActivePage }) {
             <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
             <span>Retry Sync</span>
           </button>
+        </div>
+      )}
+
+      {inventoryNotice && (
+        <div className="p-3.5 rounded-2xl bg-[#F7F7F7] dark:bg-[#111111] border border-[#DEDEDE] dark:border-[#262626] text-xs font-medium text-[#111111] dark:text-white flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{inventoryNotice}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setInventoryNotice('')}
+            className="text-[11px] text-[#666666] hover:text-[#111111] dark:text-[#999999] dark:hover:text-white cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {!loading && savedCards.length === 0 && bankAccounts.length === 0 && (
+        <div className="p-6 rounded-2xl bg-white dark:bg-[#080808] border border-dashed border-[#DEDEDE] dark:border-[#2E2E2E] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="text-xs uppercase tracking-wider font-semibold text-[#666666] dark:text-[#999999]">
+              Empty Payment Inventory
+            </div>
+            <h2 className="text-lg font-semibold text-[#111111] dark:text-white">
+              Your account is ready — no cards or bank accounts linked yet
+            </h2>
+            <p className="text-xs text-[#666666] dark:text-[#999999]">
+              Link a payment card or settlement bank account to start processing international payments and payouts.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowAddCardModal(true)}
+              className="px-4 py-2.5 rounded-full bg-black text-white dark:bg-white dark:text-black font-semibold text-xs flex items-center gap-2 hover:opacity-90 transition-all cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Add Payment Card</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLinkBankModal(true)}
+              className="px-4 py-2.5 rounded-full bg-[#F7F7F7] dark:bg-[#141414] text-[#111111] dark:text-white border border-[#DEDEDE] dark:border-[#333333] font-semibold text-xs flex items-center gap-2 hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] transition-all cursor-pointer"
+            >
+              <Building2 className="w-4 h-4" />
+              <span>Link Bank Account</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -251,7 +326,9 @@ export default function DashboardPage({ setActivePage }) {
             </div>
             <div className="text-xs text-[#CCCCCC] flex items-center space-x-1 mt-1 font-semibold">
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>+24.6% vs previous cycle</span>
+              <span>
+                {activeTotalVolume > 0 ? 'Live settled balance' : 'No settled balance yet'}
+              </span>
             </div>
           </div>
 
@@ -298,7 +375,9 @@ export default function DashboardPage({ setActivePage }) {
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] flex items-center gap-1 mt-1 font-semibold">
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>+14.8% from last week</span>
+              <span>
+                {activeTotalVolume > 0 ? 'Settled across active corridors' : '0 settled volume'}
+              </span>
             </div>
           </div>
         </div>
@@ -313,7 +392,7 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              {(Number(metrics?.total_transactions) || 1248).toLocaleString()}
+              {(Number(metrics?.total_transactions ?? 0)).toLocaleString()}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] mt-1">
               Cross-border & domestic rails
@@ -331,10 +410,10 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              {(Number(metrics?.settled_transactions) || 1204).toLocaleString()}
+              {(Number(metrics?.settled_transactions ?? 0)).toLocaleString()}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] flex items-center gap-1 mt-1 font-semibold">
-              <span>{metrics?.conversion_rate_percent || 96.5}% success SLA</span>
+              <span>{Number(metrics?.conversion_rate_percent ?? 0)}% success SLA</span>
             </div>
           </div>
         </div>
@@ -349,10 +428,14 @@ export default function DashboardPage({ setActivePage }) {
           </div>
           <div>
             <div className="text-2xl font-black text-[#111111] dark:text-white font-mono tracking-tight">
-              {(Number(metrics?.failed_transactions) || 20).toLocaleString()}
+              {(Number(metrics?.failed_transactions ?? 0)).toLocaleString()}
             </div>
             <div className="text-xs text-[#666666] dark:text-[#999999] flex items-center gap-1 mt-1">
-              <span>1.6% decline / retry rate</span>
+              <span>
+                {Number(metrics?.total_transactions ?? 0) > 0
+                  ? `${((Number(metrics?.failed_transactions ?? 0) / Number(metrics?.total_transactions)) * 100).toFixed(1)}% decline / retry rate`
+                  : 'No decline history'}
+              </span>
             </div>
           </div>
         </div>
@@ -427,14 +510,14 @@ export default function DashboardPage({ setActivePage }) {
 
           <div className="space-y-3">
             {savedCards.length === 0 ? (
-              <div className="p-6 text-center text-xs text-[#666666] rounded-xl bg-[#F7F7F7] dark:bg-[#111111] border border-dashed border-[#DEDEDE] dark:border-[#262626]">
+              <div className="p-5 text-center text-xs text-[#666666] rounded-xl bg-[#F7F7F7] dark:bg-[#111111] border border-dashed border-[#DEDEDE] dark:border-[#262626]">
                 No cards linked yet.
                 <button
                   type="button"
-                  onClick={() => setActivePage('cards')}
+                  onClick={() => setShowAddCardModal(true)}
                   className="block mx-auto mt-2 text-[#111111] dark:text-white font-bold hover:underline cursor-pointer"
                 >
-                  Link a Card
+                  + Add Card
                 </button>
               </div>
             ) : (
@@ -487,6 +570,83 @@ export default function DashboardPage({ setActivePage }) {
             <span>View All Cards ({savedCards.length})</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
+
+          {/* Linked Bank Accounts Inventory */}
+          <div className="pt-4 border-t border-[#DEDEDE] dark:border-[#222222] space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-[#111111] dark:text-white">
+                  Linked Bank Accounts
+                </h4>
+                <p className="text-[11px] text-[#666666] dark:text-[#999999]">
+                  ACH, SEPA, SWIFT &amp; IMPS settlement accounts
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLinkBankModal(true)}
+                className="text-xs text-[#111111] dark:text-white hover:underline font-semibold cursor-pointer"
+              >
+                + Link Bank
+              </button>
+            </div>
+
+            {bankAccounts.length === 0 ? (
+              <div className="p-5 text-center text-xs text-[#666666] rounded-xl bg-[#F7F7F7] dark:bg-[#111111] border border-dashed border-[#DEDEDE] dark:border-[#262626]">
+                No bank accounts linked yet.
+                <button
+                  type="button"
+                  onClick={() => setShowLinkBankModal(true)}
+                  className="block mx-auto mt-2 text-[#111111] dark:text-white font-bold hover:underline cursor-pointer"
+                >
+                  + Link Bank Account
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {bankAccounts.slice(0, 3).map((acc) => (
+                  <div
+                    key={acc.id}
+                    className="p-3 rounded-xl bg-[#F7F7F7] dark:bg-[#111111] border border-[#DEDEDE] dark:border-[#262626] flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-black dark:bg-white text-white dark:text-black flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-[#111111] dark:text-white text-xs truncate">
+                          {acc.bank_name}
+                        </div>
+                        <div className="font-mono text-[11px] text-[#666666] dark:text-[#999999]">
+                          {acc.account_number_masked} · {acc.currency}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2 py-0.5 text-[9px] font-bold rounded-full border bg-black text-white dark:bg-white dark:text-black border-black dark:border-white">
+                        {acc.is_default ? 'Primary' : 'Verified'}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Unlink ${acc.bank_name}`}
+                        onClick={async () => {
+                          try {
+                            await api.bankAccounts.delete(acc.id);
+                            loadDashboardData();
+                          } catch (err) {
+                            console.error('[Unlink Bank Error]:', err);
+                          }
+                        }}
+                        className="p-1 rounded-lg text-[#666666] hover:text-[#111111] dark:text-[#999999] dark:hover:text-white cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -587,6 +747,25 @@ export default function DashboardPage({ setActivePage }) {
           </table>
         </div>
       </div>
+
+      {/* Add Card & Link Bank Account Popups */}
+      <AddCardModal
+        isOpen={showAddCardModal}
+        onClose={() => setShowAddCardModal(false)}
+        onSuccess={(card) => {
+          setInventoryNotice(`Card ending in ${card.last_four} securely linked to your inventory.`);
+          loadDashboardData();
+        }}
+      />
+
+      <LinkBankAccountModal
+        isOpen={showLinkBankModal}
+        onClose={() => setShowLinkBankModal(false)}
+        onSuccess={(account) => {
+          setInventoryNotice(`Bank account ${account.bank_name} (${account.account_number_masked}) linked successfully.`);
+          loadDashboardData();
+        }}
+      />
     </div>
   );
 }

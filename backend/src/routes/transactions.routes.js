@@ -6,8 +6,9 @@ const { optionalAuth } = require('../middleware/auth.middleware');
 // GET /
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
     const { status, currency, provider, search, limit = 50, page = 1 } = req.query;
-    let list = await db.table('transactions').find();
+    let list = await db.table('transactions').find(t => t.merchant_id === merchantId);
 
     // Filters
     if (status && status !== 'all') {
@@ -49,7 +50,8 @@ router.get('/', optionalAuth, async (req, res) => {
 // GET /export/csv
 router.get('/export/csv', optionalAuth, async (req, res) => {
   try {
-    const transactions = await db.table('transactions').find();
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    const transactions = await db.table('transactions').find(t => t.merchant_id === merchantId);
     transactions.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     const headers = ['ID', 'Date', 'Customer Email', 'Country', 'Amount', 'Currency', 'Method', 'Primary Gateway', 'Executed Gateway', 'Status', 'Risk Score', 'Fee Charged', 'Latency (ms)', 'Decline Reason'];
@@ -82,7 +84,8 @@ router.get('/export/csv', optionalAuth, async (req, res) => {
 // GET /export/json
 router.get('/export/json', optionalAuth, async (req, res) => {
   try {
-    const transactions = await db.table('transactions').find();
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    const transactions = await db.table('transactions').find(t => t.merchant_id === merchantId);
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Content-Disposition', 'attachment; filename="transactions_export.json"');
     res.json(transactions);

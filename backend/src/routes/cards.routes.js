@@ -86,7 +86,7 @@ function evaluateCardSupport(network, bin) {
 router.get('/', async (req, res) => {
   try {
     const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
-    const cards = await db.table('saved_cards').find(c => c.merchant_id === merchantId || !c.merchant_id);
+    const cards = await db.table('saved_cards').find(c => c.merchant_id === merchantId);
     
     // Sort default card first, then newest
     const sorted = [...cards].sort((a, b) => {
@@ -142,7 +142,7 @@ router.post('/', async (req, res) => {
     const supportEvaluation = evaluateCardSupport(network, bin);
 
     // Check if user has existing cards; if first, set as default
-    const existingCards = await db.table('saved_cards').find(c => c.merchant_id === merchantId || !c.merchant_id);
+    const existingCards = await db.table('saved_cards').find(c => c.merchant_id === merchantId);
     const shouldBeDefault = existingCards.length === 0 || Boolean(is_default);
 
     if (shouldBeDefault && existingCards.length > 0) {
@@ -192,7 +192,7 @@ router.put('/:id/default', async (req, res) => {
     const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
     const cardId = req.params.id;
 
-    const cards = await db.table('saved_cards').find(c => c.merchant_id === merchantId || !c.merchant_id);
+    const cards = await db.table('saved_cards').find(c => c.merchant_id === merchantId);
     const target = cards.find(c => c.id === cardId);
 
     if (!target) {
@@ -217,7 +217,7 @@ router.delete('/:id', async (req, res) => {
     const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
     const cardId = req.params.id;
 
-    const cards = await db.table('saved_cards').find(c => c.merchant_id === merchantId || !c.merchant_id);
+    const cards = await db.table('saved_cards').find(c => c.merchant_id === merchantId);
     const target = cards.find(c => c.id === cardId);
 
     if (!target) {

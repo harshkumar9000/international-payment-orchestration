@@ -41,6 +41,7 @@ const ALLOWED_TABLES = new Set([
   'refund_records',
   'agentic_audit_logs',
   'saved_cards',
+  'bank_accounts',
   'schema_migrations'
 ]);
 
@@ -52,7 +53,8 @@ const TABLES_WITH_UPDATED_AT = new Set([
   'student_profiles',
   'guardian_approvals',
   'refund_records',
-  'saved_cards'
+  'saved_cards',
+  'bank_accounts'
 ]);
 
 function validateTableName(tableName) {
@@ -88,7 +90,8 @@ let fallbackStore = {
   guardian_approvals: [],
   refund_records: [],
   agentic_audit_logs: [],
-  saved_cards: []
+  saved_cards: [],
+  bank_accounts: []
 };
 
 // Load existing local store if present
@@ -101,6 +104,12 @@ function loadFallbackStore() {
     if (fs.existsSync(storeFile)) {
       const data = fs.readFileSync(storeFile, 'utf8');
       fallbackStore = JSON.parse(data);
+      if (!Array.isArray(fallbackStore.bank_accounts)) {
+        fallbackStore.bank_accounts = [];
+      }
+      if (!Array.isArray(fallbackStore.saved_cards)) {
+        fallbackStore.saved_cards = [];
+      }
     }
   } catch (err) {
     console.warn('[DB] Warning loading fallback store file, initializing clean state:', err.message);
@@ -592,7 +601,8 @@ const db = {
       guardian_approvals: [],
       refund_records: [],
       agentic_audit_logs: [],
-      saved_cards: []
+      saved_cards: [],
+      bank_accounts: []
     };
     saveFallbackStore();
   },

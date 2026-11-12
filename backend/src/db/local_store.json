@@ -11,6 +11,30 @@
       "role": "merchant",
       "created_at": "2026-10-11T16:19:39.031Z",
       "updated_at": "2026-11-10T16:19:39.031Z"
+    },
+    {
+      "id": "mer_f17c3845-913",
+      "email": "verify_1794481174305@atlaspay.test",
+      "password_hash": "$2a$10$nmjaTnaxIFApbWCTAQgOD.06zvYlbzdDhiLcV./xvlicX16Oa8Hem",
+      "company_name": "Verify Empty Store",
+      "default_currency": "USD",
+      "markup_percentage": 1.25,
+      "api_key": "sk_live_f24a95e09fb84050976925bc4935f271",
+      "role": "merchant",
+      "created_at": "2026-11-12T10:59:34.479Z",
+      "updated_at": "2026-11-12T10:59:34.480Z"
+    },
+    {
+      "id": "mer_10cb855f-332",
+      "email": "tanish.25bce11137@vitbhopal.ac.in",
+      "password_hash": "$2a$10$JI4JrDNA2Sf653Hq/fZggOlJG3r8Pz3yUxp3SdpQLw6XOKPkxCGWy",
+      "company_name": "zxcvbnm",
+      "default_currency": "USD",
+      "markup_percentage": 1.25,
+      "api_key": "sk_live_a43ca2baab6b4afd942b9eb3a90244e4",
+      "role": "merchant",
+      "created_at": "2026-11-12T11:00:54.979Z",
+      "updated_at": "2026-11-12T11:00:54.979Z"
     }
   ],
   "providers": [
@@ -125,6 +149,66 @@
       "condition_json": "{\"currency\":\"USD\",\"country\":\"US\"}",
       "target_provider": "stripe",
       "created_at": "2026-11-10T16:19:39.039Z"
+    },
+    {
+      "id": "rule_96f343e8",
+      "merchant_id": "mer_f17c3845-913",
+      "name": "India UPI Rail Priority",
+      "priority_order": 1,
+      "is_active": true,
+      "condition_json": "{\"currency\":\"INR\",\"payment_method\":\"upi\"}",
+      "target_provider": "razorpay_upi",
+      "created_at": "2026-11-12T10:59:34.483Z"
+    },
+    {
+      "id": "rule_5df958dc",
+      "merchant_id": "mer_f17c3845-913",
+      "name": "EU Low-Fee SEPA / Cards",
+      "priority_order": 2,
+      "is_active": true,
+      "condition_json": "{\"currency\":\"EUR\"}",
+      "target_provider": "adyen",
+      "created_at": "2026-11-12T10:59:34.483Z"
+    },
+    {
+      "id": "rule_5fea50bf",
+      "merchant_id": "mer_f17c3845-913",
+      "name": "Global Card Processing",
+      "priority_order": 3,
+      "is_active": true,
+      "condition_json": "{\"payment_method\":\"credit_card\"}",
+      "target_provider": "stripe",
+      "created_at": "2026-11-12T10:59:34.483Z"
+    },
+    {
+      "id": "rule_cacf26b2",
+      "merchant_id": "mer_10cb855f-332",
+      "name": "India UPI Rail Priority",
+      "priority_order": 1,
+      "is_active": true,
+      "condition_json": "{\"currency\":\"INR\",\"payment_method\":\"upi\"}",
+      "target_provider": "razorpay_upi",
+      "created_at": "2026-11-12T11:00:54.982Z"
+    },
+    {
+      "id": "rule_45cfbf0b",
+      "merchant_id": "mer_10cb855f-332",
+      "name": "EU Low-Fee SEPA / Cards",
+      "priority_order": 2,
+      "is_active": true,
+      "condition_json": "{\"currency\":\"EUR\"}",
+      "target_provider": "adyen",
+      "created_at": "2026-11-12T11:00:54.982Z"
+    },
+    {
+      "id": "rule_cd994b57",
+      "merchant_id": "mer_10cb855f-332",
+      "name": "Global Card Processing",
+      "priority_order": 3,
+      "is_active": true,
+      "condition_json": "{\"payment_method\":\"credit_card\"}",
+      "target_provider": "stripe",
+      "created_at": "2026-11-12T11:00:54.982Z"
     }
   ],
   "transactions": [
@@ -814,5 +898,6 @@
       "created_at": "2026-11-07T16:19:39.044Z",
       "updated_at": "2026-11-10T16:19:39.089Z"
     }
-  ]
+  ],
+  "bank_accounts": []
 }

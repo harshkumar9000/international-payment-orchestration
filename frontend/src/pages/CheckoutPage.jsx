@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import AnimatedPaymentModal from '../components/AnimatedPaymentModal';
+import { AddCardModal } from '../components/LinkInstrumentModals';
 import {
   CreditCard,
   Globe2,
@@ -34,14 +36,16 @@ const COUNTRIES = [
 ];
 
 export default function CheckoutPage({ setActivePage }) {
-  // Step 1: Merchant & Payment Details
-  const [merchantName, setMerchantName] = useState('Coursera Inc.');
-  const [description, setDescription] = useState('Global AI & Data Science Specialization');
-  const [amount, setAmount] = useState('149.00');
+  const { merchant } = useAuth();
+
+  // Step 1: Merchant & Payment Details (empty by default for new users)
+  const [merchantName, setMerchantName] = useState('');
+  const [description, setDescription] = useState('');
+  const [amount, setAmount] = useState('');
 
   // Step 2: Destination & Currency
-  const [selectedCountry, setSelectedCountry] = useState('US');
-  const [selectedCurrency, setSelectedCurrency] = useState('USD');
+  const [selectedCountry, setSelectedCountry] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState('');
 
   // Step 3: Payment Method
   const [savedCards, setSavedCards] = useState([]);
@@ -55,7 +59,7 @@ export default function CheckoutPage({ setActivePage }) {
   const [newCardholderName, setNewCardholderName] = useState('');
 
   // UPI VPA (if selectedMethodType === 'upi')
-  const [upiVpa, setUpiVpa] = useState('student@okaxis');
+  const [upiVpa, setUpiVpa] = useState('');
 
   // FX & Calculation States
   const [conversion, setConversion] = useState(null);
@@ -64,32 +68,61 @@ export default function CheckoutPage({ setActivePage }) {
   // Processing & Receipt States
   const [processing, setProcessing] = useState(false);
   const [otpRequired, setOtpRequired] = useState(false);
-  const [otpCode, setOtpCode] = useState('123456');
+  const [otpCode, setOtpCode] = useState('');
   const [transactionReceipt, setTransactionReceipt] = useState(null);
   const [checkoutError, setCheckoutError] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showAddCardModal, setShowAddCardModal] = useState(false);
+
+  function handleLoadDemoData() {
+    setCheckoutError('');
+    setMerchantName('Coursera Inc.');
+    setDescription('Global AI & Data Science Specialization');
+    setSelectedCountry('US');
+    setSelectedCurrency('USD');
+    setAmount('149.00');
+    setUpiVpa('student@okaxis');
+  }
+
+  function handleClearForm() {
+    setCheckoutError('');
+    setMerchantName('');
+    setDescription('');
+    setSelectedCountry('');
+    setSelectedCurrency('');
+    setAmount('');
+    setUpiVpa('');
+    setConversion(null);
+  }
+
+  const loadCards = useCallback(async () => {
+    try {
+      const res = await api.cards.list();
+      const cards = res.cards || [];
+      setSavedCards(cards);
+      if (cards.length > 0) {
+        const defaultCard = cards.find(c => c.is_default) || cards[0];
+        setSelectedCardId(defaultCard.id);
+      } else {
+        setSelectedCardId('');
+      }
+    } catch (err) {
+      console.error('[Load Cards Error]:', err);
+    }
+  }, []);
 
   // Load Saved Cards on Mount
   useEffect(() => {
-    async function loadCards() {
-      try {
-        const res = await api.cards.list();
-        const cards = res.cards || [];
-        setSavedCards(cards);
-        if (cards.length > 0) {
-          const defaultCard = cards.find(c => c.is_default) || cards[0];
-          setSelectedCardId(defaultCard.id);
-        }
-      } catch (err) {
-        console.error('[Load Cards Error]:', err);
-      }
-    }
     loadCards();
-  }, []);
+  }, [loadCards]);
 
   // Update Currency when Country changes
   function handleCountryChange(countryCode) {
     setSelectedCountry(countryCode);
+    if (!countryCode) {
+      setSelectedCurrency('');
+      return;
+    }
     const country = COUNTRIES.find(c => c.code === countryCode);
     if (country) {
       setSelectedCurrency(country.currency);
@@ -98,11 +131,23 @@ export default function CheckoutPage({ setActivePage }) {
 
   // Calculate live FX rate and conversion
   useEffect(() => {
+    const parsedAmount = parseFloat(amount);
+    if (!selectedCurrency || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      const fallbackRates = { USD: 83.45, EUR: 90.80, GBP: 106.20, SGD: 62.10, AED: 22.72, CAD: 61.30, AUD: 54.80, JPY: 0.55 };
+      setConversion({
+        exchange_rate: selectedCurrency ? (fallbackRates[selectedCurrency] || 83.45) : 0,
+        converted_amount: 0,
+        markup_fee: 0,
+        original_amount: 0
+      });
+      setLoadingRates(false);
+      return;
+    }
+
     let isCancelled = false;
     async function fetchFx() {
       setLoadingRates(true);
       try {
-        const parsedAmount = parseFloat(amount) || 100;
         const res = await api.currency.convert({
           amount: parsedAmount,
           from_currency: selectedCurrency,
@@ -114,17 +159,15 @@ export default function CheckoutPage({ setActivePage }) {
       } catch (err) {
         console.warn('[FX Convert Fallback]:', err.message);
         if (!isCancelled) {
-          // Reliable local fallback rates
           const fallbackRates = { USD: 83.45, EUR: 90.80, GBP: 106.20, SGD: 62.10, AED: 22.72, CAD: 61.30, AUD: 54.80, JPY: 0.55 };
           const baseRate = fallbackRates[selectedCurrency] || 83.45;
-          const parsed = parseFloat(amount) || 100;
-          const grossInr = parsed * baseRate;
+          const grossInr = parsedAmount * baseRate;
           const markupInr = grossInr * 0.0125;
           setConversion({
             exchange_rate: baseRate,
             converted_amount: Math.round((grossInr + markupInr) * 100) / 100,
             markup_fee: Math.round(markupInr * 100) / 100,
-            original_amount: parsed
+            original_amount: parsedAmount
           });
         }
       } finally {
@@ -139,8 +182,15 @@ export default function CheckoutPage({ setActivePage }) {
     };
   }, [amount, selectedCurrency]);
 
-  const activeCountry = COUNTRIES.find(c => c.code === selectedCountry) || COUNTRIES[0];
+  const activeCountry = COUNTRIES.find(c => c.code === selectedCountry) || null;
   const activeCard = savedCards.find(c => c.id === selectedCardId);
+  const parsedCheckoutAmount = parseFloat(amount);
+  const isCheckoutReady =
+    Boolean(merchantName.trim()) &&
+    Boolean(selectedCountry) &&
+    Boolean(selectedCurrency) &&
+    !Number.isNaN(parsedCheckoutAmount) &&
+    parsedCheckoutAmount > 0;
 
   // Check if chosen payment method is valid/supported
   let methodIneligibleReason = null;
@@ -149,7 +199,7 @@ export default function CheckoutPage({ setActivePage }) {
       methodIneligibleReason = `${activeCard.issuing_bank} ${activeCard.card_type} is a domestic-only card. Overseas foreign payments are not supported on this instrument. Please select an international card or PayPal.`;
     }
   } else if (selectedMethodType === 'upi') {
-    if (!activeCountry.upiSupported) {
+    if (activeCountry && !activeCountry.upiSupported) {
       methodIneligibleReason = `UPI International is not supported for payments to ${activeCountry.name}. Active bilateral corridors include Singapore (PayNow), UAE (NeoPay), and France (Lyra).`;
     }
   }
@@ -158,6 +208,12 @@ export default function CheckoutPage({ setActivePage }) {
   async function handleConfirmPayment(e) {
     if (e) e.preventDefault();
     setCheckoutError('');
+
+    if (!isCheckoutReady) {
+      setCheckoutError('Please enter merchant name, destination country, and a valid payment amount (or click Demo Data).');
+      return;
+    }
+
     setProcessing(true);
 
     if (methodIneligibleReason) {
@@ -167,21 +223,15 @@ export default function CheckoutPage({ setActivePage }) {
     }
 
     try {
-      const parsedAmount = parseFloat(amount) || 100;
-      
-      // Determine payment payload
-      let methodData = {
-        type: selectedMethodType === 'linked_card' ? 'credit_card' : selectedMethodType,
-        token: activeCard?.token || 'tok_sim_adhoc',
-        cardholder_name: activeCard?.cardholder_name || newCardholderName || 'Alex Customer'
-      };
+      const parsedAmount = parsedCheckoutAmount;
 
       const initiateRes = await api.checkout.initiate({
         amount: parsedAmount,
         currency: selectedCurrency,
         customer_country: selectedCountry,
-        customer_email: 'customer@atlaspay.demo',
-        merchant_id: 'mer_demo_orchestration_01',
+        customer_email: merchant?.email || 'customer@atlaspay.demo',
+        merchant_id: merchant?.id || 'mer_demo_orchestration_01',
+        merchant_name: merchantName.trim(),
         payment_method: selectedMethodType === 'upi' ? 'upi' : 'credit_card',
         card_cvc: '888',
         is_vpn: false
@@ -222,13 +272,13 @@ export default function CheckoutPage({ setActivePage }) {
     setProcessing(true);
     setCheckoutError('');
     try {
-      const parsedAmount = parseFloat(amount) || 100;
+      const parsedAmount = parsedCheckoutAmount || 0;
       setTransactionReceipt({
         id: `tx_${Date.now().toString(36)}`,
         status: 'settled',
         amount: parsedAmount,
         currency: selectedCurrency,
-        amount_inr: conversion?.converted_amount || Math.round(parsedAmount * 83.45),
+        amount_inr: conversion?.converted_amount ?? Math.round(parsedAmount * 83.45),
         merchant: merchantName,
         payment_method: selectedMethodType === 'linked_card' ? `${activeCard?.issuing_bank} ${activeCard?.network}` : 'Card (3DS Verified)',
         timestamp: new Date().toISOString()
@@ -245,9 +295,9 @@ export default function CheckoutPage({ setActivePage }) {
   const currentPaymentData = {
     merchantName,
     description,
-    amount: parseFloat(amount) || 100,
-    currency: selectedCurrency,
-    country: activeCountry,
+    amount: parsedCheckoutAmount || 0,
+    currency: selectedCurrency || 'USD',
+    country: activeCountry || COUNTRIES[0],
     conversion,
     selectedMethod: {
       type: selectedMethodType,
@@ -259,19 +309,23 @@ export default function CheckoutPage({ setActivePage }) {
   // Execution Handler triggered inside the Animated Payment Modal
   async function handleExecuteModalPayment() {
     setCheckoutError('');
+    if (!isCheckoutReady) {
+      throw new Error('Please fill in Merchant Name, Destination Country, and Payment Amount (or click Demo Data).');
+    }
     if (methodIneligibleReason) {
       throw new Error(methodIneligibleReason);
     }
 
-    const parsedAmount = parseFloat(amount) || 100;
-    
+    const parsedAmount = parsedCheckoutAmount;
+
     // Initiate transaction with payment provider
     const initiateRes = await api.checkout.initiate({
       amount: parsedAmount,
       currency: selectedCurrency,
       customer_country: selectedCountry,
-      customer_email: 'customer@atlaspay.demo',
-      merchant_id: 'mer_demo_orchestration_01',
+      customer_email: merchant?.email || 'customer@atlaspay.demo',
+      merchant_id: merchant?.id || 'mer_demo_orchestration_01',
+      merchant_name: merchantName.trim(),
       payment_method: selectedMethodType === 'upi' ? 'upi' : 'credit_card',
       card_cvc: '888',
       is_vpn: false
@@ -327,13 +381,34 @@ export default function CheckoutPage({ setActivePage }) {
           </p>
         </div>
 
-        <button
-          onClick={() => setActivePage('cards')}
-          className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-[14px] border border-slate-200 dark:border-slate-700 flex items-center gap-2 cursor-pointer transition-all self-start sm:self-auto"
-        >
-          <CreditCard className="w-4 h-4 text-[#111111] dark:text-white" />
-          <span>Manage Saved Cards</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={handleLoadDemoData}
+            className="px-4 py-2.5 rounded-xl bg-black text-white dark:bg-white dark:text-black hover:opacity-90 font-semibold text-[13px] flex items-center gap-2 cursor-pointer transition-all"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Demo Data</span>
+          </button>
+          {(merchantName || description || amount || selectedCountry) && (
+            <button
+              type="button"
+              onClick={handleClearForm}
+              className="px-3.5 py-2.5 rounded-xl bg-[#F7F7F7] dark:bg-[#141414] hover:bg-[#EEEEEE] dark:hover:bg-[#1E1E1E] text-[#111111] dark:text-white font-semibold text-[13px] border border-[#DEDEDE] dark:border-[#333333] flex items-center gap-1.5 cursor-pointer transition-all"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setActivePage('cards')}
+            className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-semibold text-[13px] border border-slate-200 dark:border-slate-700 flex items-center gap-2 cursor-pointer transition-all"
+          >
+            <CreditCard className="w-4 h-4 text-[#111111] dark:text-white" />
+            <span>Manage Saved Cards</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Checkout View: Left Form + Right Summary OR Receipt View */}
@@ -460,6 +535,7 @@ export default function CheckoutPage({ setActivePage }) {
                     type="text"
                     value={merchantName}
                     onChange={(e) => setMerchantName(e.target.value)}
+                    placeholder="e.g. Coursera Inc."
                     className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
@@ -472,6 +548,7 @@ export default function CheckoutPage({ setActivePage }) {
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
+                    placeholder="e.g. Global AI & Data Science Specialization"
                     className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   />
                 </div>
@@ -499,6 +576,7 @@ export default function CheckoutPage({ setActivePage }) {
                     onChange={(e) => handleCountryChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                   >
+                    <option value="">Select destination country...</option>
                     {COUNTRIES.map((c) => (
                       <option key={c.code} value={c.code}>
                         {c.flag} {c.name} ({c.currency})
@@ -509,19 +587,20 @@ export default function CheckoutPage({ setActivePage }) {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Amount ({selectedCurrency})
+                    Amount {selectedCurrency ? `(${selectedCurrency})` : ''}
                   </label>
                   <div className="relative">
                     <input
                       type="number"
                       step="0.01"
                       min="1"
+                      placeholder="0.00"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:border-black dark:border-white"
                     />
                     <span className="absolute right-3.5 top-2.5 text-xs font-mono text-slate-400">
-                      {selectedCurrency}
+                      {selectedCurrency || '—'}
                     </span>
                   </div>
                 </div>
@@ -541,7 +620,7 @@ export default function CheckoutPage({ setActivePage }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActivePage('cards')}
+                  onClick={() => setShowAddCardModal(true)}
                   className="text-xs text-[#111111] dark:text-white hover:underline font-semibold cursor-pointer"
                 >
                   + Add Card
@@ -593,7 +672,7 @@ export default function CheckoutPage({ setActivePage }) {
                   {savedCards.length === 0 ? (
                     <div className="p-4 text-center rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-xs text-slate-400">
                       No cards linked yet.{' '}
-                      <button onClick={() => setActivePage('cards')} className="text-[#111111] dark:text-white font-bold hover:underline">
+                      <button type="button" onClick={() => setShowAddCardModal(true)} className="text-[#111111] dark:text-white font-bold hover:underline cursor-pointer">
                         Link a Card here
                       </button>
                     </div>
@@ -665,7 +744,9 @@ export default function CheckoutPage({ setActivePage }) {
                     />
                   </div>
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-[#DEDEDE] dark:border-[#222222] text-[11px] text-slate-400">
-                    Bilateral linkage active with {activeCountry.upiSupported ? `${activeCountry.name} (${activeCountry.upiRail})` : 'selected country'}.
+                    {activeCountry
+                      ? `Bilateral linkage active with ${activeCountry.upiSupported ? `${activeCountry.name} (${activeCountry.upiRail})` : 'selected country'}.`
+                      : 'Select a destination country above to verify bilateral UPI linkage.'}
                   </div>
                 </div>
               )}
@@ -709,27 +790,31 @@ export default function CheckoutPage({ setActivePage }) {
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500 dark:text-slate-400">Payment Amount:</span>
                   <span className="font-mono font-bold text-slate-800 dark:text-white">
-                    ${parseFloat(amount || 0).toFixed(2)} {selectedCurrency}
+                    {!Number.isNaN(parsedCheckoutAmount) && parsedCheckoutAmount > 0 && selectedCurrency
+                      ? `${parsedCheckoutAmount.toFixed(2)} ${selectedCurrency}`
+                      : '—'}
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500 dark:text-slate-400">Mid-Market FX Rate:</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">
-                    1 {selectedCurrency} = ₹{(conversion?.exchange_rate || 83.45).toFixed(2)} INR
+                    {selectedCurrency
+                      ? `1 ${selectedCurrency} = ₹${(conversion?.exchange_rate ?? 0).toFixed(2)} INR`
+                      : 'Select destination country'}
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500 dark:text-slate-400">Conversion Spread (1.25%):</span>
                   <span className="font-mono text-slate-700 dark:text-slate-300">
-                    ₹{(conversion?.markup_fee || 155.33).toFixed(2)} INR
+                    ₹{(conversion?.markup_fee ?? 0).toFixed(2)} INR
                   </span>
                 </div>
 
                 <div className="flex justify-between py-1">
                   <span className="text-slate-500 dark:text-slate-400">Estimated TCS / Compliance:</span>
-                  <span className="font-mono text-emerald-500 font-semibold">
+                  <span className="font-mono text-[#111111] dark:text-white font-semibold">
                     ₹0.00 (Exempt)
                   </span>
                 </div>
@@ -741,7 +826,7 @@ export default function CheckoutPage({ setActivePage }) {
                   </div>
                   <div className="text-right">
                     <span className="text-xl font-black font-mono text-[#111111] dark:text-white">
-                      ₹{(conversion?.converted_amount || 12589).toLocaleString()}
+                      ₹{(conversion?.converted_amount ?? 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
@@ -757,17 +842,25 @@ export default function CheckoutPage({ setActivePage }) {
               <button
                 type="button"
                 onClick={() => {
+                  if (!isCheckoutReady) {
+                    setCheckoutError('Please enter merchant name, destination country, and amount (or click Demo Data).');
+                    return;
+                  }
                   if (methodIneligibleReason) {
                     setCheckoutError(methodIneligibleReason);
                     return;
                   }
                   setShowPaymentModal(true);
                 }}
-                disabled={Boolean(methodIneligibleReason)}
+                disabled={!isCheckoutReady || Boolean(methodIneligibleReason)}
                 className="w-full py-3.5 rounded-xl bg-black hover:bg-[#222222] dark:bg-white dark:text-black dark:hover:bg-[#EEEEEE] text-white font-bold text-xs shadow-lg shadow-sm disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2"
               >
                 <Lock className="w-4 h-4" />
-                <span>Pay Now — ₹{(conversion?.converted_amount || 12589).toLocaleString()}</span>
+                <span>
+                  {isCheckoutReady
+                    ? `Pay Now — ₹${(conversion?.converted_amount ?? 0).toLocaleString()}`
+                    : 'Enter payment details or click Demo Data'}
+                </span>
               </button>
 
               <div className="pt-2 text-center text-[10px] text-slate-400 space-y-1">
@@ -791,6 +884,14 @@ export default function CheckoutPage({ setActivePage }) {
         onDone={() => {
           setShowPaymentModal(false);
           setTransactionReceipt(null);
+        }}
+      />
+
+      <AddCardModal
+        isOpen={showAddCardModal}
+        onClose={() => setShowAddCardModal(false)}
+        onSuccess={() => {
+          loadCards();
         }}
       />
     </div>

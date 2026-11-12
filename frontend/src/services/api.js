@@ -124,6 +124,14 @@ export const api = {
     getById: (id) => request(`/cards/${id}`)
   },
 
+  // Bank Accounts (Settlement & Payout Rails)
+  bankAccounts: {
+    list: () => request('/bank-accounts'),
+    create: (accountData) => request('/bank-accounts', { method: 'POST', body: accountData }),
+    delete: (id) => request(`/bank-accounts/${id}`, { method: 'DELETE' }),
+    setDefault: (id) => request(`/bank-accounts/${id}/default`, { method: 'PUT' })
+  },
+
   // Domestic Card & UPI International
   domesticCard: {
     checkEligibility: (payload) => request('/domestic-card/check-eligibility', { method: 'POST', body: payload }),

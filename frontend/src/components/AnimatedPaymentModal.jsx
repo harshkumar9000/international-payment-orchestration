@@ -78,19 +78,19 @@ export default function AnimatedPaymentModal({
   if (!isOpen) return null;
 
   const {
-    merchantName = 'Coursera Inc.',
-    description = 'Global Course Specialization',
-    amount = 149.00,
+    merchantName = '',
+    description = '',
+    amount = 0,
     currency = 'USD',
     country = { name: 'United States', flag: '🇺🇸', code: 'US' },
-    conversion = { exchange_rate: 83.45, converted_amount: 12589.00, markup_fee: 155.33 },
+    conversion = null,
     selectedMethod = { type: 'linked_card' }
   } = paymentData || {};
 
   const numAmount = parseFloat(amount || 0);
-  const totalInr = conversion?.converted_amount || Math.round(numAmount * (conversion?.exchange_rate || 83.45));
-  const fxRate = conversion?.exchange_rate || 83.45;
-  const markupFee = conversion?.markup_fee || (totalInr * 0.0125);
+  const fxRate = conversion?.exchange_rate ?? 83.45;
+  const totalInr = conversion?.converted_amount ?? Math.round(numAmount * fxRate);
+  const markupFee = conversion?.markup_fee ?? (totalInr * 0.0125);
 
   // Start Payment Processing Sequence
   async function triggerPaymentExecution() {

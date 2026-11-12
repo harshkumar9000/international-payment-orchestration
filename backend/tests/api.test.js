@@ -2112,6 +2112,91 @@ describe('International Payment Orchestration API Suite', () => {
         assert.ok(typeof tx.amount === 'number' || !isNaN(Number(tx.amount)), 'Transaction amount must be numeric');
       }
     });
+
+    test('8. Newly registered merchant starts with empty inventory and can link bank accounts and cards in isolation', async () => {
+      const uniqueEmail = `fresh_${Date.now()}@atlaspay.test`;
+      const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: uniqueEmail,
+          password: 'Password123!',
+          company_name: 'Fresh Empty Merchant'
+        })
+      });
+      assert.strictEqual(regRes.status, 201);
+      const regData = await regRes.json();
+      assert.ok(regData.token);
+      const authHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${regData.token}`
+      };
+
+      // 8A. Cards, bank accounts, transactions, and analytics must all be completely empty (0)
+      const [cardsRes, banksRes, txRes, metricsRes, chartRes] = await Promise.all([
+        fetch(`${BASE_URL}/api/cards`, { headers: authHeaders }),
+        fetch(`${BASE_URL}/api/bank-accounts`, { headers: authHeaders }),
+        fetch(`${BASE_URL}/api/transactions`, { headers: authHeaders }),
+        fetch(`${BASE_URL}/api/analytics/metrics`, { headers: authHeaders }),
+        fetch(`${BASE_URL}/api/analytics/volume-chart`, { headers: authHeaders })
+      ]);
+
+      const cardsData = await cardsRes.json();
+      const banksData = await banksRes.json();
+      const txData = await txRes.json();
+      const metricsData = await metricsRes.json();
+      const chartData = await chartRes.json();
+
+      assert.strictEqual(cardsData.cards.length, 0);
+      assert.strictEqual(banksData.bank_accounts.length, 0);
+      assert.strictEqual(txData.transactions.length, 0);
+      assert.strictEqual(metricsData.total_volume_usd, 0);
+      assert.strictEqual(metricsData.total_transactions, 0);
+      assert.strictEqual(metricsData.settled_transactions, 0);
+      assert.strictEqual(metricsData.failed_transactions, 0);
+      assert.strictEqual(metricsData.conversion_rate_percent, 0);
+      assert.deepStrictEqual(chartData.volumes, [0, 0, 0, 0, 0, 0, 0]);
+      assert.deepStrictEqual(chartData.transactions_count, [0, 0, 0, 0, 0, 0, 0]);
+
+      // 8B. Link a bank account securely with masking & tokenization
+      const linkBankRes = await fetch(`${BASE_URL}/api/bank-accounts`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          account_holder_name: 'Fresh Empty Merchant',
+          bank_name: 'HDFC Bank',
+          account_number: '501002394812',
+          routing_code: 'HDFC0000240',
+          account_type: 'current',
+          currency: 'INR',
+          country: 'IN'
+        })
+      });
+      assert.strictEqual(linkBankRes.status, 201);
+      const linkedBank = await linkBankRes.json();
+      assert.strictEqual(linkedBank.success, true);
+      assert.strictEqual(linkedBank.bank_account.last_four, '4812');
+      assert.strictEqual(linkedBank.bank_account.account_number_masked, '•••• •••• 4812');
+      assert.strictEqual(linkedBank.bank_account.account_number, undefined);
+      assert.strictEqual(linkedBank.bank_account.is_default, true);
+      assert.ok(linkedBank.bank_account.token.startsWith('ba_sim_'));
+
+      // Verify demo account does NOT see this merchant's bank account
+      const demoBanksRes = await fetch(`${BASE_URL}/api/bank-accounts`);
+      const demoBanksData = await demoBanksRes.json();
+      assert.ok(!demoBanksData.bank_accounts.some(b => b.id === linkedBank.bank_account.id));
+
+      // Verify fresh merchant DOES see it and can unlink it
+      const freshBanksRes = await fetch(`${BASE_URL}/api/bank-accounts`, { headers: authHeaders });
+      const freshBanksData = await freshBanksRes.json();
+      assert.strictEqual(freshBanksData.bank_accounts.length, 1);
+
+      const delBankRes = await fetch(`${BASE_URL}/api/bank-accounts/${linkedBank.bank_account.id}`, {
+        method: 'DELETE',
+        headers: authHeaders
+      });
+      assert.strictEqual(delBankRes.status, 200);
+    });
   });
 });
 

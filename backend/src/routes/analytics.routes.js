@@ -6,7 +6,8 @@ const { optionalAuth } = require('../middleware/auth.middleware');
 // GET /metrics
 router.get('/metrics', optionalAuth, async (req, res) => {
   try {
-    const transactions = await db.table('transactions').find();
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    const transactions = await db.table('transactions').find(t => t.merchant_id === merchantId);
 
     const totalCount = transactions.length;
     const settled = transactions.filter(t => t.status === 'settled' || t.status === 'recovered');
@@ -30,7 +31,7 @@ router.get('/metrics', optionalAuth, async (req, res) => {
 
     const conversionRate = totalCount > 0
       ? Math.round((settled.length / totalCount) * 1000) / 10
-      : 96.4;
+      : 0;
 
     // Smart routing savings: difference between typical naive 3.5% + $0.50 fee and optimized fees
     let totalActualFees = 0;
@@ -43,7 +44,7 @@ router.get('/metrics', optionalAuth, async (req, res) => {
 
     const fraudBlockedRate = totalCount > 0
       ? Math.round((blocked.length / totalCount) * 1000) / 10
-      : 3.2;
+      : 0;
 
     res.json({
       total_volume_usd: Math.round(totalVolumeUsd * 100) / 100,
@@ -64,10 +65,45 @@ router.get('/metrics', optionalAuth, async (req, res) => {
 // GET /volume-chart
 router.get('/volume-chart', optionalAuth, async (req, res) => {
   try {
-    // Return volume timeline grouped by recent periods
-    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const volumes = [12400, 18500, 24100, 19800, 31200, 28900, 36400];
-    const transactionsCount = [45, 62, 88, 71, 114, 98, 132];
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    const transactions = await db.table('transactions').find(t => t.merchant_id === merchantId);
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const labels = [];
+    const volumes = [];
+    const transactionsCount = [];
+    const dateKeys = [];
+
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      dateKeys.push(`${yyyy}-${mm}-${dd}`);
+      labels.push(dayNames[d.getDay()]);
+      volumes.push(0);
+      transactionsCount.push(0);
+    }
+
+    for (const tx of transactions) {
+      if (!tx.created_at) continue;
+      const d = new Date(tx.created_at);
+      if (Number.isNaN(d.getTime())) continue;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const key = `${yyyy}-${mm}-${dd}`;
+      const idx = dateKeys.indexOf(key);
+      if (idx !== -1) {
+        transactionsCount[idx] += 1;
+        if (tx.status === 'settled' || tx.status === 'recovered') {
+          volumes[idx] = Math.round((volumes[idx] + (parseFloat(tx.amount) || 0)) * 100) / 100;
+        }
+      }
+    }
 
     res.json({
       labels,
@@ -82,7 +118,8 @@ router.get('/volume-chart', optionalAuth, async (req, res) => {
 // GET /corridors
 router.get('/corridors', optionalAuth, async (req, res) => {
   try {
-    const transactions = await db.table('transactions').find();
+    const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
+    const transactions = await db.table('transactions').find(t => t.merchant_id === merchantId);
     const currencyMap = {};
     const countryMap = {};
 

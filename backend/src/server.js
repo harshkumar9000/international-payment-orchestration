@@ -32,6 +32,7 @@ const agenticRefundRoutes = require('./routes/agenticRefund.routes');
 const studentRoutes = require('./routes/student.routes');
 const guardianRoutes = require('./routes/guardian.routes');
 const cardsRoutes = require('./routes/cards.routes');
+const bankAccountsRoutes = require('./routes/bankAccounts.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -149,6 +150,7 @@ app.use('/api/agentic-refund', agenticRefundRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/guardian', guardianRoutes);
 app.use('/api/cards', cardsRoutes);
+app.use('/api/bank-accounts', bankAccountsRoutes);
 
 // Health Check Endpoint
 app.get('/api/health', async (req, res) => {
