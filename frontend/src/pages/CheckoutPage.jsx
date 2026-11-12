@@ -991,11 +991,18 @@ export default function CheckoutPage({ setActivePage }) {
                   </span>
                 </div>
 
-                <div className="flex justify-between py-1">
+                <div className="flex justify-between py-1 items-center">
                   <span className="text-slate-500 dark:text-slate-400">Mid-Market FX Rate:</span>
-                  <span className="font-mono text-slate-700 dark:text-slate-300">
-                    {formatFxRateDisplay(conversion, selectedCurrency, loadingRates)}
-                  </span>
+                  <div className="text-right">
+                    <span className="font-mono text-slate-700 dark:text-slate-300 block">
+                      {formatFxRateDisplay(conversion, selectedCurrency, loadingRates)}
+                    </span>
+                    {(conversion?.is_demo_mode || conversion?.fx_metadata?.is_demo_mode || (!conversion?.fx_metadata?.is_live && conversion?.exchange_rate)) && (
+                      <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-500 uppercase">
+                        DEMO FX RATE — SIMULATED
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex justify-between py-1">

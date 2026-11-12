@@ -306,11 +306,18 @@ export default function AnimatedPaymentModal({
 
             {/* Price & Exchange Rate Breakdown Table */}
             <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 divide-y divide-slate-800/70 text-xs">
-              <div className="flex justify-between py-2">
+              <div className="flex justify-between py-2 items-center">
                 <span className="text-slate-400">Exchange Rate:</span>
-                <span className="font-mono text-slate-200">
-                  {fxRate !== null ? `1 ${currency} = ₹${fxRate.toFixed(2)} INR` : 'FX rate unavailable'}
-                </span>
+                <div className="text-right">
+                  <span className="font-mono text-slate-200 block">
+                    {fxRate !== null ? `1 ${currency} = ₹${fxRate.toFixed(2)} INR` : 'FX rate unavailable'}
+                  </span>
+                  {(conversion?.is_demo_mode || conversion?.fx_metadata?.is_demo_mode || (!conversion?.fx_metadata?.is_live && fxRate !== null)) && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 uppercase">
+                      DEMO FX RATE — SIMULATED
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex justify-between py-2">
                 <span className="text-slate-400">Conversion Spread (1.25%):</span>
@@ -689,6 +696,20 @@ export default function AnimatedPaymentModal({
                   <span>{transactionResult?.id || 'tx_atlas_demo_01'}</span>
                   {copiedTxId ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                 </button>
+              </div>
+
+              <div className="flex justify-between items-center py-2">
+                <span className="text-slate-400">FX Settlement:</span>
+                <div className="text-right">
+                  <span className="font-mono text-slate-200 block">
+                    {fxRate !== null ? `1 ${currency} = ₹${fxRate.toFixed(2)} INR` : 'Standard'}
+                  </span>
+                  {(conversion?.is_demo_mode || conversion?.fx_metadata?.is_demo_mode || (!conversion?.fx_metadata?.is_live && fxRate !== null)) && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wider bg-amber-500/10 border border-amber-500/30 text-amber-400 uppercase">
+                      DEMO FX RATE — SIMULATED
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-between py-2">

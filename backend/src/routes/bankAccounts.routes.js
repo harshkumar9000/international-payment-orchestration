@@ -16,12 +16,43 @@ router.use(optionalAuth);
 router.get('/', async (req, res) => {
   try {
     const merchantId = req.merchant?.id || 'mer_demo_orchestration_01';
-    const accounts = await db.table('bank_accounts').find(a => a.merchant_id === merchantId);
+    let accounts;
+    try {
+      accounts = await db.table('bank_accounts').find(a => a.merchant_id === merchantId);
+    } catch (queryErr) {
+      const msg = queryErr.message || '';
+
+      // Missing table / migration not yet applied — not a live connectivity failure
+      const isTableMissing =
+        msg.includes('does not exist') ||
+        msg.includes('relation') ||
+        msg.includes('uninitialized') ||
+        msg.includes('migration');
+
+      if (isTableMissing) {
+        console.warn('⚠️ [Bank Accounts] Table not yet migrated — run migration 004_add_bank_accounts.sql:', msg);
+        return res.status(503).json({
+          error: 'Bank accounts table is not yet available. Please apply migration 004_add_bank_accounts.sql.',
+          code: 'BANK_ACCOUNTS_TABLE_MISSING'
+        });
+      }
+
+      // Any other error is a genuine DB connectivity / runtime failure
+      console.error('❌ [Bank Accounts] Database error:', msg);
+      return res.status(503).json({
+        error: 'Bank accounts service is temporarily unavailable. Please try again later.',
+        code: 'BANK_ACCOUNTS_DB_UNAVAILABLE'
+      });
+    }
+
+    if (!Array.isArray(accounts)) {
+      accounts = [];
+    }
 
     accounts.sort((a, b) => {
       if (a.is_default && !b.is_default) return -1;
       if (!a.is_default && b.is_default) return 1;
-      return new Date(b.created_at) - new Date(a.created_at);
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     });
 
     res.json({

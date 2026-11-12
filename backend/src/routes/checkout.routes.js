@@ -261,11 +261,14 @@ router.post('/process', optionalAuth, async (req, res) => {
     }
 
     // Guard against executing live payment processing when FX is simulated in production
+    // Permit simulated FX rates on Vercel only when DEMO_MODE=true and PAYPAL_ENV=sandbox
     if (currencyService.isProductionOrLivePayment() && !currencyService.isLiveFx()) {
-      return res.status(503).json({
-        error: 'Production payment blocked: FX service is running in simulated mode. Live payment processing requires a verified live FX market feed.',
-        code: 'FX_SIMULATED_IN_PRODUCTION_BLOCKED'
-      });
+      if (!currencyService.isDemoModeAllowed()) {
+        return res.status(503).json({
+          error: 'Production payment blocked: FX service is running in simulated mode. Live payment processing requires a verified live FX market feed.',
+          code: 'FX_SIMULATED_IN_PRODUCTION_BLOCKED'
+        });
+      }
     }
 
     const metadata = typeof tx.metadata_json === 'string' ? JSON.parse(tx.metadata_json || '{}') : (tx.metadata_json || {});

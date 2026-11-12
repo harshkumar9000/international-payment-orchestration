@@ -87,6 +87,18 @@ function isLiveFx() {
   return process.env.FX_IS_LIVE === 'true';
 }
 
+function isDemoModeAllowed() {
+  const isDemo = (process.env.DEMO_MODE || '').toLowerCase() === 'true';
+  const paypalEnv = (process.env.PAYPAL_ENV || 'sandbox').toLowerCase();
+  const paymentMode = (process.env.PAYMENT_MODE || '').toLowerCase();
+
+  // Explicit Hackathon Demo Mode:
+  // Permitted on Vercel / Production ONLY when DEMO_MODE=true and PAYPAL_ENV=sandbox.
+  // Never enable PayPal Live through demo mode.
+  // If payment mode is live or paypal env is live, demo mode is strictly disallowed.
+  return isDemo && paypalEnv === 'sandbox' && paymentMode !== 'live';
+}
+
 function getDecimals(currency) {
   return ZERO_DECIMAL_CURRENCIES.has((currency || '').toUpperCase()) ? 0 : 2;
 }
@@ -98,16 +110,22 @@ function getDecimals(currency) {
 function getRates() {
   const isStale = isRateStale();
   const isUnavailable = isRatesUnavailable();
-  const isLive = process.env.FX_IS_LIVE === 'true';
+  const isLive = isLiveFx();
+  const isDemo = isDemoModeAllowed();
 
   return {
     base: 'USD',
     rates: isUnavailable ? {} : { ...MARKET_FX_RATES },
     symbols: CURRENCY_SYMBOLS,
-    source: isLive ? 'interbank_live_feed' : 'simulated_market_feed',
+    source: isLive ? 'interbank_live_feed' : (isDemo ? 'demo_simulated_market_feed' : 'simulated_market_feed'),
     is_live: isLive,
+    is_demo_mode: isDemo,
     mode: isLive ? 'live' : 'simulated',
-    provider: isLive ? 'Live Interbank Multi-Bank FX Feed' : 'ATLAS.PAY Simulated Market Feed (Dev/Test)',
+    rate_type: isDemo ? 'DEMO FX RATE — SIMULATED' : (isLive ? 'LIVE MARKET RATE' : 'SIMULATED FX RATE'),
+    label: isDemo ? 'DEMO FX RATE — SIMULATED' : (isLive ? 'LIVE INTERBANK RATE' : 'SIMULATED MARKET RATE'),
+    provider: isLive
+      ? 'Live Interbank Multi-Bank FX Feed'
+      : (isDemo ? 'ATLAS.PAY Hackathon Demo Feed (DEMO FX RATE — SIMULATED)' : 'ATLAS.PAY Simulated Market Feed (Dev/Test)'),
     last_updated: ratesUpdatedAt.toISOString(),
     cache_ttl_ms: CACHE_TTL_MS,
     max_stale_age_ms: MAX_STALE_AGE_MS,
@@ -141,11 +159,14 @@ function convertAmount(amount, fromCurrency, toCurrency, markupPercentage = 1.25
   }
 
   // Production safety: block live payment processing when FX feed is in simulated mode
+  // Permit simulated FX rates on Vercel only when DEMO_MODE=true and PAYPAL_ENV=sandbox
   if (isProductionOrLivePayment() && !isLiveFx()) {
-    const err = new Error('Production payment blocked: FX service is running in simulated mode. Live payment processing requires a verified live FX market feed.');
-    err.status = 503;
-    err.code = 'FX_SIMULATED_IN_PRODUCTION_BLOCKED';
-    throw err;
+    if (!isDemoModeAllowed()) {
+      const err = new Error('Production payment blocked: FX service is running in simulated mode. Live payment processing requires a verified live FX market feed.');
+      err.status = 503;
+      err.code = 'FX_SIMULATED_IN_PRODUCTION_BLOCKED';
+      throw err;
+    }
   }
 
   // 2. Reject unsupported/missing currencies without fabricated fallbacks
@@ -179,7 +200,8 @@ function convertAmount(amount, fromCurrency, toCurrency, markupPercentage = 1.25
   const decimals = getDecimals(toCurrency);
   const roundedAmount = Number(finalTargetAmount.toFixed(decimals));
   const markupAmount = Number((finalTargetAmount - baseTargetAmount).toFixed(decimals));
-  const isLive = process.env.FX_IS_LIVE === 'true';
+  const isLive = isLiveFx();
+  const isDemo = isDemoModeAllowed();
 
   return {
     from_currency: fromCurrency,
@@ -196,11 +218,20 @@ function convertAmount(amount, fromCurrency, toCurrency, markupPercentage = 1.25
     decimals: decimals,
     timestamp: new Date().toISOString(),
     is_stale: false,
+    is_live: isLive,
+    is_demo_mode: isDemo,
+    rate_type: isDemo ? 'DEMO FX RATE — SIMULATED' : (isLive ? 'LIVE MARKET RATE' : 'SIMULATED FX RATE'),
+    label: isDemo ? 'DEMO FX RATE — SIMULATED' : (isLive ? 'LIVE INTERBANK RATE' : 'SIMULATED MARKET RATE'),
     fx_metadata: {
-      source: isLive ? 'interbank_live_feed' : 'simulated_market_feed',
+      source: isLive ? 'interbank_live_feed' : (isDemo ? 'demo_simulated_market_feed' : 'simulated_market_feed'),
       is_live: isLive,
+      is_demo_mode: isDemo,
       mode: isLive ? 'live' : 'simulated',
-      provider: isLive ? 'Live Interbank Multi-Bank FX Feed' : 'ATLAS.PAY Simulated Market Feed (Dev/Test)',
+      rate_type: isDemo ? 'DEMO FX RATE — SIMULATED' : (isLive ? 'LIVE MARKET RATE' : 'SIMULATED FX RATE'),
+      label: isDemo ? 'DEMO FX RATE — SIMULATED' : (isLive ? 'LIVE INTERBANK RATE' : 'SIMULATED MARKET RATE'),
+      provider: isLive
+        ? 'Live Interbank Multi-Bank FX Feed'
+        : (isDemo ? 'ATLAS.PAY Hackathon Demo Feed (DEMO FX RATE — SIMULATED)' : 'ATLAS.PAY Simulated Market Feed (Dev/Test)'),
       last_updated: ratesUpdatedAt.toISOString(),
       is_stale: false
     }
@@ -229,6 +260,7 @@ module.exports = {
   CURRENCY_SYMBOLS,
   isProductionOrLivePayment,
   isLiveFx,
+  isDemoModeAllowed,
   setMockStaleForTesting,
   setMockUnavailableForTesting,
   setRatesUpdatedAtForTesting

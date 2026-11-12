@@ -3526,6 +3526,289 @@ describe('International Payment Orchestration API Suite', () => {
       assert.ok(sql.includes('CREATE INDEX IF NOT EXISTS idx_processed_webhooks_provider_event'));
       assert.ok(sql.includes('CREATE INDEX IF NOT EXISTS idx_processed_webhooks_processed_at'));
     });
+
+    // Priority 6 — Hackathon Demo Mode & Bank Accounts Resiliency Suite
+    test('19. DEMO_MODE allows simulated FX in production only with PAYPAL_ENV=sandbox', async () => {
+      const origNodeEnv = process.env.NODE_ENV;
+      const origDemo = process.env.DEMO_MODE;
+      const origPaypalEnv = process.env.PAYPAL_ENV;
+      const origLive = process.env.FX_IS_LIVE;
+
+      try {
+        process.env.NODE_ENV = 'production';
+        process.env.FX_IS_LIVE = 'false';
+        process.env.DEMO_MODE = 'true';
+        process.env.PAYPAL_ENV = 'sandbox';
+
+        // 1. With DEMO_MODE=true and PAYPAL_ENV=sandbox on Vercel, conversion is permitted
+        const convertRes = await fetch(`${BASE_URL}/api/currency/convert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 100,
+            from_currency: 'USD',
+            to_currency: 'EUR'
+          })
+        });
+        assert.strictEqual(convertRes.status, 200);
+        const convertData = await convertRes.json();
+        assert.ok(convertData.converted_amount > 0);
+        assert.strictEqual(convertData.is_demo_mode, true);
+
+        // 2. Checkout initiate is also permitted in demo mode
+        const checkoutRes = await fetch(`${BASE_URL}/api/checkout/initiate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 50,
+            currency: 'USD',
+            customer_country: 'US'
+          })
+        });
+        assert.strictEqual(checkoutRes.status, 200);
+
+        // 3. But if PAYPAL_ENV=live, demo mode is strictly disallowed and blocks simulated FX
+        process.env.PAYPAL_ENV = 'live';
+        const liveBlockRes = await fetch(`${BASE_URL}/api/currency/convert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 100,
+            from_currency: 'USD',
+            to_currency: 'EUR'
+          })
+        });
+        assert.strictEqual(liveBlockRes.status, 503);
+        const liveBlockData = await liveBlockRes.json();
+        assert.strictEqual(liveBlockData.code, 'FX_SIMULATED_IN_PRODUCTION_BLOCKED');
+      } finally {
+        if (origNodeEnv !== undefined) process.env.NODE_ENV = origNodeEnv;
+        else delete process.env.NODE_ENV;
+        if (origDemo !== undefined) process.env.DEMO_MODE = origDemo;
+        else delete process.env.DEMO_MODE;
+        if (origPaypalEnv !== undefined) process.env.PAYPAL_ENV = origPaypalEnv;
+        else delete process.env.PAYPAL_ENV;
+        if (origLive !== undefined) process.env.FX_IS_LIVE = origLive;
+        else delete process.env.FX_IS_LIVE;
+      }
+    });
+
+    test('20. DEMO_MODE=false blocks simulated FX in production', async () => {
+      const origEnv = process.env.NODE_ENV;
+      const origDemo = process.env.DEMO_MODE;
+      const origLive = process.env.FX_IS_LIVE;
+
+      try {
+        process.env.NODE_ENV = 'production';
+        process.env.FX_IS_LIVE = 'false';
+        process.env.DEMO_MODE = 'false';
+
+        const res = await fetch(`${BASE_URL}/api/currency/convert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 100,
+            from_currency: 'USD',
+            to_currency: 'EUR'
+          })
+        });
+
+        assert.strictEqual(res.status, 503);
+        const data = await res.json();
+        assert.strictEqual(data.code, 'FX_SIMULATED_IN_PRODUCTION_BLOCKED');
+      } finally {
+        if (origEnv !== undefined) process.env.NODE_ENV = origEnv;
+        else delete process.env.NODE_ENV;
+        if (origDemo !== undefined) process.env.DEMO_MODE = origDemo;
+        else delete process.env.DEMO_MODE;
+        if (origLive !== undefined) process.env.FX_IS_LIVE = origLive;
+        else delete process.env.FX_IS_LIVE;
+      }
+    });
+
+    test('21. Demo FX response clearly identifies simulated mode and preserves exact conversion & spread', async () => {
+      const origDemo = process.env.DEMO_MODE;
+      const origPaypalEnv = process.env.PAYPAL_ENV;
+      const origLive = process.env.FX_IS_LIVE;
+
+      try {
+        process.env.DEMO_MODE = 'true';
+        process.env.PAYPAL_ENV = 'sandbox';
+        process.env.FX_IS_LIVE = 'false';
+
+        const convertRes = await fetch(`${BASE_URL}/api/currency/convert`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 2344.37,
+            from_currency: 'USD',
+            to_currency: 'INR',
+            custom_markup: 1.25
+          })
+        });
+
+        assert.strictEqual(convertRes.status, 200);
+        const data = await convertRes.json();
+
+        // Must never pretend simulated rate is live
+        assert.strictEqual(data.is_live, false);
+        assert.strictEqual(data.is_demo_mode, true);
+        assert.strictEqual(data.rate_type, 'DEMO FX RATE — SIMULATED');
+        assert.strictEqual(data.label, 'DEMO FX RATE — SIMULATED');
+        assert.strictEqual(data.fx_metadata.is_live, false);
+        assert.strictEqual(data.fx_metadata.mode, 'simulated');
+        assert.strictEqual(data.fx_metadata.label, 'DEMO FX RATE — SIMULATED');
+
+        // Preserves exact conversion math: $2,344.37 USD -> ₹205,204.17 INR with 1.25% spread
+        assert.strictEqual(data.converted_amount, 205204.17);
+        assert.strictEqual(data.mid_market_rate, 86.45);
+        assert.strictEqual(data.markup_amount, 2533.38);
+
+        // Check /rates endpoint in demo mode
+        const ratesRes = await fetch(`${BASE_URL}/api/currency/rates`);
+        assert.strictEqual(ratesRes.status, 200);
+        const ratesData = await ratesRes.json();
+        assert.strictEqual(ratesData.is_live, false);
+        assert.strictEqual(ratesData.is_demo_mode, true);
+        assert.strictEqual(ratesData.label, 'DEMO FX RATE — SIMULATED');
+      } finally {
+        if (origDemo !== undefined) process.env.DEMO_MODE = origDemo;
+        else delete process.env.DEMO_MODE;
+        if (origPaypalEnv !== undefined) process.env.PAYPAL_ENV = origPaypalEnv;
+        else delete process.env.PAYPAL_ENV;
+        if (origLive !== undefined) process.env.FX_IS_LIVE = origLive;
+        else delete process.env.FX_IS_LIVE;
+      }
+    });
+
+    test('22. PayPal order still uses USD and never receives the INR estimate in demo mode', async () => {
+      const origDemo = process.env.DEMO_MODE;
+      const origPaypalEnv = process.env.PAYPAL_ENV;
+
+      try {
+        process.env.DEMO_MODE = 'true';
+        process.env.PAYPAL_ENV = 'sandbox';
+
+        const txId = `tx_pp_demo_usd_${Date.now()}`;
+        const res = await fetch(`${BASE_URL}/api/paypal/create-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: 2344.37,
+            currency: 'USD',
+            customer_country: 'US',
+            customer_email: 'buyer@example.com',
+            transaction_id: txId
+          })
+        });
+
+        assert.strictEqual(res.status, 200);
+        const data = await res.json();
+        assert.strictEqual(parseFloat(data.amount), 2344.37);
+        assert.strictEqual(data.currency, 'USD');
+        assert.notStrictEqual(parseFloat(data.amount), 205204.17);
+
+        // Verify stored transaction in DB
+        const tx = await db.table('transactions').findById(txId);
+        assert.ok(tx);
+        assert.strictEqual(parseFloat(tx.amount), 2344.37);
+        assert.strictEqual(tx.currency, 'USD');
+      } finally {
+        if (origDemo !== undefined) process.env.DEMO_MODE = origDemo;
+        else delete process.env.DEMO_MODE;
+        if (origPaypalEnv !== undefined) process.env.PAYPAL_ENV = origPaypalEnv;
+        else delete process.env.PAYPAL_ENV;
+      }
+    });
+
+    test('23. Bank accounts endpoint returns correct responses for each scenario', async () => {
+      // --- Scenario A: Successful query with zero accounts (HTTP 200) ---
+      const res = await fetch(`${BASE_URL}/api/bank-accounts`, {
+        headers: {
+          'x-merchant-id': 'mer_unlinked_demo_999'
+        }
+      });
+
+      assert.strictEqual(res.status, 200);
+      const data = await res.json();
+      assert.strictEqual(data.success, true);
+      assert.ok(Array.isArray(data.bank_accounts));
+      // For this isolated merchant, no bank accounts should exist
+      const accountsForMerchant = data.bank_accounts.filter(a => a.merchant_id === 'mer_unlinked_demo_999');
+      assert.strictEqual(accountsForMerchant.length, 0);
+
+      // --- Scenario B: Missing bank_accounts table → HTTP 503 (not 200, not 500) ---
+      // Mock db.table itself so the route handler gets the stubbed object on its fresh call
+      const origDbTable = db.table.bind(db);
+      try {
+        db.table = (name) => {
+          if (name === 'bank_accounts') {
+            return {
+              find: async () => { throw new Error('relation "bank_accounts" does not exist'); },
+              findById: origDbTable(name).findById,
+              insert: origDbTable(name).insert,
+              update: origDbTable(name).update,
+              delete: origDbTable(name).delete,
+            };
+          }
+          return origDbTable(name);
+        };
+
+        const missingTableRes = await fetch(`${BASE_URL}/api/bank-accounts`);
+        assert.strictEqual(missingTableRes.status, 503, 'Missing table must return HTTP 503, not 200 or 500');
+        const missingTableData = await missingTableRes.json();
+        assert.strictEqual(missingTableData.code, 'BANK_ACCOUNTS_TABLE_MISSING');
+        assert.ok(typeof missingTableData.error === 'string');
+      } finally {
+        db.table = origDbTable;
+      }
+
+      // --- Scenario C: Generic DB connectivity failure → HTTP 503 ---
+      const origDbTable2 = db.table.bind(db);
+      try {
+        db.table = (name) => {
+          if (name === 'bank_accounts') {
+            return {
+              find: async () => { throw new Error('connection refused: ECONNREFUSED 127.0.0.1:5432'); },
+              findById: origDbTable2(name).findById,
+              insert: origDbTable2(name).insert,
+              update: origDbTable2(name).update,
+              delete: origDbTable2(name).delete,
+            };
+          }
+          return origDbTable2(name);
+        };
+
+        const dbDownRes = await fetch(`${BASE_URL}/api/bank-accounts`);
+        assert.strictEqual(dbDownRes.status, 503, 'DB connectivity failure must return HTTP 503');
+        const dbDownData = await dbDownRes.json();
+        assert.strictEqual(dbDownData.code, 'BANK_ACCOUNTS_DB_UNAVAILABLE');
+      } finally {
+        db.table = origDbTable2;
+      }
+    });
+
+    test('24. Migration 004_add_bank_accounts.sql exists and defines idempotent schema', () => {
+      const migrationPath = path.join(__dirname, '..', 'src', 'db', 'migrations', '004_add_bank_accounts.sql');
+      assert.ok(fs.existsSync(migrationPath), 'Migration 004 file must exist');
+
+      const sql = fs.readFileSync(migrationPath, 'utf8');
+      assert.ok(sql.includes('CREATE TABLE IF NOT EXISTS bank_accounts'));
+      assert.ok(sql.includes('id VARCHAR(64) PRIMARY KEY'));
+      assert.ok(sql.includes('merchant_id VARCHAR(64) NOT NULL'));
+      assert.ok(sql.includes('account_holder_name VARCHAR(255) NOT NULL'));
+      assert.ok(sql.includes('bank_name VARCHAR(128) NOT NULL'));
+      assert.ok(sql.includes('account_number_masked VARCHAR(64) NOT NULL'));
+      assert.ok(sql.includes('last_four VARCHAR(4) NOT NULL'));
+      assert.ok(sql.includes('routing_code VARCHAR(32) NOT NULL'));
+      assert.ok(sql.includes('account_type VARCHAR(32)'));
+      assert.ok(sql.includes('currency VARCHAR(8)'));
+      assert.ok(sql.includes('country VARCHAR(8)'));
+      assert.ok(sql.includes('verification_status VARCHAR(32)'));
+      assert.ok(sql.includes('is_default BOOLEAN'));
+      assert.ok(sql.includes('token VARCHAR(128)'));
+      assert.ok(sql.includes('CREATE INDEX IF NOT EXISTS idx_bank_accounts_merchant'));
+    });
   });
 });
 
